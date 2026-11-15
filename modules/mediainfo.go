@@ -192,7 +192,7 @@ func createTelegraphPage(title, htmlContent string) (string, error) {
 	postData := url.Values{}
 	postData.Set("access_token", "d3b25feccb89e508a9114afb82aa421fe2a9712b963b387cc62ac036ee2b")
 	postData.Set("title", title)
-	postData.Set("author_name", "AZML-Go")
+	postData.Set("author_name", "MediaInfo")
 	postData.Set("author_url", "https://t.me/TJ_Bots")
 
 	contentNodes := []telegraphNode{

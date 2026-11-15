@@ -332,10 +332,12 @@ func (m *YtdlModule) processYtdl(peer tg.InputPeerClass, msg *types.MessageConte
 
 	botUser := telegram.CurrentBotUsername
 	if botUser == "" {
-		botUser = "Yukiileechrrbot"
+		botUser = ""
 	}
 	finishBtn := telegram.NewButtonMaker()
-	finishBtn.UButtonStyled("◈ "+telegram.ToSmallCaps("View in Bot PM"), fmt.Sprintf("https://t.me/%s", botUser), "primary")
+	if botUser != "" {
+		finishBtn.UButtonStyled("View in Bot PM", fmt.Sprintf("https://t.me/%s", botUser), "primary")
+	}
 
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, sb.String(), msg.MessageID, finishBtn, 1)
 

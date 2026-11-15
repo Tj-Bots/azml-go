@@ -85,7 +85,7 @@ var configVarKeys = []string{
 }
 
 var defaultVarValues = map[string]string{
-	"OWNER_USERNAME":               "exe_aquib",
+	"OWNER_USERNAME":               "",
 	"USER_SESSION_STRING":          "",
 	"DUMP_CHAT_ID":                 "0",
 	"LEECH_LOG_ID":                 "0",

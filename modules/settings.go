@@ -1232,7 +1232,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 	case "edit_lmeta":
 		ext.SetPendingSettingSession(targetUID, "lmeta", 0, msgID, 60*time.Second)
 		prompt := "㊂ <b><u>Set Video Leech Metadata</u></b>\n\n" +
-			"Send metadata text within <b>60 seconds</b> (e.g. <code>Encoded by TBX TEAM</code>):"
+			"Send metadata text within <b>60 seconds</b> (e.g. <code>Encoded by MyChannel</code>):"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lmeta", u.UserID), "danger")
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")

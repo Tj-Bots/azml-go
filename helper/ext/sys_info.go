@@ -487,7 +487,7 @@ func RenderSysStats() string {
 // RenderRepoStats produces the exact Python REPO_STATS theme output
 func RenderRepoStats() string {
 	lastCommit := "N/A"
-	changeLog := "<code>Latest updates and improvements</code> <b>By</b> AZML"
+	changeLog := "<code>Latest updates and improvements</code>"
 
 	// Try reading git log
 	cmdCommit := exec.Command("git", "log", "-1", "--pretty=format:%cd ( %cr )", "--date=format-local:%d/%m/%Y")

@@ -152,9 +152,10 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 const homepageHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
+    <style>*{-webkit-tap-highlight-color:transparent}</style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AZML-Go | Next Gen Leech Engine</title>
+    <title>Leech Bot</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Exo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -242,16 +243,15 @@ const homepageHTML = `<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <img class="logo" src="https://graph.org/file/1a6ad157f55bc42b548df.png" alt="AZML Logo">
-        <div><span class="version">AZML-Go Pure Edition</span></div>
-        <h1>AZML</h1>
-        <p class="subtitle">Next generation high-speed workflow automation powered by Go</p>
+        <img class="logo" src="https://raw.githubusercontent.com/Tj-Bots/Leech-TJ/wzgram/docs/logo.png" alt="Logo">
+        <h1>Leech Bot</h1>
+        <p class="subtitle">Fast Telegram Leech &amp; Mirror bot</p>
         <div class="links">
             <a href="https://t.me/TJ_Bots" target="_blank" class="button">
                 <i class="fab fa-telegram-plane"></i> Telegram Channel
             </a>
         </div>
-        <p class="copyright">&copy; 2026 AZML-Go. All rights reserved.</p>
+        <p class="copyright">&copy; TJ Bots</p>
     </div>
 </body>
 </html>`
@@ -259,9 +259,10 @@ const homepageHTML = `<!DOCTYPE html>
 const codePageHTML = `<!DOCTYPE html>
 <html class="dark" lang="en">
 <head>
+    <style>*{-webkit-tap-highlight-color:transparent}</style>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Security Access - AZML Selector</title>
+    <title>Security Access - File Selector</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -304,10 +305,11 @@ const codePageHTML = `<!DOCTYPE html>
 const pageHTML = `<!DOCTYPE html>
 <html class="dark" lang="en">
 <head>
+    <style>*{-webkit-tap-highlight-color:transparent}</style>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AZML File Selector</title>
-    <link rel="icon" href="https://graph.org/file/1a6ad157f55bc42b548df.png" type="image/jpg">
+    <title>File Selector</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/Tj-Bots/Leech-TJ/wzgram/docs/logo.png" type="image/png">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -358,8 +360,8 @@ const pageHTML = `<!DOCTYPE html>
         <!-- Header -->
         <header class="glass-card rounded-2xl p-3 sm:p-4 flex items-center justify-between shadow-xl">
             <div class="flex items-center gap-3">
-                <img class="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-purple-500/30" src="https://graph.org/file/1a6ad157f55bc42b548df.png" alt="logo" />
-                <h1 class="font-bold text-lg sm:text-xl tracking-tight text-white">AZML File Selection</h1>
+                <img class="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-purple-500/30" src="https://raw.githubusercontent.com/Tj-Bots/Leech-TJ/wzgram/docs/logo.png" alt="logo" />
+                <h1 class="font-bold text-lg sm:text-xl tracking-tight text-white">File Selection</h1>
             </div>
             <div class="flex items-center gap-3 sm:gap-4 text-zinc-400">
                 <a href="https://t.me/TJ_Bots" target="_blank" class="hover:text-purple-400 transition-colors"><span class="material-symbols-outlined text-lg sm:text-2xl">chat</span></a>

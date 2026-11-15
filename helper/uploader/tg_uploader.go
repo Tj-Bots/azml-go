@@ -828,7 +828,7 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		details, _ := ext.ProbeMedia(opt.FilePath)
 		dur := 0
 		title := uploadName
-		performer := "AZML"
+		performer := ""
 		if details != nil {
 			dur = details.Duration
 			if details.Title != "" {

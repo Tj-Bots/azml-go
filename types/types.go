@@ -40,6 +40,8 @@ type UserSettings struct {
 	MirrorHost     string            `json:"mirror_host" bson:"mirror_host"`
 	ExcludedExts   string            `json:"excluded_exts" bson:"excluded_exts"`
 	CapFont        string            `json:"cap_font" bson:"cap_font"`
+	Screenshots    int               `json:"screenshots" bson:"screenshots"` // screenshots per video, 0 = off
+	SampleSec      int               `json:"sample_sec" bson:"sample_sec"`   // sample video length, 0 = off
 	DDLKeys        map[string]string `json:"ddl_keys" bson:"ddl_keys"` // per user API keys of the /mirror hosts
 	ThumbData      []byte            `json:"thumb_data,omitempty" bson:"thumb_data,omitempty"` // the thumbnail image, so it survives restarts
 }

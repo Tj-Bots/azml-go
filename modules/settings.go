@@ -329,7 +329,8 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.Autorename || (u.RenameMethod != "" && u.RenameMethod != "auto") ||
 		u.AutoThumb || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
-		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != ""
+		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" ||
+		u.Screenshots != 0 || u.SampleSec != 0
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -447,11 +448,13 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		"┠ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
 		"┠ <b>Leech Metadata :</b> <code>%s</code>\n"+
 		"┠ <b>Caption Font :</b> <i>%s</i>\n"+
-		"╰ <b>Excluded Ext :</b> <code>%s</code></blockquote>",
+		"┠ <b>Excluded Ext :</b> <code>%s</code>\n"+
+		"┠ <b>Screenshots :</b> <i>%s</i>\n"+
+		"╰ <b>Sample Video :</b> <i>%s</i></blockquote>",
 		"Leech Settings",
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
 		caption, prefix, suffix, dumps, remnameAuto, remnameRegex, renameMethod,
-		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts))
+		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts), shotsText(u.Screenshots), sampleText(u.SampleSec))
 
 	btn := telegram.NewButtonMaker()
 	docLabel := "Send As Document"
@@ -485,6 +488,9 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	btn.Row()
 	btn.IButton("Caption Font", fmt.Sprintf("userset %d capfont", u.UserID))
 	btn.IButton("Excluded Ext", fmt.Sprintf("userset %d lexcluded", u.UserID))
+	btn.Row()
+	btn.IButton("Screenshots", fmt.Sprintf("userset %d shots", u.UserID))
+	btn.IButton("Sample Video", fmt.Sprintf("userset %d sample", u.UserID))
 	btn.Row()
 	if u.RenameMethod == "regex" {
 		btn.IButton("Rename Method: Regex", fmt.Sprintf("userset %d rename_method", u.UserID))
@@ -736,6 +742,8 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.ExcludedExts = ""
 		u.MirrorHost = ""
 		u.BotPM = false
+		u.Screenshots = 0
+		u.SampleSec = 0
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1098,6 +1106,30 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "Mirror Host: "+mirrorHostText(u.MirrorHost), false)
 		text, btn := m.buildMirrorHostMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+
+	case "shots", "setshots":
+		if action == "setshots" && len(parts) > 3 {
+			if n, err := strconv.Atoi(parts[3]); err == nil && n >= 0 && n <= 10 {
+				u.Screenshots = n
+				go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
+			}
+		}
+		text, btn := m.buildChoiceMenu(u, "Screenshots", "Screenshots", shotsText(u.Screenshots),
+			"Screenshots of every leeched video, posted as a link under the file.", "setshots", "shots", u.Screenshots, []int{0, 3, 5, 8, 10})
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 3)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "sample", "setsample":
+		if action == "setsample" && len(parts) > 3 {
+			if n, err := strconv.Atoi(parts[3]); err == nil && n >= 0 && n <= 60 {
+				u.SampleSec = n
+				go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
+			}
+		}
+		text, btn := m.buildChoiceMenu(u, "Sample Video", "Sample Video", sampleText(u.SampleSec),
+			"A short sample from the middle of every leeched video, sent after the file.", "setsample", "sample", u.SampleSec, []int{0, 10, 20, 30, 60})
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 3)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "ddlservers":
 		text, btn := m.buildDDLServersMenu(u)
@@ -1477,6 +1509,49 @@ func (m *SettingsModule) buildDDLHostMenu(u *types.UserSettings, hostID string) 
 	}
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d ddlservers", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+func shotsText(n int) string {
+	if n <= 0 {
+		return "Disabled"
+	}
+	return fmt.Sprintf("%d per video", n)
+}
+
+func sampleText(sec int) string {
+	if sec <= 0 {
+		return "Disabled"
+	}
+	return fmt.Sprintf("%d sec", sec)
+}
+
+// buildChoiceMenu is a setting page with a few fixed values (0 = off).
+func (m *SettingsModule) buildChoiceMenu(u *types.UserSettings, title, label, current, desc, setAction, _ string, value int, choices []int) (string, *telegram.ButtonMaker) {
+	text := fmt.Sprintf("㊂ <b><u>%s Settings :</u></b>\n\n"+
+		"➲ <b>%s :</b> <i>%s</i>\n\n"+
+		"➲ <b>Description :</b> <i>%s</i>", title, label, current, desc)
+	btn := telegram.NewButtonMaker()
+	for i, c := range choices {
+		name := strconv.Itoa(c)
+		if c == 0 {
+			name = "Off"
+		} else if setAction == "setsample" {
+			name += "s"
+		}
+		if c == value {
+			btn.IButtonStyled("✓ "+name, fmt.Sprintf("userset %d %s %d", u.UserID, setAction, c), "success")
+		} else {
+			btn.IButton(name, fmt.Sprintf("userset %d %s %d", u.UserID, setAction, c))
+		}
+		if i%3 == 2 {
+			btn.Row()
+		}
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn

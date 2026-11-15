@@ -1197,8 +1197,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 		// Screenshots
 		var ssLinks []string
-		if opt.Screenshots > 0 || cfg.ScreenshotsMode {
+		userShots := 0
+		if user != nil {
+			userShots = user.Screenshots
+		}
+		if opt.Screenshots > 0 || userShots > 0 || cfg.ScreenshotsMode {
 			ssCount := opt.Screenshots
+			if ssCount <= 0 {
+				ssCount = userShots
+			}
 			if ssCount <= 0 {
 				ssCount = 4
 			}
@@ -1315,7 +1322,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			useGroup = len(splitParts) > 1 && user.MediaGroup
 		}
 		partResults := make([]uploader.UploadResult, len(splitParts))
-		var groupOpt uploader.UploadOptions
+		var groupOpt, lastUpOpt uploader.UploadOptions
 		for idx, part := range splitParts {
 			partCaption := caption
 			if len(splitParts) > 1 {
@@ -1350,6 +1357,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 
 			upOpt.Result = &partResults[idx]
+			lastUpOpt = upOpt
 			if useGroup {
 				upOpt.SkipDelivery = true
 				groupOpt = upOpt
@@ -1370,6 +1378,24 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 			if first := m.uploader.SendAlbum(ctx, done, groupOpt); first.MsgID > 0 {
 				partResults[0] = first
+			}
+		}
+		if user != nil && user.SampleSec > 0 && !opt.IsMirror {
+			if samplePath := ext.MakeSampleVideo(curFile, user.SampleSec); samplePath != "" {
+				sampleOpt := groupOpt
+				if !useGroup {
+					sampleOpt = lastUpOpt
+				}
+				sampleOpt.FilePath = samplePath
+				sampleOpt.FileName = filepath.Base(samplePath)
+				sampleOpt.Caption = fmt.Sprintf("<b>Sample</b> | <code>%s</code>", telegram.EscapeHTML(finalName))
+				sampleOpt.SkipDelivery = false
+				sampleOpt.Result = nil
+				sampleOpt.OnProgress = nil
+				if _, sErr := m.uploader.UploadFile(ctx, peer, sampleOpt); sErr != nil {
+					log.Printf("[AZML-Go Leech] Sample upload failed: %v", sErr)
+				}
+				_ = os.Remove(samplePath)
 			}
 		}
 		if len(partResults) > 0 {

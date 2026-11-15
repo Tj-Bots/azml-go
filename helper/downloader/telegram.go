@@ -160,9 +160,11 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 		return fmt.Errorf("invalid file size %d for chunk download", fileSize)
 	}
 
-	// MTProto optimal chunk size: 1MB (1048576) — maximum allowed by Telegram API.
-	// Must be divisible by 4096 and a power of 2 up to 1MB.
-	const partSize int64 = 1048576 // 1 MB
+	// Hyper (our Python bot): 256KB chunks, many in flight. HYPER_CHUNK (KB) changes it.
+	partSize := int64(256 * 1024)
+	if v, e := strconv.Atoi(os.Getenv("HYPER_CHUNK")); e == nil && v >= 64 && v <= 1024 && v&(v-1) == 0 {
+		partSize = int64(v) * 1024
+	}
 
 	totalParts := int((fileSize + partSize - 1) / partSize)
 	if totalParts <= 0 {
@@ -177,27 +179,23 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 
 	_ = out.Truncate(fileSize)
 
-	numWorkers := 5
-	maxWorkers := 8
-	if len(d.clients) > 1 {
-		// two requests in flight per connection
-		numWorkers = len(d.clients) * 2
-		maxWorkers = 32
-	}
-	if envVal := os.Getenv("DOWNLOAD_THREADS"); envVal != "" {
-		if val, pErr := strconv.Atoi(envVal); pErr == nil && val > 0 {
-			numWorkers = val
+	// pipeline window like Hyper: start 16 in flight, never below 4, up to 64
+	startWin, maxWin := hyperStart, hyperMax
+	if v, e := strconv.Atoi(os.Getenv("HYPER_PIPELINE")); e == nil && v >= hyperMin {
+		startWin = v
+		if maxWin < v*2 {
+			maxWin = v * 2
 		}
 	}
-	if numWorkers > maxWorkers {
-		numWorkers = maxWorkers
-	}
-	if numWorkers < 2 {
-		numWorkers = 2
-	}
+	numWorkers := maxWin // goroutines; the gate decides how many requests are in flight
 	if totalParts < numWorkers {
 		numWorkers = totalParts
 	}
+	if startWin > numWorkers {
+		startWin = numWorkers
+	}
+	d.minIntervalNs.Store(0) // no pacing: Hyper sends as fast as the window allows
+	d.baseIntervalNs = 0
 
 	// Pre-compute the actual byte count for each part (last part may be smaller)
 	partActualSize := make([]int64, totalParts)
@@ -265,7 +263,7 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 
 	// how many requests may be in flight: starts at numWorkers, halves on FloodWait,
 	// grows back slowly while Telegram accepts the rate (finds the account's limit by itself)
-	d.gate = newFlowGate(numWorkers)
+	d.gate = newFlowGate(startWin, maxWin)
 	defer func() {
 		lim, floods := d.gate.stats()
 		log.Printf("[TG Chunk DL] Finished %s: %d FloodWait(s), last parallel limit %d/%d",
@@ -382,7 +380,7 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 		}
 		partCtx, partCancel := context.WithTimeout(ctx, 60*time.Second)
 		res, err := client.UploadGetFile(partCtx, &tg.UploadGetFileRequest{
-			Precise:      false,
+			Precise:      true,
 			CDNSupported: false,
 			Location:     loc,
 			Offset:       offset,
@@ -390,8 +388,8 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 		})
 		partCancel()
 		if d.gate != nil {
-			_, isFlood := tgerr.AsFloodWait(err)
-			d.gate.release(err == nil, isFlood)
+			fw, isFlood := tgerr.AsFloodWait(err)
+			d.gate.release(err == nil, isFlood, fw)
 		}
 
 		if err == nil {
@@ -430,7 +428,7 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 				}
 				log.Printf("[TG Chunk DL] FloodWait %v at part %d/%d, parallel limit now %d", waitDur, partIndex+1, totalParts, lim)
 			}
-			d.triggerGlobalFlood(totalWait)
+			// only this request waits (like Hyper), the others keep going
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -540,24 +538,44 @@ func (t *TelegramDownloadTask) Cancel() error {
 	return nil
 }
 
-// flowGate limits the requests in flight with AIMD: half on FloodWait, +1 after a run of successes.
+// Hyper window (bot/helper/mirror_utils/hyper_utils.py in our Python bot).
+const (
+	hyperStart = 16
+	hyperMin   = 4
+	hyperMax   = 64
+)
+
+// flowGate is Hyper's pipeline window: how many getFile requests are in flight.
+// It grows by 2 after a full window of successes and shrinks by a quarter (never below 4)
+// only after 3 FloodWaits or one longer than 10s.
 type flowGate struct {
 	mu       sync.Mutex
 	cond     *sync.Cond
 	limit    int
 	max      int
+	min      int
 	inFlight int
-	okStreak int
+	okCount  int
+	floodRun int
 	floods   int
-	lastCut  time.Time
 	lastLog  time.Time
 }
 
-func newFlowGate(max int) *flowGate {
+func newFlowGate(start, max int) *flowGate {
 	if max < 1 {
 		max = 1
 	}
-	g := &flowGate{limit: max, max: max}
+	if start > max {
+		start = max
+	}
+	if start < 1 {
+		start = 1
+	}
+	min := hyperMin
+	if min > start {
+		min = start
+	}
+	g := &flowGate{limit: start, max: max, min: min}
 	g.cond = sync.NewCond(&g.mu)
 	return g
 }
@@ -584,27 +602,34 @@ func (g *flowGate) acquire(ctx context.Context) error {
 	return nil
 }
 
-func (g *flowGate) release(ok, flood bool) {
+func (g *flowGate) release(ok, flood bool, wait time.Duration) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.inFlight--
 	switch {
 	case flood:
 		g.floods++
-		g.okStreak = 0
-		// one cut per burst: many requests flood together
-		if time.Since(g.lastCut) > 2*time.Second {
-			g.limit /= 2
-			if g.limit < 1 {
-				g.limit = 1
+		g.floodRun++
+		if wait > 10*time.Second || g.floodRun >= 3 {
+			cut := g.limit / 4
+			if cut < 1 {
+				cut = 1
 			}
-			g.lastCut = time.Now()
+			g.limit -= cut
+			if g.limit < g.min {
+				g.limit = g.min
+			}
+			g.okCount = 0
+			g.floodRun = 0
 		}
 	case ok:
-		g.okStreak++
-		if g.okStreak >= 3*g.limit+8 && g.limit < g.max {
-			g.limit++
-			g.okStreak = 0
+		g.okCount++
+		if g.okCount >= g.limit {
+			g.limit += 2
+			if g.limit > g.max {
+				g.limit = g.max
+			}
+			g.okCount = 0
 		}
 	}
 	g.cond.Broadcast()

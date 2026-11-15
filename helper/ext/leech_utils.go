@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -646,44 +647,54 @@ func splitBinary(filePath string, maxSplitSize int64, outDir string) ([]string, 
 	return parts, nil
 }
 
-func TakeScreenshots(videoPath string, count int) ([]string, error) {
+// MakeScreenshots takes count frames of a video as jpg files in a new temp folder.
+// The caller removes the folder (filepath.Dir of the files).
+func MakeScreenshots(videoPath string, count int) ([]string, error) {
 	if count <= 0 {
 		count = 3
+	}
+	if count > 10 {
+		count = 10
 	}
 	details, err := ProbeMedia(videoPath)
 	if err != nil {
 		return nil, err
 	}
+	if details.Duration <= 0 {
+		return nil, fmt.Errorf("not a video")
+	}
 	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("ss_%s", RandomHex(4)))
 	_ = os.MkdirAll(tmpDir, 0755)
-	defer os.RemoveAll(tmpDir)
-
-	step := details.Duration / (count + 1)
-	var imageFiles []string
-
+	step := float64(details.Duration) / float64(count+1)
+	var files []string
 	for i := 1; i <= count; i++ {
-		sec := i * step
-		imgPath := filepath.Join(tmpDir, fmt.Sprintf("ss_%d.jpg", i))
+		imgPath := filepath.Join(tmpDir, fmt.Sprintf("SS%02d.jpg", i))
 		cmd := exec.Command("ffmpeg",
 			"-hide_banner", "-loglevel", "error",
-			"-ss", strconv.Itoa(sec),
+			"-ss", fmt.Sprintf("%.2f", step*float64(i)),
 			"-i", videoPath,
 			"-vframes", "1",
 			"-q:v", "2",
 			imgPath, "-y",
 		)
-		if cmd.Run() == nil {
-			imageFiles = append(imageFiles, imgPath)
+		if out, err := cmd.CombinedOutput(); err == nil {
+			if fi, sErr := os.Stat(imgPath); sErr == nil && fi.Size() > 0 {
+				files = append(files, imgPath)
+			}
+		} else {
+			log.Printf("[Screenshots] ffmpeg failed at %.0fs: %v %s", step*float64(i), err, strings.TrimSpace(string(out)))
 		}
 	}
+	if len(files) == 0 {
+		_ = os.RemoveAll(tmpDir)
+		return nil, fmt.Errorf("no screenshots taken")
+	}
+	return files, nil
+}
 
-	var telegraphLinks []string
-	for _, img := range imageFiles {
-		if link, err := uploadToTelegraph(img); err == nil {
-			telegraphLinks = append(telegraphLinks, link)
-		}
-	}
-	return telegraphLinks, nil
+// TakeScreenshots is kept for old callers: Telegraph no longer accepts images, so it returns no links.
+func TakeScreenshots(videoPath string, count int) ([]string, error) {
+	return nil, fmt.Errorf("telegraph image upload is not available")
 }
 
 func uploadToTelegraph(filePath string) (string, error) {

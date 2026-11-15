@@ -639,6 +639,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 							downloadedPath = destPath
 							uTask.SetProgress(doc.Size, doc.Size, 0, "-")
 							dlSuccess = true
+						} else if ctx.Err() != nil {
+							dlErr = ctx.Err()
+							dlSuccess = true // cancelled: no fallback
 						} else {
 							log.Printf("[LEECH] User session download failed (%v), downloading with the bot", uErr)
 							_ = os.Remove(destPath)
@@ -1252,7 +1255,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		uploadedNames = append(uploadedNames, finalName)
 
 		// Screenshots
-		var ssLinks []string
+		var ssLinks []string // old Telegraph links (no longer filled)
+		var ssFiles []string // screenshots sent as an album after the file
 		userShots := 0
 		if user != nil {
 			userShots = user.Screenshots
@@ -1265,8 +1269,16 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			if ssCount <= 0 {
 				ssCount = 4
 			}
-			setStep(uTask, "Screenshots (FFmpeg)")
-			ssLinks, _ = ext.TakeScreenshots(curFile, ssCount)
+			if !opt.IsMirror {
+				setStep(uTask, "Screenshots (FFmpeg)")
+				var ssErr error
+				if ssFiles, ssErr = ext.MakeScreenshots(curFile, ssCount); ssErr != nil {
+					log.Printf("[AZML-Go Leech] Screenshots skipped for %s: %v", filepath.Base(curFile), ssErr)
+				}
+			}
+		}
+		if len(ssFiles) > 0 {
+			defer os.RemoveAll(filepath.Dir(ssFiles[0]))
 		}
 
 		// Thumbnail & HD Cover
@@ -1483,6 +1495,18 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				_ = os.Remove(samplePath)
 			}
 		}
+		if len(ssFiles) > 0 && len(partResults) > 0 && partResults[0].MsgID > 0 {
+			setStep(uTask, "Screenshots")
+			dest := partResults[0].ChatID
+			copyTo := []int64{msg.UserID}
+			if lg := cfg.LeechLogID; lg != 0 && lg != dest {
+				copyTo = append(copyTo, lg)
+			}
+			caption := fmt.Sprintf("<b>Screenshots</b> | <code>%s</code>", telegram.EscapeHTML(finalName))
+			if err := uploader.SendScreenshots(dest, partResults[0].MsgID, ssFiles, caption, copyTo); err != nil {
+				log.Printf("[AZML-Go Leech] Screenshots album failed: %v", err)
+			}
+		}
 		if len(partResults) > 0 {
 			fileLinks = append(fileLinks, channelMessageLink(partResults[0].ChatID, partResults[0].MsgID))
 		} else {
@@ -1540,34 +1564,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 	botPM := cfg.BotPM || (user != nil && user.BotPM) || (msg.ChatID != msg.UserID)
 	if opt.IsMirror {
-		sb.WriteString(fmt.Sprintf("➲ <i>Uploaded to %s:</i>\n", mirrorHostName(opt.MirrorHost)))
-		for idx, upF := range uploadedNames {
-			if idx >= 10 {
-				sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(uploadedNames)-10))
-				break
-			}
-			if idx < len(mirrorLinks) {
-				sb.WriteString(fmt.Sprintf("%d. <a href=\"%s\">%s</a>\n", idx+1, mirrorLinks[idx], telegram.EscapeHTML(upF)))
-			}
-		}
+		sb.WriteString(fmt.Sprintf("➲ <b><i>Uploaded to %s :</i></b>\n", mirrorHostName(opt.MirrorHost)))
+		sb.WriteString(finishFileList(uploadedNames, mirrorLinks))
 	} else {
 		if botPM {
 			sb.WriteString("➲ <b><i>File(s) have been Sent to Bot PM (Private)</i></b>\n")
 		} else {
 			sb.WriteString("➲ <b><i>File(s) have been Sent. Access via Links...</i></b>\n")
 		}
-
-		for idx, upF := range uploadedNames {
-			if idx >= 10 {
-				sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(uploadedNames)-10))
-				break
-			}
-			if idx < len(fileLinks) && fileLinks[idx] != "" {
-				sb.WriteString(fmt.Sprintf("%d. <a href=\"%s\">%s</a>\n", idx+1, fileLinks[idx], telegram.EscapeHTML(upF)))
-			} else {
-				sb.WriteString(fmt.Sprintf("%d. <code>%s</code>\n", idx+1, telegram.EscapeHTML(upF)))
-			}
-		}
+		sb.WriteString(finishFileList(uploadedNames, fileLinks))
 	}
 
 	botUser := telegram.CurrentBotUsername
@@ -1947,6 +1952,9 @@ func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeer
 		if err == nil {
 			return nil
 		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		log.Printf("[LEECH] DC pool download failed (%v), trying the user session pool", err)
 	}
 	clients := []*tg.Client{m.userRawAPI}
@@ -2136,4 +2144,31 @@ func ytdlResult(taskDir, _ string) string {
 		return files[0]
 	}
 	return taskDir
+}
+
+// finishFileList: every file name with its link, all in one collapsed (expandable) quote.
+func finishFileList(names, links []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("<blockquote expandable>")
+	budget := 2800 // visible chars; the whole message must stay under 4096
+	for idx, name := range names {
+		if r := []rune(name); len(r) > 120 {
+			name = string(r[:117]) + "..."
+		}
+		budget -= len([]rune(name)) + 6
+		if budget < 0 {
+			sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(names)-idx))
+			break
+		}
+		if idx < len(links) && links[idx] != "" {
+			sb.WriteString(fmt.Sprintf("%d. <a href=\"%s\">%s</a>\n", idx+1, links[idx], telegram.EscapeHTML(name)))
+		} else {
+			sb.WriteString(fmt.Sprintf("%d. <code>%s</code>\n", idx+1, telegram.EscapeHTML(name)))
+		}
+	}
+	out := strings.TrimRight(sb.String(), "\n")
+	return out + "</blockquote>"
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -352,9 +353,9 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 }
 
 func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMaker) {
-	cfgMap := config.GetConfigMap()
-	keys := configVarKeys
-
+	// like the Python bot: sorted, 10 per page, 2 per row
+	keys := append([]string(nil), configVarKeys...)
+	sort.Strings(keys)
 	limit := 10
 	totalPages := (len(keys) + limit - 1) / limit
 	if page < 0 {
@@ -363,64 +364,33 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 	if page >= totalPages {
 		page = totalPages - 1
 	}
-
 	start := page * limit
 	end := start + limit
 	if end > len(keys) {
 		end = len(keys)
 	}
 
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("㊂ <b><u>%s :</u></b> <b>Page %d/%d</b>\n\n", "Config Variables", page+1, totalPages))
-
 	btn := telegram.NewButtonMaker()
 	for i := start; i < end; i++ {
-		k := keys[i]
-		v := configValue(cfgMap, k)
-		if v == "" {
-			v = "Not Set"
-		} else if isSecretVar(k) {
-			v = maskAPI(v)
-		}
-		mark := "┠"
-		switch {
-		case i == start && i == end-1:
-			mark = "<blockquote>╭"
-		case i == start:
-			mark = "<blockquote>╭"
-		case i == end-1:
-			mark = "╰"
-		}
-		closeTag := ""
-		if i == end-1 {
-			closeTag = "</blockquote>"
-		}
-		sb.WriteString(fmt.Sprintf("%s <b>%s:</b> <code>%s</code>%s\n", mark, k, telegram.EscapeHTML(v), closeTag))
-
-		btn.IButton(k, fmt.Sprintf("botset editvar %s %d", k, page))
+		btn.IButton(keys[i], fmt.Sprintf("botset editvar %s %d", keys[i], page))
 		if (i-start)%2 == 1 || i == end-1 {
 			btn.Row()
 		}
 	}
-	sb.WriteString("\n<i>Tap on a variable to view, toggle, or edit its value in-place.</i>")
-
-	// Page jump buttons (AZML style numbered jump bar, up to 6 per row)
+	btn.IButtonStyled("◀️", "botset back", "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
+	btn.Row()
 	for p := 0; p < totalPages; p++ {
 		if p == page {
 			btn.IButtonStyled(fmt.Sprintf("» %d «", p+1), fmt.Sprintf("botset var %d", p), "success")
 		} else {
-			btn.IButtonStyled(fmt.Sprintf("%d", p+1), fmt.Sprintf("botset var %d", p), "primary")
+			btn.IButton(fmt.Sprintf("%d", p+1), fmt.Sprintf("botset var %d", p))
 		}
 		if (p+1)%6 == 0 || p == totalPages-1 {
 			btn.Row()
 		}
 	}
-
-	btn.IButtonStyled("◀️", "botset back", "primary")
-	btn.IButtonStyled("❌", "botset close", "danger")
-	btn.Row()
-
-	return sb.String(), btn
+	return fmt.Sprintf("<b>Config Variables</b> | <b>Page: %d</b>", page+1), btn
 }
 
 func isPrivatePeer(peer tg.InputPeerClass) bool {
@@ -459,8 +429,15 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing, pr
 
 	if isBoolVar(key) {
 		text += "\n\n<i>Choose a valid value for the above Var:</i>"
-		btn.IButtonStyled("True", fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
-		btn.IButtonStyled("False", fmt.Sprintf("botset boolvar %s false %d", key, page), "danger")
+		// like the Python bot: ✓ and green on the current value only
+		on := isTrueValue(configValue(cfgMap, key))
+		if on {
+			btn.IButtonStyled("✓ True", fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
+			btn.IButton("False", fmt.Sprintf("botset boolvar %s false %d", key, page))
+		} else {
+			btn.IButton("True", fmt.Sprintf("botset boolvar %s true %d", key, page))
+			btn.IButtonStyled("✓ False", fmt.Sprintf("botset boolvar %s false %d", key, page), "success")
+		}
 		btn.Row()
 		btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
 		btn.IButtonStyled("❌", "botset close", "danger")
@@ -942,4 +919,12 @@ func (m *BotSettingsModule) buildShortenerMenu() (string, *telegram.ButtonMaker)
 	btn.Row()
 
 	return sb.String(), btn
+}
+
+func isTrueValue(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "true", "1", "yes", "on":
+		return true
+	}
+	return false
 }

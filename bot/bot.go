@@ -1037,7 +1037,7 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 					"<blockquote>╭ <b>Date:</b> %s\n"+
 					"┠ <b>Time:</b> %s\n"+
 					"┠ <b>TimeZone:</b> %s\n"+
-					"╰ <b>Version:</b> <code>1.0.2</code></blockquote>", dateStr, timeStr, timz)
+					"╰ <b>Version:</b> <code>1.1.0</code></blockquote>", dateStr, timeStr, timz)
 
 				peer := b.getPeerForChatID(chatID)
 				if b.sender != nil && peer != nil {
@@ -1053,7 +1053,7 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 		"<blockquote>╭ <b>Date:</b> %s\n"+
 		"┠ <b>Time:</b> %s\n"+
 		"┠ <b>TimeZone:</b> %s\n"+
-		"╰ <b>Version:</b> <code>1.0.2</code></blockquote>", dateStr, timeStr, timz)
+		"╰ <b>Version:</b> <code>1.1.0</code></blockquote>", dateStr, timeStr, timz)
 
 	sendNotification := func(targetID int64) {
 		if targetID == 0 || b.sender == nil {

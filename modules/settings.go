@@ -1487,6 +1487,8 @@ func (m *SettingsModule) buildDDLHostMenu(u *types.UserSettings, hostID string) 
 		keyText = "Exists"
 	} else if h.Key(config.Get()) != "" {
 		keyText = "Not Exists (the owner's key is used)"
+	} else if h.NoKey {
+		keyText = "Not needed"
 	} else if !h.NeedsKey {
 		keyText = "Not Exists (Guest upload)"
 	}
@@ -1506,11 +1508,13 @@ func (m *SettingsModule) buildDDLHostMenu(u *types.UserSettings, hostID string) 
 		btn.IButton("Use as default", fmt.Sprintf("userset %d sethost %s", u.UserID, h.ID))
 		btn.Row()
 	}
-	btn.IButton(label, fmt.Sprintf("userset %d edit_ddlkey %s", u.UserID, h.ID))
-	if has {
-		btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ddlkey %s", u.UserID, h.ID))
+	if !h.NoKey {
+		btn.IButton(label, fmt.Sprintf("userset %d edit_ddlkey %s", u.UserID, h.ID))
+		if has {
+			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ddlkey %s", u.UserID, h.ID))
+		}
+		btn.Row()
 	}
-	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()

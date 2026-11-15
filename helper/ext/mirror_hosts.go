@@ -30,6 +30,10 @@ type MirrorHost struct {
 	// Desc and Prompt are shown in the user's DDL Servers page.
 	Desc   string
 	Prompt string
+	// MaxSize is the largest file the host takes (0 = no limit).
+	MaxSize int64
+	// NoKey: the host has no accounts / keys at all.
+	NoKey bool
 }
 
 // MirrorHosts are the /mirror upload hosts (the same ones as the DDL list of the Python bot).
@@ -39,6 +43,8 @@ var MirrorHosts = []MirrorHost{
 	{ID: "pixeldrain", Name: "PixelDrain", KeyVar: "PIXELDRAIN_KEY", Key: func(c *config.Config) string { return c.PixelDrainKey }, Desc: "PixelDrain is a fast free file hosting.", Prompt: "Send PixelDrain's API Key. Get it on https://pixeldrain.com/user/api_keys"},
 	{ID: "buzzheavier", Name: "BuzzHeavier", KeyVar: "BUZZHEAVIER_TOKEN", NeedsKey: true, Key: func(c *config.Config) string { return c.BuzzHeavierToken }, Desc: "BuzzHeavier is a free file hosting with no size limit.", Prompt: "Send BuzzHeavier's Account ID (API token)."},
 	{ID: "devuploads", Name: "DevUploads", KeyVar: "DEVUPLOADS_KEY", NeedsKey: true, Key: func(c *config.Config) string { return c.DevUploadsKey }, Desc: "DevUploads is a file hosting that pays per download.", Prompt: "Send DevUploads's API Key. Get it on https://devuploads.com/?op=my_account"},
+	{ID: "catbox", Name: "Catbox", KeyVar: "CATBOX_USERHASH", MaxSize: 200 << 20, Key: func(c *config.Config) string { return "" }, Desc: "Catbox is a simple free file host, files are kept forever (max 200 MB). Works without User Hash too (as Guest).", Prompt: "Send Catbox's User Hash. Get it on https://catbox.moe/user/manage.php"},
+	{ID: "litterbox", Name: "Litterbox", MaxSize: 1 << 30, NoKey: true, Key: func(c *config.Config) string { return "" }, Desc: "Litterbox keeps your files for 72 hours (max 1 GB), no account needed.", Prompt: "Litterbox needs no key."},
 	{ID: "streamtape", Name: "StreamTape", KeyVar: "STREAMTAPE_API", NeedsKey: true, Key: func(c *config.Config) string { return c.StreamTapeAPI }, Desc: "Streamtape is free Video Streaming & sharing Hoster", Prompt: "Send StreamTape's Login and Key\n<b>Format:</b> <code>user_login:pass_key</code>"},
 }
 
@@ -50,6 +56,8 @@ var (
 	DevUploadsAPI        = "https://devuploads.com/api"
 	VikingFileAPI        = "https://vikingfile.com/api"
 	StreamTapeAPIURL     = "https://api.streamtape.com"
+	CatboxAPI            = "https://catbox.moe/user/api.php"
+	LitterboxAPI         = "https://litterbox.catbox.moe/resources/internals/api.php"
 )
 
 var uploadClient = &http.Client{Timeout: 6 * time.Hour}
@@ -112,7 +120,16 @@ func UploadToHost(ctx context.Context, hostID, path string, sess *MirrorSession,
 	if h.NeedsKey && key == "" {
 		return "", fmt.Errorf("%s needs an API key: set it in /us → Mirror Settings → DDL Servers (or %s in /bs)", h.Name, h.KeyVar)
 	}
+	if h.MaxSize > 0 {
+		if fi, err := os.Stat(path); err == nil && fi.Size() > h.MaxSize {
+			return "", fmt.Errorf("%s takes files up to %s, this one is %s", h.Name, GetReadableFileSize(h.MaxSize), GetReadableFileSize(fi.Size()))
+		}
+	}
 	switch h.ID {
+	case "catbox":
+		return uploadCatbox(ctx, CatboxAPI, path, map[string]string{"reqtype": "fileupload", "userhash": key}, onProgress)
+	case "litterbox":
+		return uploadCatbox(ctx, LitterboxAPI, path, map[string]string{"reqtype": "fileupload", "time": "72h"}, onProgress)
 	case "gofile":
 		return uploadGoFile(ctx, path, key, sess, onProgress)
 	case "pixeldrain":
@@ -310,6 +327,24 @@ func uploadStreamTape(ctx context.Context, path, api string, onProgress func(sen
 		}
 	}
 	return "", fmt.Errorf("streamtape: upload failed (HTTP %d) %s", status, trimText(body))
+}
+
+// uploadCatbox: Catbox and Litterbox answer with the file URL as plain text.
+func uploadCatbox(ctx context.Context, endpoint, path string, fields map[string]string, onProgress func(sent, total int64)) (string, error) {
+	for k, v := range fields {
+		if v == "" {
+			delete(fields, k)
+		}
+	}
+	body, status, err := postMultipart(ctx, endpoint, fields, "fileToUpload", path, onProgress)
+	if err != nil {
+		return "", err
+	}
+	link := strings.TrimSpace(string(body))
+	if status != 200 || !strings.HasPrefix(link, "https://") {
+		return "", fmt.Errorf("catbox: upload failed (HTTP %d) %s", status, trimText(body))
+	}
+	return link, nil
 }
 
 // ---- helpers ----

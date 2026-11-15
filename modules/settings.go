@@ -834,7 +834,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		ext.ClearPendingSettingSession(targetUID)
 		ext.ClearPendingThumbSession(targetUID)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Settings closed", false)
-		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+		m.sender.DeleteWithCommand(ctx, peer, msgID)
 
 	// 2. Direct Toggles (Edit message in-place without glitch)
 	case "doc":

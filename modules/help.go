@@ -61,6 +61,10 @@ func (m *HelpModule) getHelpGuideText() string {
 		"<blockquote>╭ <b>Admin & Control:</b>\n"+
 		"┠ <code>/bs%s</code> — Bot Settings (Config vars, Aria2c, Private files)\n"+
 		"┠ <code>/cancel%s [GID]</code> — Cancel specific task\n"+
+		"┠ <code>/a</code> <code>/ua</code> — Authorize / unauthorize a user or this chat (reply or ID)\n"+
+		"┠ <code>/addsudo</code> <code>/rmsudo</code> — Add / remove a Sudo user (owner)\n"+
+		"┠ <code>/bl</code> <code>/rbl</code> — Blacklist / unblacklist a user\n"+
+		"┠ <code>/users</code> <code>/authlist</code> <code>/sudolist</code> — Lists of users\n"+
 		"╰ <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>\n\n"+
 		"<i>Click Back below to return to start menu.</i>",
 		telegram.ToSmallCaps("AZML-Go Commands Guide"),
@@ -192,8 +196,8 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 	}
 
 	if key == "close" {
-		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed!", false)
+		m.sender.DeleteWithCommand(ctx, peer, msgID)
 		return
 	}
 

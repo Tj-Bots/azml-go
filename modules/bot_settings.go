@@ -552,8 +552,8 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 	switch action {
 	case "close":
 		ext.ClearPendingBotSettingSession(fromUID)
-		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
+		m.sender.DeleteWithCommand(ctx, peer, msgID)
 
 	case "back":
 		ext.ClearPendingBotSettingSession(fromUID)

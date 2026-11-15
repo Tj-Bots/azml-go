@@ -763,6 +763,17 @@ func (m *MessageSender) SendLocalPhoto(ctx context.Context, peer tg.InputPeerCla
 	return ExtractMessageID(updates), nil
 }
 
+// DeleteWithCommand deletes a bot message together with the user's command it replied to.
+func (m *MessageSender) DeleteWithCommand(ctx context.Context, peer tg.InputPeerClass, msgID int) {
+	ids := []int{msgID}
+	if msg, err := FetchMessage(ctx, m.rawClient, peer, msgID); err == nil && msg != nil {
+		if h, ok := msg.ReplyTo.(*tg.MessageReplyHeader); ok && h.ReplyToMsgID > 0 {
+			ids = append(ids, h.ReplyToMsgID)
+		}
+	}
+	_ = m.DeleteMessage(ctx, peer, ids)
+}
+
 // SendDocumentBytes uploads data as a document with the given file name.
 func (m *MessageSender) SendDocumentBytes(ctx context.Context, peer tg.InputPeerClass, name string, data []byte, caption string, replyToID int) (int, error) {
 	u := uploader.NewUploader(m.rawClient)

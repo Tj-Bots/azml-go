@@ -273,8 +273,8 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 		}
 
 	case "close":
-		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 		_ = m.sender.AnswerCallback(ctx, queryID, "Status closed", false)
+		m.sender.DeleteWithCommand(ctx, peer, msgID)
 		m.mu.Lock()
 		if chatID != 0 {
 			delete(m.statusReplies, chatID)

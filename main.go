@@ -201,6 +201,7 @@ func main() {
 		authMod.HandleRmPremium,
 		authMod.HandleCheckPremium,
 	)
+	app.SetAdminHandlers(authMod.HandleBlacklist, authMod.HandleRmBlacklist, authMod.HandleUsers)
 	app.SetHelpHandlers(
 		helpMod.HandleStart,
 		helpMod.HandleHelp,

@@ -65,6 +65,9 @@ type BotApp struct {
 	bsettingCbHandler     func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	bsettingInputHandler  func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key, val string, page int)
 	bsettingCancelHandler func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key string, page int)
+	blacklistHandler      func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	rmBlacklistHandler    func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	usersHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	authHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	unauthHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	addSudoHandler        func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -428,6 +431,11 @@ func (b *BotApp) SetAuthorizeHandlers(auth, unauth, addSudo, rmSudo, addPrem, rm
 	b.addPremHandler = addPrem
 	b.rmPremHandler = rmPrem
 	b.checkPremHandler = checkPrem
+}
+func (b *BotApp) SetAdminHandlers(blacklist, rmBlacklist, users func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)) {
+	b.blacklistHandler = blacklist
+	b.rmBlacklistHandler = rmBlacklist
+	b.usersHandler = users
 }
 func (b *BotApp) SetHelpHandlers(
 	start, help, ping, stats, logH, restart func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext),
@@ -810,6 +818,18 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	case telegram.MatchCommand(text, telegram.BotCommands.RmPremium, b.botUsername):
 		if b.rmPremHandler != nil {
 			b.rmPremHandler(ctx, peer, msgCtx)
+		}
+	case telegram.MatchCommand(text, telegram.BotCommands.Blacklist, b.botUsername):
+		if b.blacklistHandler != nil {
+			b.blacklistHandler(ctx, peer, msgCtx)
+		}
+	case telegram.MatchCommand(text, telegram.BotCommands.RmBlacklist, b.botUsername):
+		if b.rmBlacklistHandler != nil {
+			b.rmBlacklistHandler(ctx, peer, msgCtx)
+		}
+	case telegram.MatchCommand(text, telegram.BotCommands.Users, b.botUsername):
+		if b.usersHandler != nil {
+			b.usersHandler(ctx, peer, msgCtx)
 		}
 	case telegram.MatchCommand(text, telegram.BotCommands.Premium, b.botUsername):
 		if b.checkPremHandler != nil {

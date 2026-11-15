@@ -23,6 +23,7 @@ type Commands struct {
 	Premium     []string
 	Blacklist   []string
 	RmBlacklist []string
+	Users       []string
 	Ping        []string
 	Stats       []string
 	Restart     []string
@@ -124,6 +125,12 @@ func InitCommands() {
 		RmBlacklist: []string{
 			"rmblacklist" + suffix,
 			"rbl" + suffix,
+		},
+		Users: []string{
+			"users" + suffix,
+			"authlist" + suffix,
+			"sudolist" + suffix,
+			"blacklisted" + suffix,
 		},
 		Ping: []string{
 			"ping" + suffix,

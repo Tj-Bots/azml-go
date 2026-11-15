@@ -77,6 +77,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	}
 
 	opt, link := parseLeechArgs(msg.Text)
+	opt.IsMirror = msg.IsMirror
 	if isZip {
 		opt.IsZip = true
 	}
@@ -221,6 +222,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					RawMedia:   targetMsg.Media,
 					ReplyToID:  targetID,
 					IsReply:    true,
+					IsMirror:   msg.IsMirror,
 				}
 
 				log.Printf("[LEECH -i] Sequentially triggering download for message ID %d (part %d/%d)", targetID, idx+1, multiCount)
@@ -442,6 +444,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var maxULSpeed float64
 	var totalSize int64
 	var uploadedNames []string
+	var mirrorLinks []string
 	modeStr := "#Leech | #Aria2"
 	if ext.IsMagnet(link) || strings.HasSuffix(strings.ToLower(link), ".torrent") {
 		modeStr = "#Leech | #Torrent"
@@ -1216,9 +1219,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 
 		splitDir := filepath.Join(taskDir, "splits")
-		splitParts, splitErr := ext.SplitFile(curFile, splitSize, splitDir, equalSplits)
-		if splitErr != nil || len(splitParts) == 0 {
-			splitParts = []string{curFile}
+		splitParts := []string{curFile}
+		if !opt.IsMirror {
+			var splitErr error
+			splitParts, splitErr = ext.SplitFile(curFile, splitSize, splitDir, equalSplits)
+			if splitErr != nil || len(splitParts) == 0 {
+				splitParts = []string{curFile}
+			}
 		}
 
 		fi, _ := os.Stat(curFile)
@@ -1231,6 +1238,34 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		uTask.SetStatus(types.StatusUploading, "MTProto")
 		uTask.SetSize(itemSize)
 		uTask.SetProgress(0, itemSize, 0, "-")
+
+		if opt.IsMirror {
+			uTask.SetStatus(types.StatusUploading, "GoFile")
+			mirrorStart := time.Now()
+			link, gErr := ext.UploadToGoFile(ctx, curFile, func(sent, total int64) {
+				secs := time.Since(mirrorStart).Seconds()
+				if secs < 0.5 {
+					return
+				}
+				speed := float64(sent) / secs
+				eta := "-"
+				if speed > 0 && total > sent {
+					eta = ext.GetReadableTime(int64(float64(total-sent) / speed))
+				}
+				if speed > maxULSpeed {
+					maxULSpeed = speed
+				}
+				uTask.SetProgress(sent, total, speed, eta)
+			})
+			if gErr != nil {
+				log.Printf("[AZML-Go Mirror] GoFile upload error for %s: %v", curFile, gErr)
+				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("GoFile Upload Failed: %v", gErr), modeStr, taskStartTime)
+				return
+			}
+			mirrorLinks = append(mirrorLinks, link)
+			ext.RecordDailyUsage(msg.UserID, itemSize)
+			continue
+		}
 
 		for idx, part := range splitParts {
 			partCaption := caption
@@ -1323,18 +1358,31 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	sb.WriteString(fmt.Sprintf("└── <b>By:</b> %s\n\n", userTag))
 
 	botPM := cfg.BotPM || (user != nil && user.BotPM) || (msg.ChatID != msg.UserID)
-	if botPM {
-		sb.WriteString("➲ <i>File(s) have been Sent to Bot PM (Private)</i>\n")
-	} else {
-		sb.WriteString("➲ <i>File(s) have been Sent. Access via Links...</i>\n")
-	}
-
-	for idx, upF := range uploadedNames {
-		if idx >= 10 {
-			sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(uploadedNames)-10))
-			break
+	if opt.IsMirror {
+		sb.WriteString("➲ <i>Uploaded to GoFile:</i>\n")
+		for idx, upF := range uploadedNames {
+			if idx >= 10 {
+				sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(uploadedNames)-10))
+				break
+			}
+			if idx < len(mirrorLinks) {
+				sb.WriteString(fmt.Sprintf("%d. <a href=\"%s\">%s</a>\n", idx+1, mirrorLinks[idx], telegram.EscapeHTML(upF)))
+			}
 		}
-		sb.WriteString(fmt.Sprintf("%d. <code>%s</code>\n", idx+1, upF))
+	} else {
+		if botPM {
+			sb.WriteString("➲ <i>File(s) have been Sent to Bot PM (Private)</i>\n")
+		} else {
+			sb.WriteString("➲ <i>File(s) have been Sent. Access via Links...</i>\n")
+		}
+
+		for idx, upF := range uploadedNames {
+			if idx >= 10 {
+				sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(uploadedNames)-10))
+				break
+			}
+			sb.WriteString(fmt.Sprintf("%d. <code>%s</code>\n", idx+1, upF))
+		}
 	}
 
 	botUser := telegram.CurrentBotUsername
@@ -1342,7 +1390,16 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		botUser = "Yukiileechrrbot"
 	}
 	finishBtn := telegram.NewButtonMaker()
-	finishBtn.UButtonStyled("◈ "+telegram.ToSmallCaps("View in Bot PM"), fmt.Sprintf("https://t.me/%s", botUser), "primary")
+	if opt.IsMirror {
+		for idx, link := range mirrorLinks {
+			if idx >= 3 {
+				break
+			}
+			finishBtn.UButtonStyled(fmt.Sprintf("◈ GoFile %d", idx+1), link, "primary")
+		}
+	} else {
+		finishBtn.UButtonStyled("◈ "+telegram.ToSmallCaps("View in Bot PM"), fmt.Sprintf("https://t.me/%s", botUser), "primary")
+	}
 
 	// Send completion message into the group / chat where leech was initiated, replying to user's command
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, sb.String(), msg.MessageID, finishBtn, 1)

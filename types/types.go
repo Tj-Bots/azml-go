@@ -102,9 +102,11 @@ type LeechOptions struct {
 	Select      bool
 	Multi       int
 	MediaGroup  bool
+	IsMirror    bool
 }
 
 type MessageContext struct {
+	IsMirror    bool
 	ChatID      int64
 	MessageID   int
 	UserID      int64

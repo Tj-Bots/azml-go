@@ -757,6 +757,11 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		if b.leechHandler != nil {
 			b.leechHandler(ctx, peer, msgCtx, isZip, isUnzip)
 		}
+	case telegram.MatchCommand(text, telegram.BotCommands.Mirror, b.botUsername):
+		msgCtx.IsMirror = true
+		if b.leechHandler != nil {
+			b.leechHandler(ctx, peer, msgCtx, false, false)
+		}
 	case telegram.MatchCommand(text, telegram.BotCommands.Ytdl, b.botUsername):
 		if b.ytdlHandler != nil {
 			b.ytdlHandler(ctx, peer, msgCtx)

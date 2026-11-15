@@ -51,6 +51,7 @@ func (m *HelpModule) getHelpGuideText() string {
 		"┠ <code>/leech%s [link]</code> — Direct, Magnet, Torrent, Mega, TG media\n"+
 		"┠ <code>/zipleech%s [link]</code> — Zip contents before uploading\n"+
 		"┠ <code>/unzipleech%s [link]</code> — Extract zip/rar/7z archives\n"+
+		"┠ <code>/mirror%s [link]</code> — Download and upload to GoFile, get a link\n"+
 		"╰ <code>/ytdl%s [link]</code> — Download video/audio via yt-dlp</blockquote>\n\n"+
 		"<blockquote>╭ <b>User Configuration:</b>\n"+
 		"┠ <code>/us%s</code> — User settings (Prefix, Suffix, Caption, AutoRename)\n"+
@@ -63,7 +64,7 @@ func (m *HelpModule) getHelpGuideText() string {
 		"╰ <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>\n\n"+
 		"<i>Click Back below to return to start menu.</i>",
 		telegram.ToSmallCaps("AZML-Go Commands Guide"),
-		sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx)
+		sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx)
 }
 
 func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {

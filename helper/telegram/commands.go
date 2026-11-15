@@ -9,6 +9,7 @@ import (
 type Commands struct {
 	Start       []string
 	Leech       []string
+	Mirror      []string
 	Ytdl        []string
 	Status      []string
 	Cancel      []string
@@ -54,6 +55,10 @@ func InitCommands() {
 			"zl" + suffix,
 			"unzipleech" + suffix,
 			"uzl" + suffix,
+		},
+		Mirror: []string{
+			"mirror" + suffix,
+			"m" + suffix,
 		},
 		Ytdl: []string{
 			"ytdl" + suffix,

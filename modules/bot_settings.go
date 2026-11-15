@@ -136,8 +136,11 @@ func isBoolVar(key string) bool {
 
 // isSecretVar: values that should not be shown in full in the chat.
 func isSecretVar(key string) bool {
-	for _, w := range []string{"SESSION", "TOKEN", "_KEY", "_API", "PASSWORD"} {
-		if strings.Contains(key, w) {
+	if strings.Contains(key, "SESSION_STRING") || strings.Contains(key, "PASSWORD") {
+		return true
+	}
+	for _, w := range []string{"_TOKEN", "_KEY", "_API"} {
+		if strings.HasSuffix(key, w) {
 			return true
 		}
 	}

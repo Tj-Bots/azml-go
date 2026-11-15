@@ -92,7 +92,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 							_, err := dl.Download(m.rawAPI, loc).ToPath(ctx, destThumb)
 							if err == nil {
 								u.CustomThumb = destThumb
-								u.ThumbData, _ = os.ReadFile(destThumb)
+								u.ThumbData = ext.ThumbBytes(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
 								_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied photo!</b> It will be attached to all your future leeched files.", msg.MessageID, nil)
@@ -110,7 +110,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 							_, err := dl.Download(m.rawAPI, loc).ToPath(ctx, destThumb)
 							if err == nil {
 								u.CustomThumb = destThumb
-								u.ThumbData, _ = os.ReadFile(destThumb)
+								u.ThumbData = ext.ThumbBytes(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
 								_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied document!</b> It will be attached to all your future leeched files.", msg.MessageID, nil)
@@ -326,15 +326,13 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 	return u.Prefix != "" || u.Suffix != "" || u.Caption != "" ||
 		u.RemnameAuto != "" || u.RemnameRegex != "" || u.SplitSize != 0 ||
-		u.Autorename || u.AutoThumb || u.EqualSplits || u.MediaGroup ||
+		!u.Autorename || (u.RenameMethod != "" && u.RenameMethod != "auto") ||
+		u.AutoThumb || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != ""
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
-	if userName == "" {
-		userName = fmt.Sprintf("User_%d", u.UserID)
-	}
 	if userName == "" {
 		userName = u.Name
 	}
@@ -536,7 +534,6 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 		splitSize = ext.GetReadableFileSize(u.SplitSize)
 	}
 
-
 	text := fmt.Sprintf("㊂ <b><u>Leech Splits Settings :</u></b>\n\n"+
 		"➲ <b>Leech Split Size :</b> <i>%s</i>\n\n"+
 		"➲ <b>Description :</b> <i>Leech Splits Size is the size to split the Leeched File before uploading</i>",
@@ -729,7 +726,8 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.RemnameAuto = ""
 		u.RemnameRegex = ""
 		u.SplitSize = 0
-		u.Autorename = false
+		u.Autorename = true
+		u.RenameMethod = "auto"
 		u.AutoThumb = false
 		u.EqualSplits = false
 		u.MediaGroup = false

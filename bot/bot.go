@@ -1437,7 +1437,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 						if err == nil {
 							u := b.userMap.GetOrCreate(senderID)
 							u.CustomThumb = destThumb
-							u.ThumbData, _ = os.ReadFile(destThumb)
+							u.ThumbData = ext.ThumbBytes(destThumb)
 							_ = ext.DB.SaveUser(u)
 
 							// Always send immediate confirmation to user in current chat
@@ -1511,7 +1511,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 					if err == nil {
 						u := b.userMap.GetOrCreate(senderID)
 						u.CustomThumb = destThumb
-						u.ThumbData, _ = os.ReadFile(destThumb)
+						u.ThumbData = ext.ThumbBytes(destThumb)
 						_ = ext.DB.SaveUser(u)
 
 						// Always send immediate confirmation to user in current chat

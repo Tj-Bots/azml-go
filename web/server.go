@@ -228,11 +228,18 @@ const homepageHTML = `<!DOCTYPE html>
             transition: all 0.3s ease;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .button:hover {
-            transform: translateY(-2px);
+        /* only on devices with a real mouse: on phones :hover stays after the tap */
+        @media (hover: hover) {
+            .button:hover {
+                transform: translateY(-2px);
+                background: linear-gradient(45deg, #00b7ff, #a855f7);
+                color: #000;
+                box-shadow: 0 5px 20px rgba(0, 183, 255, 0.4);
+            }
+        }
+        .button:active {
             background: linear-gradient(45deg, #00b7ff, #a855f7);
             color: #000;
-            box-shadow: 0 5px 20px rgba(0, 183, 255, 0.4);
         }
         .copyright {
             margin-top: 2rem;

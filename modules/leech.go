@@ -464,6 +464,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var totalSize int64
 	var uploadedNames []string
 	var mirrorLinks []string
+	var fileLinks []string // link to each uploaded file in the dump / log channel
 	mirrorSess := &ext.MirrorSession{}
 	modeStr := "#Leech | #Aria2"
 	if ext.IsMagnet(link) || strings.HasSuffix(strings.ToLower(link), ".torrent") {
@@ -1341,9 +1342,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				},
 			}
 
+			upOpt.Result = &partResults[idx]
 			if useGroup {
 				upOpt.SkipDelivery = true
-				upOpt.Result = &partResults[idx]
 				groupOpt = upOpt
 			}
 			_, upErr := m.uploader.UploadFile(ctx, peer, upOpt)
@@ -1360,7 +1361,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					done = append(done, r)
 				}
 			}
-			m.uploader.SendAlbum(ctx, done, groupOpt)
+			if first := m.uploader.SendAlbum(ctx, done, groupOpt); first.MsgID > 0 {
+				partResults[0] = first
+			}
+		}
+		if len(partResults) > 0 {
+			fileLinks = append(fileLinks, channelMessageLink(partResults[0].ChatID, partResults[0].MsgID))
+		} else {
+			fileLinks = append(fileLinks, "")
 		}
 
 		if thumbPath != "" && thumbPath != customThumb {
@@ -1426,9 +1434,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	} else {
 		if botPM {
-			sb.WriteString("➲ <i>File(s) have been Sent to Bot PM (Private)</i>\n")
+			sb.WriteString("➲ <b><i>File(s) have been Sent to Bot PM (Private)</i></b>\n")
 		} else {
-			sb.WriteString("➲ <i>File(s) have been Sent. Access via Links...</i>\n")
+			sb.WriteString("➲ <b><i>File(s) have been Sent. Access via Links...</i></b>\n")
 		}
 
 		for idx, upF := range uploadedNames {
@@ -1436,7 +1444,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(uploadedNames)-10))
 				break
 			}
-			sb.WriteString(fmt.Sprintf("%d. <code>%s</code>\n", idx+1, upF))
+			if idx < len(fileLinks) && fileLinks[idx] != "" {
+				sb.WriteString(fmt.Sprintf("%d. <a href=\"%s\">%s</a>\n", idx+1, fileLinks[idx], telegram.EscapeHTML(upF)))
+			} else {
+				sb.WriteString(fmt.Sprintf("%d. <code>%s</code>\n", idx+1, telegram.EscapeHTML(upF)))
+			}
 		}
 	}
 
@@ -1666,4 +1678,16 @@ func isExcludedFile(path, excluded string) bool {
 		}
 	}
 	return false
+}
+
+// channelMessageLink is the t.me link of a message in a channel ("" for other chats).
+func channelMessageLink(chatID int64, msgID int) string {
+	if msgID <= 0 {
+		return ""
+	}
+	id := fmt.Sprintf("%d", chatID)
+	if !strings.HasPrefix(id, "-100") {
+		return ""
+	}
+	return fmt.Sprintf("https://t.me/c/%s/%d", strings.TrimPrefix(id, "-100"), msgID)
 }

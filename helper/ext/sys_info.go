@@ -220,7 +220,7 @@ func RenderBotStats(startTime time.Time) string {
 	appRAM := GetAppMemoryUsageMB()
 
 	return fmt.Sprintf("⌬ <b><i>BOT STATISTICS :</i></b>\n"+
-		"<blockquote>╭ <b>Bot Uptime :</b> %s</blockquote>\n\n"+
+		"<blockquote>◈ <b>Bot Uptime :</b> %s</blockquote>\n\n"+
 		"<blockquote>╭ <b><i>RAM ( MEMORY ) :</i></b>\n"+
 		"┠ %s %.1f%%\n"+
 		"┠ <b>App RAM :</b> <code>%.1f MB</code>\n"+

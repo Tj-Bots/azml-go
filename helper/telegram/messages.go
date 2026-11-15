@@ -298,10 +298,11 @@ func (m *MessageSender) SendMessage(ctx context.Context, peer tg.InputPeerClass,
 
 	plainText, entities := ParseFormatting(text)
 	req := &tg.MessagesSendMessageRequest{
-		Peer:     peer,
-		Message:  plainText,
-		Entities: entities,
-		RandomID: time.Now().UnixNano(),
+		Peer:      peer,
+		Message:   plainText,
+		Entities:  entities,
+		RandomID:  time.Now().UnixNano(),
+		NoWebpage: true, // no link previews in bot messages
 	}
 	if replyToID != 0 {
 		req.ReplyTo = &tg.InputReplyToMessage{
@@ -344,10 +345,11 @@ func (m *MessageSender) EditMessage(ctx context.Context, peer tg.InputPeerClass,
 	}
 	plainText, entities := ParseFormatting(text)
 	req := &tg.MessagesEditMessageRequest{
-		Peer:     peer,
-		ID:       msgID,
-		Message:  plainText,
-		Entities: entities,
+		Peer:      peer,
+		ID:        msgID,
+		Message:   plainText,
+		Entities:  entities,
+		NoWebpage: true,
 	}
 	if markup != nil {
 		req.ReplyMarkup = markup
@@ -431,9 +433,10 @@ func (m *MessageSender) EditMessageWithButtons(ctx context.Context, peer tg.Inpu
 
 func (m *MessageSender) sendBotAPIMessage(ctx context.Context, botToken string, chatID int64, text string, replyToID int, markup tg.ReplyMarkupClass) (int, error) {
 	payload := map[string]interface{}{
-		"chat_id":    chatID,
-		"text":       text,
-		"parse_mode": "HTML",
+		"chat_id":              chatID,
+		"text":                 text,
+		"parse_mode":           "HTML",
+		"link_preview_options": map[string]bool{"is_disabled": true},
 	}
 	if replyToID != 0 {
 		payload["reply_to_message_id"] = replyToID
@@ -514,10 +517,11 @@ func buildBotAPIKeyboard(markup tg.ReplyMarkupClass) (json.RawMessage, error) {
 
 func (m *MessageSender) editBotAPIMessage(ctx context.Context, botToken string, chatID int64, msgID int, text string, btn *ButtonMaker, cols int) error {
 	payload := map[string]interface{}{
-		"chat_id":    chatID,
-		"message_id": msgID,
-		"text":       text,
-		"parse_mode": "HTML",
+		"chat_id":              chatID,
+		"message_id":           msgID,
+		"text":                 text,
+		"parse_mode":           "HTML",
+		"link_preview_options": map[string]bool{"is_disabled": true},
 	}
 	if btn != nil {
 		payload["reply_markup"] = json.RawMessage(btn.BuildBotAPIKeyboard(cols))
@@ -554,10 +558,11 @@ func (m *MessageSender) editBotAPIMessage(ctx context.Context, botToken string, 
 	// If the message is a photo/media message, edit caption instead
 	if strings.Contains(res.Description, "there is no text in the message to edit") {
 		capPayload := map[string]interface{}{
-			"chat_id":    chatID,
-			"message_id": msgID,
-			"caption":    text,
-			"parse_mode": "HTML",
+			"chat_id":              chatID,
+			"message_id":           msgID,
+			"caption":              text,
+			"parse_mode":           "HTML",
+			"link_preview_options": map[string]bool{"is_disabled": true},
 		}
 		if btn != nil {
 			capPayload["reply_markup"] = json.RawMessage(btn.BuildBotAPIKeyboard(cols))
@@ -637,10 +642,11 @@ func (m *MessageSender) SendPhotoFromURLWithButtons(ctx context.Context, peer tg
 
 	if botToken != "" && chatID != 0 {
 		payload := map[string]interface{}{
-			"chat_id":    chatID,
-			"photo":      imageURL,
-			"caption":    caption,
-			"parse_mode": "HTML",
+			"chat_id":              chatID,
+			"photo":                imageURL,
+			"caption":              caption,
+			"parse_mode":           "HTML",
+			"link_preview_options": map[string]bool{"is_disabled": true},
 		}
 		if btn != nil {
 			payload["reply_markup"] = json.RawMessage(btn.BuildBotAPIKeyboard(cols))

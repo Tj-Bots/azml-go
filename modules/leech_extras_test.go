@@ -16,3 +16,12 @@ func TestCaptionFontAndExcluded(t *testing.T) {
 		t.Fatal("excluded check wrong")
 	}
 }
+
+func TestChannelMessageLink(t *testing.T) {
+	if got := channelMessageLink(-1002472959232, 15); got != "https://t.me/c/2472959232/15" {
+		t.Fatal(got)
+	}
+	if channelMessageLink(6335855540, 3) != "" || channelMessageLink(-1002472959232, 0) != "" {
+		t.Fatal("no link expected")
+	}
+}

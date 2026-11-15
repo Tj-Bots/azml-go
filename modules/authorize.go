@@ -307,25 +307,28 @@ func (m *AuthorizeModule) HandleUsers(ctx context.Context, peer tg.InputPeerClas
 	}
 	list := func(title string, ids []string) string {
 		if len(ids) == 0 {
-			return fmt.Sprintf("<blockquote>╭ <b>%s:</b> 0</blockquote>\n", title)
+			return fmt.Sprintf("<blockquote>◈ <b>%s :</b> 0</blockquote>", title)
 		}
 		shown := ids
-		more := ""
+		more := 0
 		if len(shown) > 30 {
-			more = fmt.Sprintf("\n╰ <i>...and %d more</i>", len(ids)-30)
+			more = len(ids) - 30
 			shown = shown[:30]
 		}
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>%s:</b> %d\n", title, len(ids)))
+		sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>%s :</b> %d", title, len(ids)))
 		for i, id := range shown {
 			mark := "┠"
-			if i == len(shown)-1 && more == "" {
+			if i == len(shown)-1 && more == 0 {
 				mark = "╰"
 			}
-			sb.WriteString(fmt.Sprintf("%s %s\n", mark, id))
+			sb.WriteString(fmt.Sprintf("\n%s %s", mark, id))
 		}
-		out := strings.TrimRight(sb.String(), "\n") + more + "</blockquote>\n"
-		return out
+		if more > 0 {
+			sb.WriteString(fmt.Sprintf("\n╰ <i>...and %d more</i>", more))
+		}
+		sb.WriteString("</blockquote>")
+		return sb.String()
 	}
 	cmd := strings.ToLower(strings.TrimPrefix(strings.Fields(msg.Text + " x")[0], "/"))
 	if i := strings.Index(cmd, "@"); i >= 0 {
@@ -334,14 +337,20 @@ func (m *AuthorizeModule) HandleUsers(ctx context.Context, peer tg.InputPeerClas
 	var text string
 	switch {
 	case strings.HasPrefix(cmd, "authlist"):
-		text = "⌬ <b><u>Authorized</u></b>\n\n" + list("Authorized", auth)
+		text = "㊂ <b><u>Authorized :</u></b>\n\n" + list("Authorized", auth)
 	case strings.HasPrefix(cmd, "sudolist"):
-		text = "⌬ <b><u>Sudo</u></b>\n\n" + list("Sudo", sudo)
+		text = "㊂ <b><u>Sudo :</u></b>\n\n" + list("Sudo", sudo)
 	case strings.HasPrefix(cmd, "blacklisted"):
-		text = "⌬ <b><u>Blacklisted</u></b>\n\n" + list("Blacklisted", black)
+		text = "㊂ <b><u>Blacklisted :</u></b>\n\n" + list("Blacklisted", black)
 	default:
-		text = fmt.Sprintf("⌬ <b><u>Users</u></b>\n\n<blockquote>╭ <b>Saved users / chats:</b> %d</blockquote>\n", len(all)) +
-			list("Authorized", auth) + list("Sudo", sudo) + list("Premium", prem) + list("Blacklisted", black)
+		text = fmt.Sprintf("㊂ <b><u>Users :</u></b>\n\n"+
+			"<blockquote>╭ <b>Saved users / chats :</b> %d\n"+
+			"┠ <b>Authorized :</b> %d\n"+
+			"┠ <b>Sudo :</b> %d\n"+
+			"┠ <b>Premium :</b> %d\n"+
+			"╰ <b>Blacklisted :</b> %d</blockquote>\n\n"+
+			"➲ <i>Lists:</i> /authlist /sudolist /blacklisted",
+			len(all), len(auth), len(sudo), len(prem), len(black))
 	}
 	_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 }

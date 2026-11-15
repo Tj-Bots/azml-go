@@ -763,7 +763,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		}
 		ext.SetPendingBotSettingSession(fromUID, "SHORTENER", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-			"<blockquote>╭ <b>Current Domain:</b> <code>%s</code></blockquote>\n\n"+
+			"<blockquote>◈ <b>Current Domain:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Send the shortener domain (e.g. <code>droplink.co</code> or <code>https://api.shareus.io/short?api=%%s&url=%%s</code>).</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
@@ -780,7 +780,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		cur := maskAPI(cfg.ShortenerAPI)
 		ext.SetPendingBotSettingSession(fromUID, "SHORTENER_API", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-			"<blockquote>╭ <b>Current API Key:</b> <code>%s</code></blockquote>\n\n"+
+			"<blockquote>◈ <b>Current API Key:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Send your shortener API key in chat.</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
@@ -797,7 +797,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		cur := ext.GetReadableTime(cfg.TokenTimeout)
 		ext.SetPendingBotSettingSession(fromUID, "TOKEN_TIMEOUT", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-			"<blockquote>╭ <b>Current Validity:</b> <code>%s</code></blockquote>\n\n"+
+			"<blockquote>◈ <b>Current Validity:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Send custom validity duration in seconds (e.g. <code>86400</code>) or with suffix (e.g. <code>24h</code>, <code>12h</code>, <code>2d</code>).</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",

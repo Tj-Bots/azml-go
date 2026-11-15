@@ -85,9 +85,11 @@ func copyMessagesViaBotAPI(botToken string, toChatID, fromChatID int64, msgIDs [
 // SendAlbum turns the uploaded parts of one file into a media group (up to 10 per album),
 // like the Python bot: the single part messages are replaced by the album, then the album
 // is copied to the user's PM, the user dump and the leech log.
-func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, opt UploadOptions) {
+// It returns where the first album message is (zero when nothing was sent).
+func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, opt UploadOptions) UploadResult {
+	var first UploadResult
 	if len(parts) == 0 {
-		return
+		return first
 	}
 	cfg := config.Get()
 	botToken := cfg.BotToken
@@ -113,8 +115,14 @@ func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, 
 
 		albumIDs := u.makeAlbum(ctx, destChat, chunk, opt.UserAccessHash)
 		deliverIDs := ids
+		if first.MsgID == 0 {
+			first = UploadResult{ChatID: destChat, MsgID: ids[0]}
+		}
 		if len(albumIDs) > 0 {
 			deliverIDs = albumIDs
+			if start == 0 {
+				first = UploadResult{ChatID: destChat, MsgID: albumIDs[0]}
+			}
 			for _, id := range ids {
 				if !deleteMessageViaBotAPI(botToken, destChat, id) {
 					log.Printf("[Media Group] could not delete part message %d in %d", id, destChat)
@@ -149,6 +157,7 @@ func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, 
 			}
 		}
 	}
+	return first
 }
 
 // makeAlbum sends the parts again as one media group in destChat and returns the new message ids.

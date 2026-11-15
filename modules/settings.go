@@ -326,7 +326,7 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.RemnameAuto != "" || u.RemnameRegex != "" || u.SplitSize != 0 ||
 		u.Autorename || u.AutoThumb || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
-		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" || u.BotPM
+		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != ""
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -447,12 +447,11 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		"┠ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
 		"┠ <b>Leech Metadata :</b> <code>%s</code>\n"+
 		"┠ <b>Caption Font :</b> <i>%s</i>\n"+
-		"┠ <b>Excluded Ext :</b> <code>%s</code>\n"+
-		"╰ <b>Bot PM :</b> <i>%s</i></blockquote>",
+		"╰ <b>Excluded Ext :</b> <code>%s</code></blockquote>",
 		"Leech Settings",
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
 		caption, prefix, suffix, dumps, remnameAuto, remnameRegex, renameMethod,
-		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts), onOff(u.BotPM))
+		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts))
 
 	btn := telegram.NewButtonMaker()
 	docLabel := "Send As Document"
@@ -487,7 +486,6 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	btn.IButton("Caption Font", fmt.Sprintf("userset %d capfont", u.UserID))
 	btn.IButton("Excluded Ext", fmt.Sprintf("userset %d lexcluded", u.UserID))
 	btn.Row()
-	toggle("Bot PM", u.BotPM, fmt.Sprintf("userset %d botpm", u.UserID))
 	if u.RenameMethod == "regex" {
 		btn.IButton("Rename Method: Regex", fmt.Sprintf("userset %d rename_method", u.UserID))
 	} else {
@@ -1307,7 +1305,7 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 				"<b>Clear:</b> <code>/ar off</code>",
 				telegram.ToSmallCaps("Current AutoRename Template"),
 				telegram.EscapeHTML(current))
-			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup())
+			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		} else {
 			text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 				"<b>No AutoRename template set.</b>\n\n"+
@@ -1323,7 +1321,7 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 				"  • <code>{episode:+N}</code> — episode with offset\n\n"+
 				"<b>Clear:</b> <code>/ar off</code>",
 				telegram.ToSmallCaps("AutoRename Guide"))
-			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup())
+			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		}
 		return
 	}

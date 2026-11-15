@@ -46,7 +46,7 @@ func (m *BroadcastModule) HandleBroadcast(ctx context.Context, peer tg.InputPeer
 				"• Send text: <code>/broadcast [Your message here]</code>\n\n" +
 				"<b>Flags:</b>\n" +
 				"<code>-q</code> Send quietly (no notification)"
-			_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup())
+			_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 			return
 		}
 	}

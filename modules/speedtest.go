@@ -151,7 +151,7 @@ func (m *SpeedtestModule) HandleSpeedtest(ctx context.Context, peer tg.InputPeer
 			log.Printf("[AZML-Go Speedtest] Photo sending fallback to text edit: %v", pErr)
 		}
 
-		_ = m.sender.EditMessage(ctx, peer, waitID, caption, telegram.CloseMarkup())
+		_ = m.sender.EditMessage(ctx, peer, waitID, caption, telegram.CloseMarkup(msg.UserID))
 	}()
 }
 

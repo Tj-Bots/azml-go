@@ -343,5 +343,5 @@ func (m *AuthorizeModule) HandleUsers(ctx context.Context, peer tg.InputPeerClas
 		text = fmt.Sprintf("⌬ <b><u>Users</u></b>\n\n<blockquote>╭ <b>Saved users / chats:</b> %d</blockquote>\n", len(all)) +
 			list("Authorized", auth) + list("Sudo", sudo) + list("Premium", prem) + list("Blacklisted", black)
 	}
-	_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup())
+	_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 }

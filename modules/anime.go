@@ -80,7 +80,7 @@ func (m *AnimeModule) HandleAnime(ctx context.Context, peer tg.InputPeerClass, m
 		helpMsg := "<b>Anime Search Usage:</b>\n" +
 			"• <code>/anime [anime title]</code>\n" +
 			"• <code>/anilist [anime title]</code>"
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup())
+		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}
 

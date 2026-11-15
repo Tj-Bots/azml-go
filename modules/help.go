@@ -94,7 +94,7 @@ func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, ms
 func (m *HelpModule) HandleHelp(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	helpText := m.getHelpGuideText()
 	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("❌", "start_close", "danger")
+	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", msg.UserID), "danger")
 	btn.Row()
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, helpText, msg.MessageID, btn, 1)
 }
@@ -104,7 +104,7 @@ func (m *HelpModule) HandlePing(ctx context.Context, peer tg.InputPeerClass, msg
 	resID, err := m.sender.SendMessage(ctx, peer, "<i>Pinging...</i>", msg.MessageID, nil)
 	if err == nil && resID > 0 {
 		diff := time.Since(start).Milliseconds()
-		_ = m.sender.EditMessage(ctx, peer, resID, fmt.Sprintf("⌬ <b>Pong!</b> <code>%d ms</code>", diff), telegram.CloseMarkup())
+		_ = m.sender.EditMessage(ctx, peer, resID, fmt.Sprintf("⌬ <b>Pong!</b> <code>%d ms</code>", diff), telegram.CloseMarkup(msg.UserID))
 	}
 }
 
@@ -152,7 +152,7 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 		helpText := m.getHelpGuideText()
 		helpBtn := telegram.NewButtonMaker()
 		helpBtn.IButtonStyled("◀️", "start_back", "primary")
-		helpBtn.IButtonStyled("❌", "start_close", "danger")
+		helpBtn.IButtonStyled("❌", fmt.Sprintf("start_close %d", fromUID), "danger")
 		helpBtn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, helpText, helpBtn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
@@ -163,7 +163,11 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		return
 	}
-	if data == "start_close" {
+	if data == "start_close" || strings.HasPrefix(data, "start_close ") {
+		if owner := strings.TrimSpace(strings.TrimPrefix(data, "start_close")); owner != "" && owner != fmt.Sprintf("%d", fromUID) {
+			_ = m.sender.AnswerCallback(ctx, queryID, "This is not for you!", true)
+			return
+		}
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
 		m.sender.DeleteWithCommand(ctx, peer, msgID)
 		return
@@ -215,7 +219,7 @@ func (m *HelpModule) HandleLog(ctx context.Context, peer tg.InputPeerClass, msg 
 		_, _ = m.sender.SendMessage(ctx, peer, "⌬ <b>Logs:</b> nothing logged yet.", msg.MessageID, nil)
 		return
 	}
-	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>", msg.MessageID, telegram.CloseMarkup()); err != nil {
+	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>", msg.MessageID, telegram.CloseMarkup(msg.UserID)); err != nil {
 		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Could not send the log:</b> <code>%s</code>", telegram.EscapeHTML(err.Error())), msg.MessageID, nil)
 	}
 }

@@ -45,7 +45,7 @@ func (m *ImdbModule) HandleImdb(ctx context.Context, peer tg.InputPeerClass, msg
 		helpMsg := "<b>IMDb Search Usage:</b>\n" +
 			"• <code>/imdb [movie or series name]</code>\n" +
 			"• <code>/imdb tt1234567</code>"
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup())
+		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}
 

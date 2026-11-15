@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
 	"strings"
 
@@ -247,9 +248,10 @@ func (b *ButtonMaker) Rows(cols int) [][]InlineButton {
 }
 
 // CloseMarkup is a single ❌ button that deletes the message and the command it answers.
-func CloseMarkup() tg.ReplyMarkupClass {
+// Only userID can use it.
+func CloseMarkup(userID int64) tg.ReplyMarkupClass {
 	btn := NewButtonMaker()
-	btn.IButtonStyled("❌", "start_close", "danger")
+	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", userID), "danger")
 	btn.Row()
 	return btn.BuildMenu(1)
 }

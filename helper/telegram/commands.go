@@ -25,6 +25,7 @@ type Commands struct {
 	Blacklist   []string
 	RmBlacklist []string
 	Users       []string
+	History     []string
 	Ping        []string
 	Stats       []string
 	Restart     []string
@@ -126,6 +127,9 @@ func InitCommands() {
 		RmBlacklist: []string{
 			"rmblacklist" + suffix,
 			"rbl" + suffix,
+		},
+		History: []string{
+			"history" + suffix,
 		},
 		Users: []string{
 			"users" + suffix,

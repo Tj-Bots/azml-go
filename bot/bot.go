@@ -68,6 +68,8 @@ type BotApp struct {
 	blacklistHandler      func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	rmBlacklistHandler    func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	usersHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	historyHandler        func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	retryCbHandler        func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	authHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	unauthHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	addSudoHandler        func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -439,6 +441,12 @@ func (b *BotApp) SetAdminHandlers(blacklist, rmBlacklist, users func(ctx context
 	b.blacklistHandler = blacklist
 	b.rmBlacklistHandler = rmBlacklist
 	b.usersHandler = users
+}
+
+// SetTaskExtras: /history and the Retry button of failed tasks.
+func (b *BotApp) SetTaskExtras(history func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext), retry func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
+	b.historyHandler = history
+	b.retryCbHandler = retry
 }
 func (b *BotApp) SetHelpHandlers(
 	start, help, ping, stats, logH, restart func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext),
@@ -836,6 +844,10 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		if b.rmBlacklistHandler != nil {
 			b.rmBlacklistHandler(ctx, peer, msgCtx)
 		}
+	case telegram.MatchCommand(text, telegram.BotCommands.History, b.botUsername):
+		if b.historyHandler != nil {
+			b.historyHandler(ctx, peer, msgCtx)
+		}
 	case telegram.MatchCommand(text, telegram.BotCommands.Users, b.botUsername):
 		if b.usersHandler != nil {
 			b.usersHandler(ctx, peer, msgCtx)
@@ -910,6 +922,10 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 	case strings.HasPrefix(data, "uset") || strings.HasPrefix(data, "userset"):
 		if b.settingsCbHandler != nil {
 			b.settingsCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
+		}
+	case strings.HasPrefix(data, "retry "):
+		if b.retryCbHandler != nil {
+			b.retryCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
 	case strings.HasPrefix(data, "mirror "):
 		b.handleMirrorCallback(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
@@ -1185,6 +1201,9 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 	if len(bc.UnAuthorize) > 1 {
 		addCmd(bc.UnAuthorize[0], fmt.Sprintf("or /%s Unauthorize a user or chat (Owner/Sudo)", bc.UnAuthorize[1]))
+	}
+	if len(bc.History) > 0 {
+		addCmd(bc.History[0], "Your last finished tasks")
 	}
 	if len(bc.Users) > 0 {
 		addCmd(bc.Users[0], "Users, Sudo and Blacklist lists (Owner/Sudo)")

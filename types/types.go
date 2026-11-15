@@ -44,7 +44,17 @@ type UserSettings struct {
 	Screenshots    int               `json:"screenshots" bson:"screenshots"`                   // screenshots per video, 0 = off
 	SampleSec      int               `json:"sample_sec" bson:"sample_sec"`                     // sample video length, 0 = off
 	DDLKeys        map[string]string `json:"ddl_keys" bson:"ddl_keys"`                         // per user API keys of the /mirror hosts
+	History        []HistoryEntry    `json:"history" bson:"history"`                           // the last finished tasks (newest first)
 	ThumbData      []byte            `json:"thumb_data,omitempty" bson:"thumb_data,omitempty"` // the thumbnail image, so it survives restarts
+}
+
+// HistoryEntry is one finished task in /history.
+type HistoryEntry struct {
+	Name string `json:"name" bson:"name"`
+	Size int64  `json:"size" bson:"size"`
+	Mode string `json:"mode" bson:"mode"`
+	Link string `json:"link" bson:"link"`
+	Time int64  `json:"time" bson:"time"`
 }
 
 type TaskStatus string

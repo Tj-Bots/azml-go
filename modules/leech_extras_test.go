@@ -1,6 +1,10 @@
 package modules
 
-import "testing"
+import (
+	"testing"
+
+	"azml-go/types"
+)
 
 func TestCaptionFontAndExcluded(t *testing.T) {
 	if got := applyCaptionFont("hi", "b"); got != "<b>hi</b>" {
@@ -23,5 +27,15 @@ func TestChannelMessageLink(t *testing.T) {
 	}
 	if channelMessageLink(6335855540, 3) != "" || channelMessageLink(-1002472959232, 0) != "" {
 		t.Fatal("no link expected")
+	}
+}
+
+func TestHistoryKeepsTen(t *testing.T) {
+	u := &types.UserSettings{}
+	for i := 0; i < 12; i++ {
+		addHistory(u, types.HistoryEntry{Name: string(rune('a' + i))})
+	}
+	if len(u.History) != 10 || u.History[0].Name != "l" {
+		t.Fatalf("history wrong: %d %q", len(u.History), u.History[0].Name)
 	}
 }

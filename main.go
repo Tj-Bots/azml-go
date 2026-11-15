@@ -190,6 +190,7 @@ func main() {
 	animeMod := modules.NewAnimeModule(sender)
 
 	app.SetLeechHandler(leechMod.HandleLeech)
+	app.SetTaskExtras(leechMod.HandleHistory, leechMod.HandleRetryCallback)
 	app.SetYtdlHandler(ytdlMod.HandleYtdl)
 	app.SetStatusHandlers(statusMod.HandleStatus, statusMod.HandleCallback)
 	app.SetCancelHandlers(cancelMod.HandleCancel, cancelMod.HandleCancelAll, cancelMod.HandleCallback)

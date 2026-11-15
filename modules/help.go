@@ -57,7 +57,8 @@ func (m *HelpModule) getHelpGuideText() string {
 		"┠ <code>/us%s</code> — User settings (Prefix, Suffix, Caption, AutoRename)\n"+
 		"┠ <code>/ar%s [template]</code> — Quick AutoRename template set/clear\n"+
 		"┠ <code>/setthumb%s</code> (reply) — Set custom leech thumbnail\n"+
-		"╰ <code>/status%s</code> — Live download & upload speed and progress</blockquote>\n\n"+
+		"┠ <code>/status%s</code> — Live download & upload speed and progress\n"+
+		"╰ <code>/history</code> — Your last 10 finished tasks</blockquote>\n\n"+
 		"<blockquote>╭ <b>Admin & Control:</b>\n"+
 		"┠ <code>/bs%s</code> — Bot Settings (Config vars, Aria2c, Private files)\n"+
 		"┠ <code>/cancel%s [GID]</code> — Cancel specific task\n"+

@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"sync"
 	"context"
 	"errors"
 	"fmt"
@@ -339,7 +340,7 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 			_ = m.sender.DeleteMessage(ctx, peer, []int{notifyID})
 		}
 	}
-	_, _ = m.sender.SendMessage(ctx, peer, errMsg, msg.MessageID, nil)
+	_, _ = m.sender.SendMessage(ctx, peer, errMsg, msg.MessageID, retryMarkup(msg))
 
 	if m.statusMod != nil {
 		if m.taskMgr.Count() == 0 {
@@ -1552,6 +1553,23 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	// Send completion message into the group / chat where leech was initiated, replying to user's command
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, sb.String(), msg.MessageID, finishBtn, 1)
 
+	if user != nil {
+		mode := "Leech"
+		if opt.IsMirror {
+			mode = mirrorHostName(opt.MirrorHost)
+		}
+		for idx, name := range uploadedNames {
+			link := ""
+			if opt.IsMirror && idx < len(mirrorLinks) {
+				link = mirrorLinks[idx]
+			} else if idx < len(fileLinks) {
+				link = fileLinks[idx]
+			}
+			addHistory(user, types.HistoryEntry{Name: name, Size: totalSize / int64(len(uploadedNames)), Mode: mode, Link: link, Time: time.Now().Unix()})
+		}
+		_ = ext.DB.SaveUser(user)
+	}
+
 	m.taskMgr.RemoveTask(taskUID)
 	if m.taskMgr.Count() == 0 {
 		if m.statusMod != nil {
@@ -1852,4 +1870,88 @@ func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeer
 		}
 		return d.FileReference, nil
 	})
+}
+
+// ---- Retry and /history ----
+
+type retryEntry struct {
+	msg *types.MessageContext
+	at  time.Time
+}
+
+var (
+	retryMu    sync.Mutex
+	retryStore = map[string]retryEntry{}
+)
+
+// retryMarkup keeps the failed command so the Retry button can run it again (for 1 hour).
+func retryMarkup(msg *types.MessageContext) tg.ReplyMarkupClass {
+	if msg == nil {
+		return nil
+	}
+	key := ext.RandomHex(4)
+	cp := *msg
+	retryMu.Lock()
+	for k, v := range retryStore {
+		if time.Since(v.at) > time.Hour {
+			delete(retryStore, k)
+		}
+	}
+	retryStore[key] = retryEntry{msg: &cp, at: time.Now()}
+	retryMu.Unlock()
+	btn := telegram.NewButtonMaker()
+	btn.IButtonStyled("↻ Retry", fmt.Sprintf("retry %d %s", msg.UserID, key), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", msg.UserID), "danger")
+	btn.Row()
+	return btn.BuildMenu(2)
+}
+
+// HandleRetryCallback runs a failed task again: "retry <userID> <key>".
+func (m *LeechModule) HandleRetryCallback(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64) {
+	parts := strings.Fields(data)
+	if len(parts) < 3 || parts[1] != fmt.Sprintf("%d", fromUID) {
+		_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+		return
+	}
+	retryMu.Lock()
+	entry, ok := retryStore[parts[2]]
+	delete(retryStore, parts[2])
+	retryMu.Unlock()
+	if !ok {
+		_ = m.sender.AnswerCallback(ctx, queryID, "Retry is not available anymore!", true)
+		return
+	}
+	_ = m.sender.AnswerCallback(ctx, queryID, "Retrying...", false)
+	_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+	lower := strings.ToLower(entry.msg.Text)
+	isUnzip := strings.Contains(lower, "unzip")
+	isZip := strings.Contains(lower, "zip") && !isUnzip
+	go m.HandleLeech(context.Background(), peer, entry.msg, isZip, isUnzip)
+}
+
+func addHistory(u *types.UserSettings, e types.HistoryEntry) {
+	u.History = append([]types.HistoryEntry{e}, u.History...)
+	if len(u.History) > 10 {
+		u.History = u.History[:10]
+	}
+}
+
+// HandleHistory shows the user's last 10 finished tasks.
+func (m *LeechModule) HandleHistory(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
+	u := m.userMap.Get(msg.UserID)
+	if u == nil || len(u.History) == 0 {
+		_, _ = m.sender.SendMessage(ctx, peer, "㊂ <b><u>History :</u></b>\n\n<blockquote>◈ <i>No finished tasks yet.</i></blockquote>", msg.MessageID, telegram.CloseMarkup(msg.UserID))
+		return
+	}
+	var sb strings.Builder
+	sb.WriteString("㊂ <b><u>History :</u></b>\n\n")
+	for i, h := range u.History {
+		name := telegram.EscapeHTML(h.Name)
+		if h.Link != "" {
+			name = fmt.Sprintf("<a href=\"%s\">%s</a>", h.Link, name)
+		}
+		when := time.Unix(h.Time, 0).Format("02/01 15:04")
+		sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>%d.</b> %s\n╰ %s | %s | %s</blockquote>\n", i+1, name, ext.GetReadableFileSize(h.Size), telegram.EscapeHTML(h.Mode), when))
+	}
+	_, _ = m.sender.SendMessage(ctx, peer, sb.String(), msg.MessageID, telegram.CloseMarkup(msg.UserID))
 }

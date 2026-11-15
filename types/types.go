@@ -157,7 +157,7 @@ func (m *SafeUserMap) GetOrCreate(userID int64) *UserSettings {
 		UserID:       userID,
 		Autorename:   true,
 		RenameMethod: "auto",
-		AsDoc:        true,
+		AsDoc:        false, // upload as media by default
 		Metadata:     make(map[string]string),
 	}
 	m.users[userID] = u

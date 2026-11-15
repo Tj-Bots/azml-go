@@ -122,7 +122,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 
 		// Activate 60s listener
 		ext.SetPendingThumbSession(msg.UserID, msg.ChatID, msg.MessageID, 60*time.Second)
-		promptText := "⌬ <b><u>Send Custom Thumbnail</u></b>\n\n" +
+		promptText := "㊂ <b><u>Send Custom Thumbnail</u></b>\n\n" +
 			"Please send a <b>photo</b> or image document within the next <b>60 seconds</b>.\n\n" +
 			"<i>Once received, it will be automatically saved as your custom thumbnail.</i>\n" +
 			"<i>Send /cancel to abort.</i>"
@@ -295,7 +295,7 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 	if name == "" {
 		name = fmt.Sprintf("User_%d", u.UserID)
 	}
-	text := fmt.Sprintf("⌬ <b><u>%s</u> for <a href=\"tg://user?id=%d\">%s</a></b> (<code>%d</code>)\n\n"+
+	text := fmt.Sprintf("㊂ <b><u>%s</u> for <a href=\"tg://user?id=%d\">%s</a></b> (<code>%d</code>)\n\n"+
 		"<i>Select a category below to configure your preferences:</i>",
 		telegram.ToSmallCaps("User Settings"), u.UserID, name, u.UserID)
 
@@ -414,7 +414,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	}
 
 	// Exact AZML text format with small caps header
-	text := fmt.Sprintf("⌬ <b><u>%s :</u></b> %s\n\n"+
+	text := fmt.Sprintf("㊂ <b><u>%s :</u></b> %s\n\n"+
 		"<blockquote>╭ <b>Daily Leech :</b> <code>%s</code> per day\n"+
 		"┠ <b>Leech Type :</b> <i>%s</i>\n"+
 		"┠ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
@@ -431,7 +431,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		"┠ <b>AutoRename :</b> <i>%s</i>\n"+
 		"┠ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
 		"╰ <b>Leech Metadata :</b> <code>%s</code></blockquote>",
-		telegram.ToSmallCaps("Leech Settings"),
+		"Leech Settings",
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
 		caption, prefix, suffix, dumps, remnameAuto, remnameRegex, renameMethod,
 		autorename, autoThumb, metadata)
@@ -496,13 +496,11 @@ func (m *SettingsModule) buildThumbnailMenu(u *types.UserSettings, banner ...str
 		bannerText = banner[0] + "\n\n"
 	}
 
-	text := fmt.Sprintf("%s⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Status:</b> <code>%s</code>\n"+
-		"╰ <b>Stored File:</b> <code>%s</code></blockquote>\n\n"+
-		"<i>Custom thumbnail will be embedded into your leeched media files.</i>\n\n"+
-		"• Click <b>Change Thumbnail</b> to activate photo listener.\n"+
-		"• Alternatively reply to a photo with <code>/us thumb</code>.",
-		bannerText, telegram.ToSmallCaps("Custom Thumbnail Settings"), status, u.CustomThumb)
+	text := fmt.Sprintf("%s㊂ <b><u>Custom Thumbnail Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
+		"╰ <b>Set it :</b> reply to a photo with <code>/us thumb</code></blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Custom thumbnail used for your leeched files.</i>",
+		bannerText, status)
 
 	btn := telegram.NewButtonMaker()
 	if exists {
@@ -538,12 +536,12 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 		mgStatus = "Enabled"
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Current Split Size:</b> <code>%s</code>\n"+
-		"┠ <b>Equal Splits:</b> <i>%s</i>\n"+
-		"╰ <b>Media Group:</b> <i>%s</i></blockquote>\n\n"+
-		"<i>Files larger than this limit will be automatically split before uploading.</i>",
-		telegram.ToSmallCaps("Leech Split Settings"), splitSize, eqStatus, mgStatus)
+	text := fmt.Sprintf("㊂ <b><u>Leech Split Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Leech Split Size :</b> <code>%s</code>\n"+
+		"┠ <b>Equal Splits :</b> <i>%s</i>\n"+
+		"╰ <b>Media Group :</b> <i>%s</i></blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Files larger than this size are split before uploading.</i>",
+		splitSize, eqStatus, mgStatus)
 
 	btn := telegram.NewButtonMaker()
 
@@ -582,16 +580,13 @@ func (m *SettingsModule) buildCaptionMenu(u *types.UserSettings) (string, *teleg
 		caption = telegram.EscapeHTML(u.Caption)
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Current Caption:</b>\n<code>%s</code></blockquote>\n\n"+
-		"➲ <b>Supported Format Tags:</b>\n"+
-		"• <code>{filename}</code> - Original or renamed filename\n"+
-		"• <code>{size}</code> - File size (e.g. 1.25 GB)\n"+
-		"• <code>{duration}</code> - Video duration (e.g. 01:23:45)\n"+
-		"• <code>{quality}</code> - Video quality (e.g. 1080p, 720p)\n"+
-		"• <code>{languages}</code> - Audio stream languages\n"+
-		"• <code>{subtitles}</code> - Subtitle languages",
-		telegram.ToSmallCaps("Leech Caption Template"), caption)
+	text := fmt.Sprintf("㊂ <b><u>Leech Caption Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Leech Caption :</b> <code>%s</code>\n"+
+		"┠ <code>{filename}</code> name · <code>{size}</code> size\n"+
+		"┠ <code>{duration}</code> duration · <code>{quality}</code> quality\n"+
+		"╰ <code>{languages}</code> audio · <code>{subtitles}</code> subtitles</blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Caption of your leeched files. You can use the tags above.</i>",
+		caption)
 
 	btn := telegram.NewButtonMaker()
 	if u.Caption != "" {
@@ -615,11 +610,11 @@ func (m *SettingsModule) buildPrefixMenu(u *types.UserSettings) (string, *telegr
 		prefix = telegram.EscapeHTML(u.Prefix)
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Current Prefix:</b> <code>%s</code></blockquote>\n\n"+
-		"➲ <b>Description:</b> <i>Text prepended to the start of all your leeched filenames.</i>\n\n"+
-		"<b>Example:</b> <code>[AZML] </code>",
-		telegram.ToSmallCaps("Leech Prefix Settings"), prefix)
+	text := fmt.Sprintf("㊂ <b><u>Leech Prefix Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Leech Prefix :</b> <code>%s</code>\n"+
+		"╰ <b>Example :</b> <code>[TJ] </code></blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Text added at the start of your leeched filenames.</i>",
+		prefix)
 
 	btn := telegram.NewButtonMaker()
 	if u.Prefix != "" {
@@ -643,11 +638,11 @@ func (m *SettingsModule) buildSuffixMenu(u *types.UserSettings) (string, *telegr
 		suffix = telegram.EscapeHTML(u.Suffix)
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Current Suffix:</b> <code>%s</code></blockquote>\n\n"+
-		"➲ <b>Description:</b> <i>Text appended before extension in all your leeched filenames.</i>\n\n"+
-		"<b>Example:</b> <code> @MyChannel</code>",
-		telegram.ToSmallCaps("Leech Suffix Settings"), suffix)
+	text := fmt.Sprintf("㊂ <b><u>Leech Suffix Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Leech Suffix :</b> <code>%s</code>\n"+
+		"╰ <b>Example :</b> <code> @MyChannel</code></blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Text added before the extension of your leeched filenames.</i>",
+		suffix)
 
 	btn := telegram.NewButtonMaker()
 	if u.Suffix != "" {
@@ -671,15 +666,12 @@ func (m *SettingsModule) buildAutoRenameMenu(u *types.UserSettings) (string, *te
 		tmpl = telegram.EscapeHTML(u.RemnameAuto)
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Current Template:</b>\n<code>%s</code></blockquote>\n\n"+
-		"➲ <b>Supported Tags:</b>\n"+
-		"• <code>{title}</code> - Media or anime title\n"+
-		"• <code>{season}</code> - Season number (e.g. 01)\n"+
-		"• <code>{episode}</code> - Episode number (e.g. 05)\n"+
-		"• <code>{quality}</code> - Detected resolution (e.g. 1080p)\n\n"+
-		"<b>Example:</b>\n<code>{title} - S{season}E{episode} [{quality}]</code>",
-		telegram.ToSmallCaps("AutoRename Template Settings"), tmpl)
+	text := fmt.Sprintf("㊂ <b><u>AutoRename Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Template :</b> <code>%s</code>\n"+
+		"┠ <code>{title}</code> · <code>{season}</code> · <code>{episode}</code> · <code>{quality}</code>\n"+
+		"╰ <b>Example :</b> <code>{title} - S{season}E{episode} [{quality}]</code></blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>New name for your leeched files, built from the tags above.</i>",
+		tmpl)
 
 	btn := telegram.NewButtonMaker()
 	if u.RemnameAuto != "" {
@@ -703,11 +695,12 @@ func (m *SettingsModule) buildRegexMenu(u *types.UserSettings) (string, *telegra
 		regexVal = telegram.EscapeHTML(u.RemnameRegex)
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Current Regex:</b>\n<code>%s</code></blockquote>\n\n"+
-		"➲ <b>Format:</b> <code>search_regex:replacement</code>\n"+
-		"<b>Example:</b> <code>\\[TG\\]:</code> (removes [TG] from filenames)",
-		telegram.ToSmallCaps("Regex Remname Settings"), regexVal)
+	text := fmt.Sprintf("㊂ <b><u>Regex Remname Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Regex Remname :</b> <code>%s</code>\n"+
+		"┠ <b>Format :</b> <code>search_regex:replacement</code>\n"+
+		"╰ <b>Example :</b> <code>\\[TG\\]:</code> removes [TG]</blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Changes or removes parts of your filenames.</i>",
+		regexVal)
 
 	btn := telegram.NewButtonMaker()
 	if u.RemnameRegex != "" {
@@ -731,11 +724,11 @@ func (m *SettingsModule) buildDumpMenu(u *types.UserSettings) (string, *telegram
 		dumpStr = fmt.Sprintf("%d", u.DumpChatID)
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Dump Channel ID:</b> <code>%s</code></blockquote>\n\n"+
-		"➲ <b>Description:</b> <i>Leeched files will be forwarded to your personal dump channel.</i>\n\n"+
-		"<b>Note:</b> Make sure the bot is an <b>Administrator</b> in your channel!",
-		telegram.ToSmallCaps("Leech Dump Channel Settings"), dumpStr)
+	text := fmt.Sprintf("㊂ <b><u>Leech Dump Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Dump Channel :</b> <code>%s</code>\n"+
+		"╰ <b>Note :</b> the bot must be an admin there</blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Your leeched files are also sent to this channel.</i>",
+		dumpStr)
 
 	btn := telegram.NewButtonMaker()
 	if u.DumpChatID != 0 {
@@ -759,11 +752,11 @@ func (m *SettingsModule) buildMetadataMenu(u *types.UserSettings) (string, *tele
 		metaAll = telegram.EscapeHTML(u.Metadata["all"])
 	}
 
-	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"<blockquote>╭ <b>Metadata Text:</b> <code>%s</code></blockquote>\n\n"+
-		"➲ <b>Description:</b> <i>Metadata title and author encoded directly into video streams via FFmpeg.</i>\n\n"+
-		"<b>Example:</b> <code>Encoded by TBX TEAM</code>",
-		telegram.ToSmallCaps("Leech Video Metadata Settings"), metaAll)
+	text := fmt.Sprintf("㊂ <b><u>Leech Metadata Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Leech Metadata :</b> <code>%s</code>\n"+
+		"╰ <b>Example :</b> <code>Encoded by TJ</code></blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Title written into the metadata of your leeched videos.</i>",
+		metaAll)
 
 	btn := telegram.NewButtonMaker()
 	if metaAll != "Not Exists" {
@@ -913,7 +906,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 	case "cthumb":
 		chatID := telegram.PeerToChatID(peer)
 		ext.SetPendingThumbSession(targetUID, chatID, msgID, 120*time.Second)
-		prompt := "⌬ <b><u>Send Custom Thumbnail</u></b>\n\n" +
+		prompt := "㊂ <b><u>Send Custom Thumbnail</u></b>\n\n" +
 			"Please send a <b>photo</b> or image document within the next <b>2 minutes</b>.\n\n" +
 			"<i>Once received, it will be automatically saved as your custom thumbnail and this menu will update.</i>"
 		btn := telegram.NewButtonMaker()
@@ -980,7 +973,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_split":
 		ext.SetPendingSettingSession(targetUID, "split_size", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set Custom Split Size</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set Custom Split Size</u></b>\n\n" +
 			"Send custom size (e.g. <code>1.5GB</code>, <code>500MB</code>, <code>2000000000</code>) within <b>60 seconds</b>:"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d split_size", u.UserID), "danger")
@@ -996,7 +989,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_lcaption":
 		ext.SetPendingSettingSession(targetUID, "lcaption", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set Custom Leech Caption</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set Custom Leech Caption</u></b>\n\n" +
 			"Send new caption template within <b>60 seconds</b>.\n\n" +
 			"<b>Tags:</b> <code>{filename}</code>, <code>{size}</code>, <code>{duration}</code>, <code>{quality}</code>, <code>{languages}</code>"
 		btn := telegram.NewButtonMaker()
@@ -1020,7 +1013,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_lprefix":
 		ext.SetPendingSettingSession(targetUID, "lprefix", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set Leech Prefix</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set Leech Prefix</u></b>\n\n" +
 			"Send prefix text to prepend to filenames within <b>60 seconds</b> (e.g. <code>[AZML] </code>):"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lprefix", u.UserID), "danger")
@@ -1043,7 +1036,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_lsuffix":
 		ext.SetPendingSettingSession(targetUID, "lsuffix", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set Leech Suffix</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set Leech Suffix</u></b>\n\n" +
 			"Send suffix text to append before file extension within <b>60 seconds</b> (e.g. <code> @MyChannel</code>):"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lsuffix", u.UserID), "danger")
@@ -1066,7 +1059,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_lremname_auto":
 		ext.SetPendingSettingSession(targetUID, "lremname_auto", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set AutoRename Template</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set AutoRename Template</u></b>\n\n" +
 			"Send rename template within <b>60 seconds</b>.\n\n" +
 			"<b>Tags:</b> <code>{title}</code>, <code>{season}</code>, <code>{episode}</code>, <code>{quality}</code>\n" +
 			"<b>Example:</b> <code>{title} - S{season}E{episode} [{quality}]</code>"
@@ -1091,7 +1084,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_lremname_regex":
 		ext.SetPendingSettingSession(targetUID, "lremname_regex", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set Regex Remname</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set Regex Remname</u></b>\n\n" +
 			"Send regex pattern and replacement separated by colon within <b>60 seconds</b>.\n\n" +
 			"<b>Format:</b> <code>search_pattern:replacement</code>\n" +
 			"<b>Example:</b> <code>\\[TG\\]:</code>"
@@ -1116,7 +1109,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_ldump":
 		ext.SetPendingSettingSession(targetUID, "ldump", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set Leech Dump Channel ID</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set Leech Dump Channel ID</u></b>\n\n" +
 			"Send your Channel ID within <b>60 seconds</b> (e.g. <code>-1001234567890</code>).\n\n" +
 			"<i>Make sure the bot has Admin rights with Post Messages permission!</i>"
 		btn := telegram.NewButtonMaker()
@@ -1140,7 +1133,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_lmeta":
 		ext.SetPendingSettingSession(targetUID, "lmeta", 0, msgID, 60*time.Second)
-		prompt := "⌬ <b><u>Set Video Leech Metadata</u></b>\n\n" +
+		prompt := "㊂ <b><u>Set Video Leech Metadata</u></b>\n\n" +
 			"Send metadata text within <b>60 seconds</b> (e.g. <code>Encoded by TBX TEAM</code>):"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lmeta", u.UserID), "danger")
@@ -1206,7 +1199,7 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 		}
 
 		if current != "" {
-			text := fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
+			text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 				"<code>%s</code>\n\n"+
 				"<b>Usage:</b> <code>/ar [template]</code>\n"+
 				"<b>Clear:</b> <code>/ar off</code>",
@@ -1214,7 +1207,7 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 				telegram.EscapeHTML(current))
 			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
 		} else {
-			text := fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
+			text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 				"<b>No AutoRename template set.</b>\n\n"+
 				"<b>Usage:</b> <code>/ar [animeshrine.xyz] S0{season}E{episode} Dr. Stone {quality}.mkv</code>\n\n"+
 				"<b>Available tags:</b>\n"+

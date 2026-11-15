@@ -171,7 +171,7 @@ func main() {
 
 	statusMod := modules.NewStatusModule(sender)
 	leechMod := modules.NewLeechModule(app.GetRawAPI(), app.GetUserRawAPI(), sender, uploader, userMap, statusMod, sessPool, cfg.DumpChatID)
-	ytdlMod := modules.NewYtdlModule(sender, uploader, userMap, statusMod)
+	ytdlMod := modules.NewYtdlModule(sender, leechMod, userMap)
 	cancelMod := modules.NewCancelModule(sender, userMap, statusMod)
 	settingsMod := modules.NewSettingsModule(app.GetRawAPI(), sender, userMap)
 	botSetMod := modules.NewBotSettingsModule(sender, userMap)
@@ -191,7 +191,7 @@ func main() {
 
 	app.SetLeechHandler(leechMod.HandleLeech)
 	app.SetTaskExtras(leechMod.HandleHistory, leechMod.HandleRetryCallback)
-	app.SetYtdlHandler(ytdlMod.HandleYtdl)
+	app.SetYtdlHandler(ytdlMod.HandleYtdl, ytdlMod.HandleYtdlCallback)
 	app.SetStatusHandlers(statusMod.HandleStatus, statusMod.HandleCallback)
 	app.SetCancelHandlers(cancelMod.HandleCancel, cancelMod.HandleCancelAll, cancelMod.HandleCallback)
 	app.SetSettingsHandlers(settingsMod.HandleSettings, settingsMod.HandleCallback, settingsMod.HandleSettingUpdated)

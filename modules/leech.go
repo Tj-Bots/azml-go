@@ -376,7 +376,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// Try DDL API for Telegram links (t.me/... or t.me/c/...) if a link was provided
-	if cfg.DDLAPI != "" && link != "" {
+	if cfg.DDLAPI != "" && link != "" && !opt.Ytdl {
 		if cid, mid, ok := ext.ParseTelegramLink(link); ok {
 			tgChannelID := cid
 			if tgChannelID == 0 {
@@ -391,7 +391,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// Try Direct Link Generator for host URLs (Mediafire, Pixeldrain, Solidfiles)
-	if ext.IsURL(link) {
+	if ext.IsURL(link) && !opt.Ytdl {
 		if directURL, err := ext.GenerateDirectLink(link); err == nil && directURL != "" {
 			link = directURL
 		}
@@ -434,7 +434,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// For HTTP/HTTPS links: probe remote headers to resolve true filename (Content-Disposition) & extension in background
-	if ext.IsURL(link) && !ext.IsMagnet(link) && !strings.Contains(strings.ToLower(link), ".torrent") {
+	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMagnet(link) && !strings.Contains(strings.ToLower(link), ".torrent") {
 		resolvedName, finalURL, resolvedSize, _ := ext.ResolveDownloadMetadata(ctx, link)
 		if resolvedName != "" {
 			if opt.CustomName == "" {
@@ -484,6 +484,16 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		modeStr = "#Leech | #Mega"
 	} else if link == "" && (msg.IsReply || msg.HasMedia) {
 		modeStr = "#Leech | #Telegram"
+	}
+	if opt.Ytdl {
+		modeStr = "#Leech | #YtDlp"
+		if opt.IsMirror {
+			modeStr = "#Mirror | #YtDlp"
+		}
+		uTask.SetEngine("yt-dlp")
+		if opt.CustomName == "" {
+			uTask.SetName("yt-dlp Media")
+		}
 	}
 
 	// 0. Queue Check for Download (Sleep v0 Engine)
@@ -735,6 +745,24 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 	if downloadedPath != "" {
 		// Document downloaded directly via MTProto
+	} else if opt.Ytdl {
+		uTask.SetStatus(types.StatusDownloading, "yt-dlp")
+		yt := downloader.NewYtDlpDownloader()
+		var file string
+		file, dlErr = yt.Download(ctx, link, taskDir, opt.YtdlFormat, func(curr, total int64, speed float64, eta string) {
+			if speed > maxDLSpeed {
+				maxDLSpeed = speed
+			}
+			uTask.SetProgress(curr, total, speed, eta)
+		}, opt.YtdlArgs...)
+		if dlErr == nil {
+			downloadedPath = ytdlResult(taskDir, file)
+			if downloadedPath == "" {
+				dlErr = fmt.Errorf("yt-dlp finished but no file was downloaded")
+			} else {
+				uTask.SetName(filepath.Base(downloadedPath))
+			}
+		}
 	} else if downloader.IsGDriveLink(link) {
 		gdrive := downloader.GetGDriveClient()
 		fileID := downloader.ExtractGDriveID(link)
@@ -1962,6 +1990,21 @@ func (m *LeechModule) HandleRetryCallback(ctx context.Context, peer tg.InputPeer
 	}
 	_ = m.sender.AnswerCallback(ctx, queryID, "Retrying...", false)
 	_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+	if entry.msg.YtdlQuality != "" {
+		link, _ := parseYtdlArgs(entry.msg.Text)
+		if link == "" {
+			for _, w := range strings.Fields(entry.msg.ReplyText) {
+				if ext.IsURL(w) {
+					link = w
+					break
+				}
+			}
+		}
+		if link != "" {
+			m.StartYtdl(peer, entry.msg, link, entry.msg.YtdlQuality)
+			return
+		}
+	}
 	go m.HandleLeech(context.Background(), peer, entry.msg, entry.msg.IsZip, entry.msg.IsUnzip)
 }
 
@@ -2037,4 +2080,26 @@ func dcDownloadClients(ctx context.Context, client *td.Client, dc int) ([]*tg.Cl
 		clients[i] = api
 	}
 	return clients, func() { _ = inv.Close() }
+}
+
+// ytdlResult: the single downloaded file, or the folder when yt-dlp saved several (playlist).
+func ytdlResult(taskDir, _ string) string {
+	var files []string
+	_ = filepath.WalkDir(taskDir, func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			n := strings.ToLower(d.Name())
+			if strings.HasSuffix(n, ".part") || strings.HasSuffix(n, ".ytdl") || strings.HasSuffix(n, ".json") {
+				return nil
+			}
+			files = append(files, p)
+		}
+		return nil
+	})
+	switch len(files) {
+	case 0:
+		return ""
+	case 1:
+		return files[0]
+	}
+	return taskDir
 }

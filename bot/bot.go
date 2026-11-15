@@ -53,6 +53,7 @@ type BotApp struct {
 	// Modules
 	leechHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, isZip, isUnzip bool)
 	ytdlHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	ytdlCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	statusHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	statusCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	cancelHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -227,8 +228,9 @@ func NewBotApp() *BotApp {
 func (b *BotApp) SetLeechHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, isZip, isUnzip bool)) {
 	b.leechHandler = h
 }
-func (b *BotApp) SetYtdlHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)) {
+func (b *BotApp) SetYtdlHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext), cb func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
 	b.ytdlHandler = h
+	b.ytdlCbHandler = cb
 }
 func (b *BotApp) SetStatusHandlers(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext), cb func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
 	b.statusHandler = h
@@ -929,6 +931,10 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 	case strings.HasPrefix(data, "retry "):
 		if b.retryCbHandler != nil {
 			b.retryCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
+		}
+	case strings.HasPrefix(data, "ytq "):
+		if b.ytdlCbHandler != nil {
+			b.ytdlCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
 	case strings.HasPrefix(data, "mirror "):
 		b.handleMirrorCallback(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)

@@ -123,9 +123,13 @@ type LeechOptions struct {
 	MediaGroup  bool
 	IsMirror    bool
 	MirrorHost  string
+	Ytdl        bool     // download the link with yt-dlp
+	YtdlFormat  string   // yt-dlp -f
+	YtdlArgs    []string // extra yt-dlp options (audio extraction)
 }
 
 type MessageContext struct {
+	YtdlQuality string // set for /ytdl tasks (used by Retry)
 	IsZip       bool
 	IsUnzip     bool
 	IsMirror    bool

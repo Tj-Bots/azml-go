@@ -19,7 +19,7 @@ WORKDIR /usr/src/app
 
 # Install git, speedtest-cli, curl, ca-certificates, and tzdata without interactive debconf prompts
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git speedtest-cli curl ca-certificates tzdata && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git speedtest-cli curl ca-certificates tzdata unzip && \
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
     rm -rf /var/lib/apt/lists/*
 
@@ -32,6 +32,14 @@ COPY --from=builder /go/pkg/mod /go/pkg/mod
 ENV GOPATH="/go"
 
 RUN mkdir -p /usr/src/app/downloads /usr/src/app/Thumbnails
+
+# Latest yt-dlp (YouTube changes often) + Deno, which yt-dlp needs for YouTube
+RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp && \
+    curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o /tmp/deno.zip && \
+    unzip -o /tmp/deno.zip -d /usr/local/bin && \
+    chmod a+rx /usr/local/bin/deno && rm -f /tmp/deno.zip && \
+    (yt-dlp --version && deno --version || true)
 
 # Install HatchZip for in-place, space-saving archive extraction
 RUN (curl -fsSL https://raw.githubusercontent.com/xevrion/hatchzip/main/install.sh | HATCHZIP_INSTALL_DIR=/usr/local/bin sh) \

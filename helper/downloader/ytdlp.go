@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,7 +54,7 @@ func (y *YtDlpDownloader) GetInfo(ctx context.Context, link string) (title strin
 	return data.Title, false, 1, nil
 }
 
-func (y *YtDlpDownloader) Download(ctx context.Context, link, outDir, customFormat string, onProgress func(cur, total int64, speed float64, eta string)) (string, error) {
+func (y *YtDlpDownloader) Download(ctx context.Context, link, outDir, customFormat string, onProgress func(cur, total int64, speed float64, eta string), extraArgs ...string) (string, error) {
 	_ = os.MkdirAll(outDir, 0755)
 
 	outTmpl := filepath.Join(outDir, "%(title)s.%(ext)s")
@@ -62,6 +64,8 @@ func (y *YtDlpDownloader) Download(ctx context.Context, link, outDir, customForm
 		"--no-warnings",
 		"--no-part",
 		"--concurrent-fragments", "16", // Max speed parallel fragment download
+		"--trim-filenames", "180",
+		"--no-mtime",
 	}
 
 	if customFormat != "" {
@@ -73,6 +77,7 @@ func (y *YtDlpDownloader) Download(ctx context.Context, link, outDir, customForm
 	if _, err := os.Stat("cookies.txt"); err == nil {
 		args = append(args, "--cookies", "cookies.txt")
 	}
+	args = append(args, extraArgs...)
 
 	args = append(args, link)
 
@@ -81,6 +86,8 @@ func (y *YtDlpDownloader) Download(ctx context.Context, link, outDir, customForm
 	if err != nil {
 		return "", err
 	}
+	var stderr strings.Builder
+	cmd.Stderr = &tailWriter{b: &stderr, max: 4000}
 
 	if err := cmd.Start(); err != nil {
 		return "", err
@@ -115,7 +122,16 @@ func (y *YtDlpDownloader) Download(ctx context.Context, link, outDir, customForm
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return "", err
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		return "", fmt.Errorf("%s", ytdlpError(stderr.String(), err))
+	}
+	// with audio extraction the final file has another extension
+	if downloadedFile != "" {
+		if _, err := os.Stat(downloadedFile); err != nil {
+			downloadedFile = ""
+		}
 	}
 
 	if downloadedFile != "" {
@@ -194,4 +210,121 @@ func (t *YtDlpDownloadTask) Cancel() error {
 		t.cancelFn()
 	}
 	return nil
+}
+
+// tailWriter keeps only the end of a long output.
+type tailWriter struct {
+	b   *strings.Builder
+	max int
+}
+
+func (t *tailWriter) Write(p []byte) (int, error) {
+	t.b.Write(p)
+	if t.b.Len() > t.max*2 {
+		rest := t.b.String()[t.b.Len()-t.max:]
+		t.b.Reset()
+		t.b.WriteString(rest)
+	}
+	return len(p), nil
+}
+
+// ytdlpError: the last "ERROR:" line of yt-dlp, or the exit error.
+func ytdlpError(stderr string, err error) string {
+	lines := strings.Split(strings.TrimSpace(stderr), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if l := strings.TrimSpace(lines[i]); strings.HasPrefix(l, "ERROR:") {
+			return strings.TrimSpace(strings.TrimPrefix(l, "ERROR:"))
+		}
+	}
+	if len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) != "" {
+		return strings.TrimSpace(lines[len(lines)-1])
+	}
+	return "yt-dlp failed: " + err.Error()
+}
+
+// YtFormatInfo is what the quality menu needs.
+type YtFormatInfo struct {
+	Title      string
+	IsPlaylist bool
+	Count      int
+	Heights    []int         // available video heights, highest first
+	Sizes      map[int]int64 // approximate size per height (0 = unknown)
+	AudioSize  int64
+	Duration   float64
+}
+
+// GetFormats reads the formats of a link (yt-dlp -J).
+func (y *YtDlpDownloader) GetFormats(ctx context.Context, link string) (*YtFormatInfo, error) {
+	args := []string{"-J", "--no-warnings", "--flat-playlist"}
+	if _, err := os.Stat("cookies.txt"); err == nil {
+		args = append(args, "--cookies", "cookies.txt")
+	}
+	args = append(args, link)
+	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
+	var stderr strings.Builder
+	cmd.Stderr = &tailWriter{b: &stderr, max: 4000}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("%s", ytdlpError(stderr.String(), err))
+	}
+	var data struct {
+		Title    string        `json:"title"`
+		Type     string        `json:"_type"`
+		Entries  []interface{} `json:"entries"`
+		Duration float64       `json:"duration"`
+		Formats  []struct {
+			Height         int     `json:"height"`
+			Vcodec         string  `json:"vcodec"`
+			Acodec         string  `json:"acodec"`
+			Filesize       int64   `json:"filesize"`
+			FilesizeApprox int64   `json:"filesize_approx"`
+			Tbr            float64 `json:"tbr"`
+		} `json:"formats"`
+	}
+	if err := json.Unmarshal(out, &data); err != nil {
+		return nil, err
+	}
+	info := &YtFormatInfo{Title: data.Title, Sizes: map[int]int64{}, Duration: data.Duration}
+	if data.Type == "playlist" || len(data.Entries) > 0 {
+		info.IsPlaylist = true
+		info.Count = len(data.Entries)
+		return info, nil
+	}
+	seen := map[int]bool{}
+	for _, f := range data.Formats {
+		size := f.Filesize
+		if size == 0 {
+			size = f.FilesizeApprox
+		}
+		if f.Vcodec != "" && f.Vcodec != "none" && f.Height > 0 {
+			if !seen[f.Height] {
+				seen[f.Height] = true
+				info.Heights = append(info.Heights, f.Height)
+			}
+			if size > info.Sizes[f.Height] {
+				info.Sizes[f.Height] = size
+			}
+		} else if f.Acodec != "" && f.Acodec != "none" && size > info.AudioSize {
+			info.AudioSize = size
+		}
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(info.Heights)))
+	return info, nil
+}
+
+// YtQuality turns a menu choice ("best", "1080", "audio", "mp3") into yt-dlp options.
+func YtQuality(choice string) (format string, extra []string) {
+	switch choice {
+	case "", "best":
+		return "bv*+ba/b", nil
+	case "audio":
+		return "ba/b", []string{"-x"}
+	case "mp3":
+		return "ba/b", []string{"-x", "--audio-format", "mp3", "--audio-quality", "320K"}
+	}
+	h := strings.TrimSuffix(strings.ToLower(choice), "p")
+	if _, err := strconv.Atoi(h); err == nil {
+		return fmt.Sprintf("bv*[height<=%s]+ba/b[height<=%s]/b", h, h), nil
+	}
+	return choice, nil // a raw yt-dlp format given by the user
 }

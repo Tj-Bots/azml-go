@@ -1034,10 +1034,10 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 			msgID, _ := strconv.Atoi(parts[1])
 			if chatID != 0 && msgID != 0 {
 				restartSuccessText := fmt.Sprintf("⌬ <b><i>Restarted Successfully!</i></b>\n"+
-					"┠ <b>Date:</b> %s\n"+
+					"<blockquote>╭ <b>Date:</b> %s\n"+
 					"┠ <b>Time:</b> %s\n"+
 					"┠ <b>TimeZone:</b> %s\n"+
-					"┖ <b>Version:</b> <code>1.0.2</code>", dateStr, timeStr, timz)
+					"╰ <b>Version:</b> <code>1.0.2</code></blockquote>", dateStr, timeStr, timz)
 
 				peer := b.getPeerForChatID(chatID)
 				if b.sender != nil && peer != nil {
@@ -1050,10 +1050,10 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 
 	// 2. Otherwise send Bot Started Successfully notification to Authorized Chats (GC) or Owner via MTProto
 	startMsg := fmt.Sprintf("⌬ <b><i>Bot Started Successfully!</i></b>\n"+
-		"┠ <b>Date:</b> %s\n"+
+		"<blockquote>╭ <b>Date:</b> %s\n"+
 		"┠ <b>Time:</b> %s\n"+
 		"┠ <b>TimeZone:</b> %s\n"+
-		"┖ <b>Version:</b> <code>1.0.2</code>", dateStr, timeStr, timz)
+		"╰ <b>Version:</b> <code>1.0.2</code></blockquote>", dateStr, timeStr, timz)
 
 	sendNotification := func(targetID int64) {
 		if targetID == 0 || b.sender == nil {

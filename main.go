@@ -180,6 +180,7 @@ func main() {
 	helpMod := modules.NewHelpModule(sender, userMap, startTime)
 	speedMod := modules.NewSpeedtestModule(sender)
 	miMod := modules.NewMediaInfoModule(sender)
+	miMod.SetRawAPI(app.GetRawAPI)
 	bcMod := modules.NewBroadcastModule(sender, userMap)
 	imdbMod := modules.NewImdbModule(sender)
 	animeMod := modules.NewAnimeModule(sender)

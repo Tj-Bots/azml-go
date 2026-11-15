@@ -763,6 +763,35 @@ func (m *MessageSender) SendLocalPhoto(ctx context.Context, peer tg.InputPeerCla
 	return ExtractMessageID(updates), nil
 }
 
+// SendDocumentBytes uploads data as a document with the given file name.
+func (m *MessageSender) SendDocumentBytes(ctx context.Context, peer tg.InputPeerClass, name string, data []byte, caption string, replyToID int) (int, error) {
+	u := uploader.NewUploader(m.rawClient)
+	inputFile, err := u.FromBytes(ctx, name, data)
+	if err != nil {
+		return 0, err
+	}
+	plainText, entities := ParseFormatting(caption)
+	mediaReq := &tg.MessagesSendMediaRequest{
+		Peer: peer,
+		Media: &tg.InputMediaUploadedDocument{
+			File:       inputFile,
+			MimeType:   "text/plain",
+			Attributes: []tg.DocumentAttributeClass{&tg.DocumentAttributeFilename{FileName: name}},
+		},
+		Message:  plainText,
+		Entities: entities,
+		RandomID: time.Now().UnixNano(),
+	}
+	if replyToID != 0 {
+		mediaReq.ReplyTo = &tg.InputReplyToMessage{ReplyToMsgID: replyToID}
+	}
+	updates, err := m.rawClient.MessagesSendMedia(ctx, mediaReq)
+	if err != nil {
+		return 0, err
+	}
+	return ExtractMessageID(updates), nil
+}
+
 func (m *MessageSender) AutoDeleteMessage(peer tg.InputPeerClass, msgID int, seconds int) {
 	if seconds <= 0 {
 		return

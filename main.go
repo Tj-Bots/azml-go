@@ -45,7 +45,7 @@ func setupISTLogging() {
 
 	log.SetFlags(0)
 	log.SetOutput(&istLogWriter{
-		out: os.Stdout,
+		out: io.MultiWriter(os.Stdout, ext.LogBuffer),
 		loc: loc,
 	})
 }

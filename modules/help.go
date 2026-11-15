@@ -205,7 +205,14 @@ func (m *HelpModule) HandleLog(ctx context.Context, peer tg.InputPeerClass, msg 
 		_, _ = m.sender.SendMessage(ctx, peer, "Only Owner/Sudo can view logs!", msg.MessageID, nil)
 		return
 	}
-	_, _ = m.sender.SendMessage(ctx, peer, "⌬ <b>Logs:</b> All services operating normally.", msg.MessageID, nil)
+	data := ext.LogBuffer.Bytes()
+	if len(data) == 0 {
+		_, _ = m.sender.SendMessage(ctx, peer, "⌬ <b>Logs:</b> nothing logged yet.", msg.MessageID, nil)
+		return
+	}
+	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>", msg.MessageID); err != nil {
+		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Could not send the log:</b> <code>%s</code>", telegram.EscapeHTML(err.Error())), msg.MessageID, nil)
+	}
 }
 
 func (m *HelpModule) HandleRestart(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {

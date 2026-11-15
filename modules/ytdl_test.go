@@ -86,4 +86,3 @@ func TestYtdlResult(t *testing.T) {
 		t.Fatal("playlist should return folder")
 	}
 }
-

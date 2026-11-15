@@ -231,7 +231,7 @@ func (m *BotSettingsModule) buildMainMenu() (string, *telegram.ButtonMaker) {
 	btn.Row()
 	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Shortener Settings"), "botset shortener", "primary")
 	btn.Row()
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 	return text, btn
 }
@@ -279,8 +279,8 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 	btn.Row()
 	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Set Dump Channel"), "botset prompt_dump", "primary")
 	btn.Row()
-	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+	btn.IButtonStyled("◀️", "botset back", "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 
 	return text, btn
@@ -336,8 +336,8 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 		}
 	}
 
-	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+	btn.IButtonStyled("◀️", "botset back", "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 
 	return sb.String(), btn
@@ -362,8 +362,8 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 		btn.IButtonStyled("✓ "+telegram.ToSmallCaps("True"), fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
 		btn.IButtonStyled("× "+telegram.ToSmallCaps("False"), fmt.Sprintf("botset boolvar %s false %d", key, page), "danger")
 		btn.Row()
-		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), fmt.Sprintf("botset var %d", page), "primary")
-		btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+		btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
+		btn.IButtonStyled("❌", "botset close", "danger")
 		btn.Row()
 		return text, btn
 	}
@@ -377,7 +377,7 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 			telegram.ToSmallCaps("Edit Variable"), key, v)
 
 		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel Edit"), fmt.Sprintf("botset editvar %s %d", key, page), "danger")
-		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), fmt.Sprintf("botset var %d", page), "primary")
+		btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
 		btn.Row()
 		return text, btn
 	}
@@ -391,8 +391,8 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Edit Value"), fmt.Sprintf("botset editvar_prompt %s %d", key, page), "success")
 	btn.IButtonStyled("• "+telegram.ToSmallCaps("Reset"), fmt.Sprintf("botset resetvar %s %d", key, page), "danger")
 	btn.Row()
-	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), fmt.Sprintf("botset var %d", page), "primary")
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 
 	return text, btn
@@ -524,8 +524,8 @@ func (m *BotSettingsModule) buildAriaMenu() (string, *telegram.ButtonMaker) {
 		"<i>Optimized for peak network throughput on free tier VPS servers.</i>"
 
 	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+	btn.IButtonStyled("◀️", "botset back", "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 	return text, btn
 }
@@ -543,8 +543,8 @@ func (m *BotSettingsModule) buildPrivateMenu() (string, *telegram.ButtonMaker) {
 		telegram.ToSmallCaps("Private Files"))
 
 	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+	btn.IButtonStyled("◀️", "botset back", "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 	return text, btn
 }
@@ -742,7 +742,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			telegram.ToSmallCaps("Set Shortener Domain"), cur)
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset shortener", "danger")
-		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset shortener", "primary")
+		btn.IButtonStyled("◀️", "botset shortener", "primary")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, promptText, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send shortener domain within 60s...", false)
@@ -759,7 +759,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			telegram.ToSmallCaps("Set Shortener API Key"), cur)
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset shortener", "danger")
-		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset shortener", "primary")
+		btn.IButtonStyled("◀️", "botset shortener", "primary")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, promptText, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send shortener API key within 60s...", false)
@@ -776,7 +776,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			telegram.ToSmallCaps("Custom Token Validity"), cur)
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset shortener", "danger")
-		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset shortener", "primary")
+		btn.IButtonStyled("◀️", "botset shortener", "primary")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, promptText, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send validity duration within 60s...", false)
@@ -848,8 +848,8 @@ func (m *BotSettingsModule) buildShortenerMenu() (string, *telegram.ButtonMaker)
 	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Custom Validity"), "botset prompt_shrt_val", "primary")
 	btn.Row()
 
-	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
+	btn.IButtonStyled("◀️", "botset back", "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 
 	return sb.String(), btn

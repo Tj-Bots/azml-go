@@ -240,3 +240,8 @@ func (b *ButtonMaker) BuildMenu(cols int) tg.ReplyMarkupClass {
 		Rows: rows,
 	}
 }
+
+// Rows returns the final button layout (used to check the menus).
+func (b *ButtonMaker) Rows(cols int) [][]InlineButton {
+	return b.getFinalRows(cols)
+}

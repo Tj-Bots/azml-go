@@ -223,7 +223,7 @@ func RenderBotStats(startTime time.Time) string {
 		"<blockquote>╭ <b>Bot Uptime :</b> %s</blockquote>\n\n"+
 		"<blockquote>╭ <b><i>RAM ( MEMORY ) :</i></b>\n"+
 		"┠ %s %.1f%%\n"+
-		"┠ <b>App RAM (AZML-Go) :</b> <code>%.1f MB</code>\n"+
+		"┠ <b>App RAM :</b> <code>%.1f MB</code>\n"+
 		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
 		"<blockquote>╭ <b><i>SWAP MEMORY :</i></b>\n"+
 		"┠ %s %.1f%%\n"+

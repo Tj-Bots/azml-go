@@ -306,7 +306,7 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 	btn.Row()
 	btn.IButtonStyled("Reset Setting", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
 	btn.Row()
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -475,7 +475,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	if m.settingsChanged(u) {
 		btn.IButtonStyled("Reset", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
 	}
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -515,8 +515,8 @@ func (m *SettingsModule) buildThumbnailMenu(u *types.UserSettings, banner ...str
 		btn.IButtonStyled("Set Thumbnail", fmt.Sprintf("userset %d cthumb", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -549,14 +549,14 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 
 	// Toggles
 	if u.EqualSplits {
-		btn.IButtonStyled("Disable Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID), "danger")
+		btn.IButtonStyled("✓ Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID), "success")
 	} else {
-		btn.IButtonStyled("✓ "+"Enable Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID), "success")
+		btn.IButton("Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID))
 	}
 	if u.MediaGroup {
-		btn.IButtonStyled("Disable Media Group", fmt.Sprintf("userset %d mgroup", u.UserID), "danger")
+		btn.IButtonStyled("✓ Media Group", fmt.Sprintf("userset %d mgroup", u.UserID), "success")
 	} else {
-		btn.IButtonStyled("✓ "+"Enable Media Group", fmt.Sprintf("userset %d mgroup", u.UserID), "success")
+		btn.IButton("Media Group", fmt.Sprintf("userset %d mgroup", u.UserID))
 	}
 	btn.Row()
 
@@ -569,8 +569,8 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 	// Custom
 	btn.IButton("Custom Size", fmt.Sprintf("userset %d edit_split", u.UserID))
 	btn.Row()
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -602,8 +602,8 @@ func (m *SettingsModule) buildCaptionMenu(u *types.UserSettings) (string, *teleg
 		btn.IButtonStyled("Set Custom Caption", fmt.Sprintf("userset %d edit_lcaption", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -630,8 +630,8 @@ func (m *SettingsModule) buildPrefixMenu(u *types.UserSettings) (string, *telegr
 		btn.IButtonStyled("Set Prefix", fmt.Sprintf("userset %d edit_lprefix", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -658,8 +658,8 @@ func (m *SettingsModule) buildSuffixMenu(u *types.UserSettings) (string, *telegr
 		btn.IButtonStyled("Set Suffix", fmt.Sprintf("userset %d edit_lsuffix", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -690,8 +690,8 @@ func (m *SettingsModule) buildAutoRenameMenu(u *types.UserSettings) (string, *te
 		btn.IButtonStyled("Set Template", fmt.Sprintf("userset %d edit_lremname_auto", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -718,8 +718,8 @@ func (m *SettingsModule) buildRegexMenu(u *types.UserSettings) (string, *telegra
 		btn.IButtonStyled("Set Regex", fmt.Sprintf("userset %d edit_lremname_regex", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -746,8 +746,8 @@ func (m *SettingsModule) buildDumpMenu(u *types.UserSettings) (string, *telegram
 		btn.IButtonStyled("Set Dump ID", fmt.Sprintf("userset %d edit_ldump", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -774,8 +774,8 @@ func (m *SettingsModule) buildMetadataMenu(u *types.UserSettings) (string, *tele
 		btn.IButtonStyled("Set Metadata", fmt.Sprintf("userset %d edit_lmeta", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButton("◀️ Back", fmt.Sprintf("userset %d leech", u.UserID))
-	btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
 	return text, btn
@@ -918,7 +918,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"<i>Once received, it will be automatically saved as your custom thumbnail and this menu will update.</i>"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d thumb", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send your photo...", false)
 
@@ -984,7 +984,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"Send custom size (e.g. <code>1.5GB</code>, <code>500MB</code>, <code>2000000000</code>) within <b>60 seconds</b>:"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d split_size", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new split size...", false)
 
@@ -1001,7 +1001,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"<b>Tags:</b> <code>{filename}</code>, <code>{size}</code>, <code>{duration}</code>, <code>{quality}</code>, <code>{languages}</code>"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lcaption", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new caption template...", false)
 
@@ -1024,7 +1024,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"Send prefix text to prepend to filenames within <b>60 seconds</b> (e.g. <code>[AZML] </code>):"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lprefix", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new prefix...", false)
 
@@ -1047,7 +1047,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"Send suffix text to append before file extension within <b>60 seconds</b> (e.g. <code> @MyChannel</code>):"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lsuffix", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new suffix...", false)
 
@@ -1072,7 +1072,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"<b>Example:</b> <code>{title} - S{season}E{episode} [{quality}]</code>"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lremname_auto", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new autorename template...", false)
 
@@ -1097,7 +1097,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"<b>Example:</b> <code>\\[TG\\]:</code>"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lremname_regex", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new regex rule...", false)
 
@@ -1121,7 +1121,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"<i>Make sure the bot has Admin rights with Post Messages permission!</i>"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d ldump", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send Dump Channel ID...", false)
 
@@ -1144,7 +1144,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"Send metadata text within <b>60 seconds</b> (e.g. <code>Encoded by TBX TEAM</code>):"
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lmeta", u.UserID), "danger")
-		btn.IButtonStyled("Close", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send metadata text...", false)
 

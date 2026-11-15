@@ -37,8 +37,8 @@ func (m *HelpModule) getStartText() string {
 
 func (m *HelpModule) getStartButtons() *telegram.ButtonMaker {
 	btn := telegram.NewButtonMaker()
-	btn.IButton("Help Guide", "start_help")
-	btn.UButtonStyled("◈ "+telegram.ToSmallCaps("Updates"), "https://t.me/TJ_Bots", "primary")
+	btn.IButtonStyled("Help", "start_help", "primary")
+	btn.UButtonStyled("Updates", "https://t.me/TJ_Bots", "primary")
 	btn.Row()
 	return btn
 }
@@ -65,9 +65,8 @@ func (m *HelpModule) getHelpGuideText() string {
 		"┠ <code>/addsudo</code> <code>/rmsudo</code> — Add / remove a Sudo user (owner)\n"+
 		"┠ <code>/bl</code> <code>/rbl</code> — Blacklist / unblacklist a user\n"+
 		"┠ <code>/users</code> <code>/authlist</code> <code>/sudolist</code> — Lists of users\n"+
-		"╰ <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>\n\n"+
-		"<i>Click Back below to return to start menu.</i>",
-		telegram.ToSmallCaps("AZML-Go Commands Guide"),
+		"╰ <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>",
+		telegram.ToSmallCaps("Commands Guide"),
 		sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx)
 }
 
@@ -95,7 +94,7 @@ func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, ms
 func (m *HelpModule) HandleHelp(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	helpText := m.getHelpGuideText()
 	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("Close", "start_close", "danger")
+	btn.IButtonStyled("❌", "start_close", "danger")
 	btn.Row()
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, helpText, msg.MessageID, btn, 1)
 }
@@ -120,11 +119,11 @@ func (m *HelpModule) getStatsView(key string, targetUID int64) (string, *telegra
 		btn.IButton("Repo Stats", fmt.Sprintf("stats %d strepo", targetUID))
 		btn.IButton("Bot Limits", fmt.Sprintf("stats %d botlimits", targetUID))
 		btn.Row()
-		btn.IButtonStyled("Close", fmt.Sprintf("stats %d close", targetUID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("stats %d close", targetUID), "danger")
 		msg = "⌬ <b><i>Bot & OS Statistics!</i></b>"
 	} else {
-		btn.IButton("◀️ Back", fmt.Sprintf("stats %d home", targetUID))
-		btn.IButtonStyled("Close", fmt.Sprintf("stats %d close", targetUID), "danger")
+		btn.IButtonStyled("◀️", fmt.Sprintf("stats %d home", targetUID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("stats %d close", targetUID), "danger")
 
 		switch key {
 		case "stbot":
@@ -152,8 +151,8 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 	if data == "start_help" {
 		helpText := m.getHelpGuideText()
 		helpBtn := telegram.NewButtonMaker()
-		helpBtn.IButton("◀️ Back", "start_back")
-		helpBtn.IButtonStyled("Close", "start_close", "danger")
+		helpBtn.IButtonStyled("◀️", "start_back", "primary")
+		helpBtn.IButtonStyled("❌", "start_close", "danger")
 		helpBtn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, helpText, helpBtn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
@@ -165,8 +164,8 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 		return
 	}
 	if data == "start_close" {
-		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
+		m.sender.DeleteWithCommand(ctx, peer, msgID)
 		return
 	}
 
@@ -227,7 +226,7 @@ func (m *HelpModule) HandleRestart(ctx context.Context, peer tg.InputPeerClass, 
 		return
 	}
 
-	statusMsgID, _ := m.sender.SendMessage(ctx, peer, "• <i>Initializing AZML-Go Update & Restart engine...</i>", msg.MessageID, nil)
+	statusMsgID, _ := m.sender.SendMessage(ctx, peer, "• <i>Checking for updates and restarting...</i>", msg.MessageID, nil)
 
 	onStatus := func(text string) {
 		if statusMsgID > 0 {

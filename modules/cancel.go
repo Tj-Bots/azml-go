@@ -119,7 +119,7 @@ func (m *CancelModule) HandleCancelAll(ctx context.Context, peer tg.InputPeerCla
 	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Queued Dl"), "canall queueddl", "primary")
 	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Queued Up"), "canall queueup", "primary")
 	btn.IButtonStyled("× "+telegram.ToSmallCaps("All Tasks"), "canall all", "danger")
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "canall close", "danger")
+	btn.IButtonStyled("❌", "canall close", "danger")
 
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, "<b>Choose tasks to cancel:</b>", msg.MessageID, btn, 2)
 }
@@ -137,8 +137,8 @@ func (m *CancelModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 
 	action := strings.ToLower(parts[1])
 	if action == "close" {
-		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
+		m.sender.DeleteWithCommand(ctx, peer, msgID)
 		return
 	}
 

@@ -282,7 +282,8 @@ func parseFloodWait(err error) (time.Duration, bool) {
 
 func (m *MessageSender) SendMessage(ctx context.Context, peer tg.InputPeerClass, text string, replyToID int, markup tg.ReplyMarkupClass) (int, error) {
 	switch peer.(type) {
-	case *tg.InputPeerChat, *tg.InputPeerChannel:
+	case *tg.InputPeerChat, *tg.InputPeerChannel, *tg.InputPeerUser:
+		// Bot API first: its own HTTP connection, so messages are not stuck behind file transfers
 		botToken := getBotToken()
 		chatID := PeerToChatID(peer)
 		if botToken != "" && chatID != 0 {
@@ -342,6 +343,14 @@ func (m *MessageSender) SendMessage(ctx context.Context, peer tg.InputPeerClass,
 func (m *MessageSender) EditMessage(ctx context.Context, peer tg.InputPeerClass, msgID int, text string, markup tg.ReplyMarkupClass) error {
 	if msgID <= 0 {
 		return nil
+	}
+	if botToken, chatID := getBotToken(), PeerToChatID(peer); botToken != "" && chatID != 0 {
+		editCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		ok := m.editBotAPIText(editCtx, botToken, chatID, msgID, text, markup)
+		cancel()
+		if ok {
+			return nil
+		}
 	}
 	plainText, entities := ParseFormatting(text)
 	req := &tg.MessagesEditMessageRequest{
@@ -493,6 +502,16 @@ func buildBotAPIKeyboard(markup tg.ReplyMarkupClass) (json.RawMessage, error) {
 		buttons := make([]map[string]string, 0, len(row.Buttons))
 		for _, button := range row.Buttons {
 			item := map[string]string{"text": button.Text}
+			if st, ok := button.GetStyle(); ok {
+				switch {
+				case st.BgPrimary:
+					item["style"] = "primary"
+				case st.BgDanger:
+					item["style"] = "danger"
+				case st.BgSuccess:
+					item["style"] = "success"
+				}
+			}
 			switch buttonType := button.Type.(type) {
 			case *tg.InlineButtonTypeURL:
 				item["url"] = buttonType.URL
@@ -893,4 +912,44 @@ func FetchMessage(ctx context.Context, rawClient *tg.Client, peer tg.InputPeerCl
 	}
 
 	return nil, fmt.Errorf("message not found")
+}
+
+// editBotAPIText edits a text message through the Bot API (true when done or not modified).
+func (m *MessageSender) editBotAPIText(ctx context.Context, botToken string, chatID int64, msgID int, text string, markup tg.ReplyMarkupClass) bool {
+	payload := map[string]interface{}{
+		"chat_id":              chatID,
+		"message_id":           msgID,
+		"text":                 text,
+		"parse_mode":           "HTML",
+		"link_preview_options": map[string]bool{"is_disabled": true},
+	}
+	if markup != nil {
+		kb, err := buildBotAPIKeyboard(markup)
+		if err != nil {
+			return false
+		}
+		payload["reply_markup"] = kb
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return false
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://api.telegram.org/bot%s/editMessageText", botToken), bytes.NewReader(body))
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := botAPIHTTPClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var res struct {
+		Ok          bool   `json:"ok"`
+		Description string `json:"description"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&res) != nil {
+		return false
+	}
+	return res.Ok || strings.Contains(res.Description, "message is not modified")
 }

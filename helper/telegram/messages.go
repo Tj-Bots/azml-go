@@ -775,7 +775,7 @@ func (m *MessageSender) DeleteWithCommand(ctx context.Context, peer tg.InputPeer
 }
 
 // SendDocumentBytes uploads data as a document with the given file name.
-func (m *MessageSender) SendDocumentBytes(ctx context.Context, peer tg.InputPeerClass, name string, data []byte, caption string, replyToID int) (int, error) {
+func (m *MessageSender) SendDocumentBytes(ctx context.Context, peer tg.InputPeerClass, name string, data []byte, caption string, replyToID int, markup tg.ReplyMarkupClass) (int, error) {
 	u := uploader.NewUploader(m.rawClient)
 	inputFile, err := u.FromBytes(ctx, name, data)
 	if err != nil {
@@ -792,6 +792,9 @@ func (m *MessageSender) SendDocumentBytes(ctx context.Context, peer tg.InputPeer
 		Message:  plainText,
 		Entities: entities,
 		RandomID: time.Now().UnixNano(),
+	}
+	if markup != nil {
+		mediaReq.ReplyMarkup = markup
 	}
 	if replyToID != 0 {
 		mediaReq.ReplyTo = &tg.InputReplyToMessage{ReplyToMsgID: replyToID}

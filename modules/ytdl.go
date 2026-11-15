@@ -61,7 +61,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 			telegram.ToSmallCaps("YtDlp Media Downloader"),
 			telegram.ToSmallCaps("Usage"),
 			telegram.ToSmallCaps("Examples"))
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, nil)
+		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup())
 		return
 	}
 

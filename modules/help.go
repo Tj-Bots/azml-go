@@ -104,7 +104,7 @@ func (m *HelpModule) HandlePing(ctx context.Context, peer tg.InputPeerClass, msg
 	resID, err := m.sender.SendMessage(ctx, peer, "<i>Pinging...</i>", msg.MessageID, nil)
 	if err == nil && resID > 0 {
 		diff := time.Since(start).Milliseconds()
-		_ = m.sender.EditMessage(ctx, peer, resID, fmt.Sprintf("⌬ <b>Pong!</b> <code>%d ms</code>", diff), nil)
+		_ = m.sender.EditMessage(ctx, peer, resID, fmt.Sprintf("⌬ <b>Pong!</b> <code>%d ms</code>", diff), telegram.CloseMarkup())
 	}
 }
 
@@ -215,7 +215,7 @@ func (m *HelpModule) HandleLog(ctx context.Context, peer tg.InputPeerClass, msg 
 		_, _ = m.sender.SendMessage(ctx, peer, "⌬ <b>Logs:</b> nothing logged yet.", msg.MessageID, nil)
 		return
 	}
-	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>", msg.MessageID); err != nil {
+	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>", msg.MessageID, telegram.CloseMarkup()); err != nil {
 		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Could not send the log:</b> <code>%s</code>", telegram.EscapeHTML(err.Error())), msg.MessageID, nil)
 	}
 }

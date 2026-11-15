@@ -248,7 +248,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			"╰ <code>-p pass</code> — Extraction Password</blockquote>\n\n"+
 			"➲ <b>Default host :</b> /us → Mirror Settings",
 			strings.Join(hosts, ", "))
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, nil)
+		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup())
 		return
 	}
 	if link == "" && !msg.HasMedia && !msg.IsReply {
@@ -278,7 +278,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			telegram.ToSmallCaps("Upload as Media"),
 			telegram.ToSmallCaps("Custom Dump Chat ID"),
 			telegram.ToSmallCaps("Extract Video Streams"))
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, nil)
+		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup())
 		return
 	}
 

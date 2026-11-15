@@ -42,7 +42,7 @@ func (m *MediaInfoModule) HandleMediaInfo(ctx context.Context, peer tg.InputPeer
 		helpMsg := "<b>MediaInfo Usage:</b>\n" +
 			"• <code>/mediainfo [download link]</code>\n" +
 			"• Reply to a download link with <code>/mediainfo</code>"
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, nil)
+		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup())
 		return
 	}
 

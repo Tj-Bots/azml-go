@@ -245,3 +245,11 @@ func (b *ButtonMaker) BuildMenu(cols int) tg.ReplyMarkupClass {
 func (b *ButtonMaker) Rows(cols int) [][]InlineButton {
 	return b.getFinalRows(cols)
 }
+
+// CloseMarkup is a single ❌ button that deletes the message and the command it answers.
+func CloseMarkup() tg.ReplyMarkupClass {
+	btn := NewButtonMaker()
+	btn.IButtonStyled("❌", "start_close", "danger")
+	btn.Row()
+	return btn.BuildMenu(1)
+}

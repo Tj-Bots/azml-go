@@ -1307,7 +1307,7 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 				"<b>Clear:</b> <code>/ar off</code>",
 				telegram.ToSmallCaps("Current AutoRename Template"),
 				telegram.EscapeHTML(current))
-			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
+			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup())
 		} else {
 			text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 				"<b>No AutoRename template set.</b>\n\n"+
@@ -1323,7 +1323,7 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 				"  • <code>{episode:+N}</code> — episode with offset\n\n"+
 				"<b>Clear:</b> <code>/ar off</code>",
 				telegram.ToSmallCaps("AutoRename Guide"))
-			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
+			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup())
 		}
 		return
 	}

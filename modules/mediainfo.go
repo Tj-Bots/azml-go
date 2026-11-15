@@ -1,11 +1,14 @@
 package modules
 
 import (
+	"azml-go/config"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -274,8 +277,8 @@ var (
 	telegraphToken string
 )
 
-// telegraphAPIs: telegra.ph first, graph.org (same API) when it is not reachable.
-var telegraphAPIs = []string{"https://api.telegra.ph", "https://api.graph.org"}
+// telegraphAPIs: graph.org first like the Python bot, telegra.ph (same API) when it is not reachable.
+var telegraphAPIs = []string{"https://api.graph.org", "https://api.telegra.ph"}
 
 func telegraphCall(method string, form url.Values) (json.RawMessage, string, error) {
 	var lastErr error
@@ -307,9 +310,16 @@ func getTelegraphToken() (string, error) {
 	if telegraphToken != "" {
 		return telegraphToken, nil
 	}
+	cfg := config.Get()
+	shortName := randomLetters(8) // a random account, like the Python bot
 	form := url.Values{}
-	form.Set("short_name", "MediaInfo")
-	form.Set("author_name", "MediaInfo")
+	form.Set("short_name", shortName)
+	if cfg.AuthorName != "" {
+		form.Set("author_name", cfg.AuthorName)
+	}
+	if cfg.AuthorURL != "" {
+		form.Set("author_url", cfg.AuthorURL)
+	}
 	raw, _, err := telegraphCall("createAccount", form)
 	if err != nil {
 		return "", err
@@ -321,6 +331,7 @@ func getTelegraphToken() (string, error) {
 		return "", fmt.Errorf("telegraph account not created")
 	}
 	telegraphToken = acc.AccessToken
+	log.Printf("Telegraph Account Generated : %s", shortName)
 	return telegraphToken, nil
 }
 
@@ -333,7 +344,12 @@ func createTelegraphPage(title, content string) (string, error) {
 	form := url.Values{}
 	form.Set("access_token", token)
 	form.Set("title", title)
-	form.Set("author_name", "MediaInfo")
+	if cfg := config.Get(); cfg.AuthorName != "" {
+		form.Set("author_name", cfg.AuthorName)
+		if cfg.AuthorURL != "" {
+			form.Set("author_url", cfg.AuthorURL)
+		}
+	}
 	form.Set("content", content)
 	raw, api, err := telegraphCall("createPage", form)
 	if err != nil {
@@ -373,4 +389,13 @@ func mediaInfoLink(filePath, name string) string {
 		return ""
 	}
 	return link
+}
+
+func randomLetters(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }

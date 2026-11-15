@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"reflect"
 	"strings"
 
 	"azml-go/config"
@@ -273,12 +274,13 @@ func (c *Commands) IsAnyCommand(text string, botUsername ...string) bool {
 	}
 	cmdToken = strings.ToLower(cmdToken)
 
-	allLists := [][]string{
-		c.Start, c.Leech, c.Ytdl, c.Status, c.Cancel, c.CancelAll,
-		c.Authorize, c.UnAuthorize, c.AddSudo, c.RmSudo, c.AddPremium,
-		c.RmPremium, c.Premium, c.Blacklist, c.RmBlacklist, c.Ping,
-		c.Stats, c.Restart, c.Help, c.Log, c.UserSetting, c.BotSetting,
-		c.Speedtest, c.MediaInfo, c.Broadcast, c.Imdb, c.Anime, c.AutoRename,
+	// every []string field of Commands, so a new command can not be forgotten here
+	var allLists [][]string
+	v := reflect.ValueOf(*c)
+	for i := 0; i < v.NumField(); i++ {
+		if list, ok := v.Field(i).Interface().([]string); ok {
+			allLists = append(allLists, list)
+		}
 	}
 
 	for _, list := range allLists {

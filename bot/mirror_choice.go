@@ -63,6 +63,11 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 		return
 	}
 
+	// nothing to mirror yet: the leech module shows the usage
+	if !hasMirrorTarget(msgCtx) {
+		b.leechHandler(ctx, peer, msgCtx, false, false)
+		return
+	}
 	hosts := ext.AvailableMirrorHosts()
 	btn := telegram.NewButtonMaker()
 	for i, h := range hosts {
@@ -122,4 +127,17 @@ func (b *BotApp) handleMirrorCallback(ctx context.Context, peer tg.InputPeerClas
 	if b.leechHandler != nil {
 		go b.leechHandler(context.Background(), req.peer, req.msg, false, false)
 	}
+}
+
+// hasMirrorTarget: a link in the command, or a reply / file to take it from.
+func hasMirrorTarget(msgCtx *types.MessageContext) bool {
+	if msgCtx.IsReply || msgCtx.HasMedia {
+		return true
+	}
+	for _, f := range strings.Fields(msgCtx.Text) {
+		if strings.Contains(f, "://") || strings.HasPrefix(f, "magnet:") || strings.HasPrefix(f, "t.me/") {
+			return true
+		}
+	}
+	return false
 }

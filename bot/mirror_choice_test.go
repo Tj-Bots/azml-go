@@ -1,6 +1,10 @@
 package bot
 
-import "testing"
+import (
+	"testing"
+
+	"azml-go/types"
+)
 
 func TestSplitMirrorHost(t *testing.T) {
 	text, host := splitMirrorHost("/mirror https://x.y/file -up buzzheavier -n name")
@@ -13,5 +17,14 @@ func TestSplitMirrorHost(t *testing.T) {
 	}
 	if _, host = splitMirrorHost("/m link -up nope"); host != "" {
 		t.Fatalf("unknown host accepted: %q", host)
+	}
+}
+
+func TestHasMirrorTarget(t *testing.T) {
+	if hasMirrorTarget(&types.MessageContext{Text: "/m"}) || hasMirrorTarget(&types.MessageContext{Text: "/m -z -n x"}) {
+		t.Fatal("no link given")
+	}
+	if !hasMirrorTarget(&types.MessageContext{Text: "/m -z https://a.b/c"}) || !hasMirrorTarget(&types.MessageContext{Text: "/m", IsReply: true}) {
+		t.Fatal("link or reply given")
 	}
 }

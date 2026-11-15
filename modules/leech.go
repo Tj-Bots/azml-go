@@ -233,6 +233,24 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		}()
 	}
 
+	if link == "" && !msg.HasMedia && !msg.IsReply && opt.IsMirror {
+		var hosts []string
+		for _, h := range ext.AvailableMirrorHosts() {
+			hosts = append(hosts, h.Name)
+		}
+		helpMsg := fmt.Sprintf("㊂ <b><u>Mirror Command Usage :</u></b>\n\n"+
+			"<b>Usage:</b> <code>/mirror [link]</code> or reply to a link / file\n\n"+
+			"<blockquote>╭ <b>Upload To :</b> %s\n"+
+			"┠ <code>-up gofile</code> — Choose the host directly\n"+
+			"┠ <code>-n name</code> — Custom File Name\n"+
+			"┠ <code>-z</code> — Compress as Zip\n"+
+			"┠ <code>-e</code> — Extract Archive\n"+
+			"╰ <code>-p pass</code> — Extraction Password</blockquote>\n\n"+
+			"➲ <b>Default host :</b> /us → Mirror Settings",
+			strings.Join(hosts, ", "))
+		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, nil)
+		return
+	}
 	if link == "" && !msg.HasMedia && !msg.IsReply {
 		helpMsg := fmt.Sprintf("⌬ <b><u>%s:</u></b>\n\n"+
 			"<b>%s:</b> <code>/leech [link] [flags]</code>\n\n"+

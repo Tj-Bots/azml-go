@@ -309,6 +309,8 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 		u.UserID, telegram.EscapeHTML(name), u.UserID)
 
 	btn := telegram.NewButtonMaker()
+	btn.IButton("Universal Settings", fmt.Sprintf("userset %d universal", u.UserID))
+	btn.Row()
 	btn.IButton("Mirror Settings", fmt.Sprintf("userset %d mirror", u.UserID))
 	btn.Row()
 	btn.IButton("Leech Settings", fmt.Sprintf("userset %d leech", u.UserID))
@@ -330,7 +332,7 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.AutoThumb || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" ||
-		u.Screenshots != 0 || u.SampleSec != 0
+		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfo
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -744,6 +746,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.BotPM = false
 		u.Screenshots = 0
 		u.SampleSec = 0
+		u.MediaInfo = false
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1105,6 +1108,18 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		}
 		_ = m.sender.AnswerCallback(ctx, queryID, "Mirror Host: "+mirrorHostText(u.MirrorHost), false)
 		text, btn := m.buildMirrorHostMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+
+	case "universal":
+		text, btn := m.buildUniversalMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "mediainfo":
+		u.MediaInfo = !u.MediaInfo
+		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
+		_ = m.sender.AnswerCallback(ctx, queryID, "MediaInfo is now "+onOff(u.MediaInfo), false)
+		text, btn := m.buildUniversalMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 
 	case "shots", "setshots":
@@ -1552,6 +1567,31 @@ func (m *SettingsModule) buildChoiceMenu(u *types.UserSettings, title, label, cu
 	}
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+// buildUniversalMenu: settings for leech and mirror together, like the Python bot.
+func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+	name := u.Name
+	if name == "" {
+		name = fmt.Sprintf("%d", u.UserID)
+	}
+	tasks, dailyBytes := ext.GetUserDailyStats(u.UserID)
+	text := fmt.Sprintf("㊂ <b><u>Universal Settings : <a href=\"tg://user?id=%d\">%s</a></u></b>\n\n"+
+		"<blockquote>╭ <b>Daily Tasks :</b> <code>%d</code> today\n"+
+		"┠ <b>Daily Leech :</b> <code>%s</code> today\n"+
+		"╰ <b>MediaInfo Mode :</b> <i>%s</i></blockquote>",
+		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), onOff(u.MediaInfo))
+	btn := telegram.NewButtonMaker()
+	if u.MediaInfo {
+		btn.IButtonStyled("✓ MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID), "success")
+	} else {
+		btn.IButton("MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID))
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn

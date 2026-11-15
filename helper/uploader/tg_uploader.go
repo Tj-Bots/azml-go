@@ -40,7 +40,7 @@ func randID() int64 {
 	return int64(binary.LittleEndian.Uint64(b[:]))
 }
 
-func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msgID int) bool {
+func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msgID int, markupJSON string) bool {
 	if botToken == "" || toChatID == 0 || fromChatID == 0 || msgID <= 0 {
 		return false
 	}
@@ -49,6 +49,9 @@ func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msg
 		"chat_id":      toChatID,
 		"from_chat_id": fromChatID,
 		"message_id":   msgID,
+	}
+	if markupJSON != "" {
+		payload["reply_markup"] = json.RawMessage(markupJSON)
 	}
 	body, _ := json.Marshal(payload)
 	resp, err := botAPICopyClient.Post(url, "application/json", bytes.NewReader(body))
@@ -175,6 +178,8 @@ type UploadOptions struct {
 	SkipDelivery bool
 	// Result, when set, receives where the file was sent.
 	Result *UploadResult
+	// Buttons under the file (MediaInfo, Screenshots); also kept on the copies.
+	Buttons *telegram.ButtonMaker
 }
 
 // UploadResult is where an uploaded file landed.
@@ -882,6 +887,13 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		Entities: captionEntities,
 		RandomID: time.Now().UnixNano(),
 	}
+	markupJSON := ""
+	if opt.Buttons != nil {
+		if mk := opt.Buttons.BuildMenu(1); mk != nil {
+			req.ReplyMarkup = mk
+			markupJSON = opt.Buttons.BuildBotAPIKeyboard(1)
+		}
+	}
 
 	var res tg.UpdatesClass
 	var sendErr error
@@ -1020,7 +1032,7 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 
 			// 1. Try copyMessageViaBotAPI for files <= 2GB (clean copy without forward tag)
 			if fileSize <= twoGB {
-				if copyMessageViaBotAPI(botToken, targetChatID, actualDestChatID, msgID) {
+				if copyMessageViaBotAPI(botToken, targetChatID, actualDestChatID, msgID, markupJSON) {
 					log.Printf("[AZML-Go Uploader] Successfully copied media to %s (%d) via Bot API", desc, targetChatID)
 					return true
 				}

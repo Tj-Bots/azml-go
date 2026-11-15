@@ -1322,14 +1322,27 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			useGroup = len(splitParts) > 1 && user.MediaGroup
 		}
 		partResults := make([]uploader.UploadResult, len(splitParts))
+		var fileButtons *telegram.ButtonMaker
+		if user != nil && user.MediaInfo {
+			if miLink := mediaInfoLink(curFile, finalName); miLink != "" {
+				fileButtons = telegram.NewButtonMaker()
+				fileButtons.UButton("MediaInfo", miLink)
+			}
+		}
+		if len(ssLinks) > 0 {
+			if fileButtons == nil {
+				fileButtons = telegram.NewButtonMaker()
+			}
+			fileButtons.UButton("ScreenShots", ssLinks[0])
+		}
+		if fileButtons != nil {
+			fileButtons.Row()
+		}
 		var groupOpt, lastUpOpt uploader.UploadOptions
 		for idx, part := range splitParts {
 			partCaption := caption
 			if len(splitParts) > 1 {
 				partCaption = fmt.Sprintf("<b>Part %d/%d</b>\n%s", idx+1, len(splitParts), caption)
-			}
-			if len(ssLinks) > 0 {
-				partCaption += fmt.Sprintf("\n\n◈ <a href=\"%s\">Screenshots</a>", ssLinks[0])
 			}
 
 			botPM := cfg.BotPM || (user != nil && user.BotPM) || (msg.ChatID != msg.UserID)
@@ -1357,6 +1370,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 
 			upOpt.Result = &partResults[idx]
+			upOpt.Buttons = fileButtons
 			lastUpOpt = upOpt
 			if useGroup {
 				upOpt.SkipDelivery = true
@@ -1392,6 +1406,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				sampleOpt.SkipDelivery = false
 				sampleOpt.Result = nil
 				sampleOpt.OnProgress = nil
+				sampleOpt.Buttons = nil
 				if _, sErr := m.uploader.UploadFile(ctx, peer, sampleOpt); sErr != nil {
 					log.Printf("[AZML-Go Leech] Sample upload failed: %v", sErr)
 				}

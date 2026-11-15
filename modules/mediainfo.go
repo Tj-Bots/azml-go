@@ -332,3 +332,16 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
+
+// mediaInfoLink makes the MediaInfo Telegraph page of a local file ("" on failure).
+func mediaInfoLink(filePath, name string) string {
+	info := runMediaInfo(filePath)
+	if strings.TrimSpace(info) == "" {
+		return ""
+	}
+	link, err := createTelegraphPage("MediaInfo", formatMediaInfoHTML(name, info))
+	if err != nil {
+		return ""
+	}
+	return link
+}

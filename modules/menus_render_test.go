@@ -52,6 +52,8 @@ func TestRenderAllMenus(t *testing.T) {
 	} {
 		tx, b := sm.buildMainMenu(u, "Boss")
 		out.WriteString(render("us home", tx, b, 1))
+		tx, b = sm.buildUniversalMenu(u)
+		out.WriteString(render("us universal", tx, b, 2))
 		tx, b = sm.buildLeechMenu(u, "Boss")
 		out.WriteString(render("us leech", tx, b, 2))
 		for name, fn := range map[string]func(*types.UserSettings) (string, *telegram.ButtonMaker){

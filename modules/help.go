@@ -165,7 +165,7 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 	}
 	if data == "start_close" || strings.HasPrefix(data, "start_close ") {
 		if owner := strings.TrimSpace(strings.TrimPrefix(data, "start_close")); owner != "" && owner != fmt.Sprintf("%d", fromUID) {
-			_ = m.sender.AnswerCallback(ctx, queryID, "This is not for you!", true)
+			_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 			return
 		}
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
@@ -194,7 +194,7 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 	}
 
 	if targetUID != 0 && targetUID != fromUID && !telegram.IsOwner(fromUID) {
-		_ = m.sender.AnswerCallback(ctx, queryID, "This menu is not for you!", true)
+		_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 		return
 	}
 

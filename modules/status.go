@@ -255,7 +255,7 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 			task := m.taskMgr.GetTask(gid)
 			if task != nil {
 				if fromUID != 0 && task.UserID() != 0 && task.UserID() != fromUID && !telegram.IsOwner(fromUID) {
-					_ = m.sender.AnswerCallback(ctx, queryID, "⚠️ It's not your task to cancel!", true)
+					_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 					return
 				}
 				_ = task.Cancel()

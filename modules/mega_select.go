@@ -95,7 +95,7 @@ func HandleMegaSelectCallback(ctx context.Context, rawAPI *tg.Client, sender *te
 	}
 
 	if fromUID != 0 && fromUID != cache.UserID {
-		_ = sender.AnswerCallback(ctx, queryID, "× This selection is not for you!", true)
+		_ = sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 		return
 	}
 

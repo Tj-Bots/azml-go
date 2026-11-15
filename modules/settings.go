@@ -463,7 +463,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	btn.IButton(docLabel, fmt.Sprintf("userset %d doc", u.UserID))
 	btn.IButton("Thumbnail", fmt.Sprintf("userset %d thumb", u.UserID))
 	btn.Row()
-	btn.IButton("Split / Media Group", fmt.Sprintf("userset %d split_size", u.UserID))
+	btn.IButton("Leech Splits", fmt.Sprintf("userset %d split_size", u.UserID))
 	btn.IButton("Caption", fmt.Sprintf("userset %d lcaption", u.UserID))
 	btn.Row()
 	btn.IButton("Prefix", fmt.Sprintf("userset %d lprefix", u.UserID))
@@ -524,18 +524,9 @@ func (m *SettingsModule) buildThumbnailMenu(u *types.UserSettings, banner ...str
 	btn := telegram.NewButtonMaker()
 	if exists {
 		btn.IButton("View Thumbnail", fmt.Sprintf("userset %d vthumb", u.UserID))
-		btn.IButtonStyled("Delete Thumbnail", fmt.Sprintf("userset %d dthumb", u.UserID), "danger")
-		btn.Row()
-		btn.IButton("Change Thumbnail", fmt.Sprintf("userset %d cthumb", u.UserID))
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Thumbnail", fmt.Sprintf("userset %d cthumb", u.UserID), "success")
 		btn.Row()
 	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "Thumbnail", "cthumb", "dthumb", exists)
 	return text, btn
 }
 
@@ -545,51 +536,25 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 		splitSize = ext.GetReadableFileSize(u.SplitSize)
 	}
 
-	eqStatus := "Disabled"
-	if u.EqualSplits {
-		eqStatus = "Enabled"
-	}
-
-	mgStatus := "Disabled"
-	if u.MediaGroup {
-		mgStatus = "Enabled"
-	}
 
 	text := fmt.Sprintf("㊂ <b><u>Leech Splits Settings :</u></b>\n\n"+
 		"➲ <b>Leech Split Size :</b> <i>%s</i>\n\n"+
-		"➲ <b>Equal Splits :</b> <i>%s</i>\n\n"+
-		"➲ <b>Media Group :</b> <i>%s</i>\n\n"+
 		"➲ <b>Description :</b> <i>Leech Splits Size is the size to split the Leeched File before uploading</i>",
-		splitSize, eqStatus, mgStatus)
+		splitSize)
 
 	btn := telegram.NewButtonMaker()
-
-	// Toggles
 	if u.EqualSplits {
-		btn.IButtonStyled("✓ Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID), "success")
+		btn.IButton("Disable Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID))
 	} else {
-		btn.IButton("Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID))
+		btn.IButton("Enable Equal Splits", fmt.Sprintf("userset %d esplits", u.UserID))
 	}
 	if u.MediaGroup {
-		btn.IButtonStyled("✓ Media Group", fmt.Sprintf("userset %d mgroup", u.UserID), "success")
+		btn.IButton("Disable Media Group", fmt.Sprintf("userset %d mgroup", u.UserID))
 	} else {
-		btn.IButton("Media Group", fmt.Sprintf("userset %d mgroup", u.UserID))
+		btn.IButton("Enable Media Group", fmt.Sprintf("userset %d mgroup", u.UserID))
 	}
 	btn.Row()
-
-	// Presets
-	btn.IButton("2 GB", fmt.Sprintf("userset %d split_2gb", u.UserID))
-	btn.IButton("4 GB", fmt.Sprintf("userset %d split_4gb", u.UserID))
-	btn.IButton("Default Limit", fmt.Sprintf("userset %d split_default", u.UserID))
-	btn.Row()
-
-	// Custom
-	btn.IButton("Custom Size", fmt.Sprintf("userset %d edit_split", u.UserID))
-	btn.Row()
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "Leech Splits", "edit_split", "split_default", u.SplitSize > 0)
 	return text, btn
 }
 
@@ -605,18 +570,7 @@ func (m *SettingsModule) buildCaptionMenu(u *types.UserSettings) (string, *teleg
 		caption)
 
 	btn := telegram.NewButtonMaker()
-	if u.Caption != "" {
-		btn.IButton("Change Caption", fmt.Sprintf("userset %d edit_lcaption", u.UserID))
-		btn.IButtonStyled("Reset to Default", fmt.Sprintf("userset %d del_lcaption", u.UserID), "danger")
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Custom Caption", fmt.Sprintf("userset %d edit_lcaption", u.UserID), "success")
-		btn.Row()
-	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "Caption", "edit_lcaption", "del_lcaption", u.Caption != "")
 	return text, btn
 }
 
@@ -632,18 +586,7 @@ func (m *SettingsModule) buildPrefixMenu(u *types.UserSettings) (string, *telegr
 		prefix)
 
 	btn := telegram.NewButtonMaker()
-	if u.Prefix != "" {
-		btn.IButton("Change Prefix", fmt.Sprintf("userset %d edit_lprefix", u.UserID))
-		btn.IButtonStyled("Delete Prefix", fmt.Sprintf("userset %d del_lprefix", u.UserID), "danger")
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Prefix", fmt.Sprintf("userset %d edit_lprefix", u.UserID), "success")
-		btn.Row()
-	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "Prefix", "edit_lprefix", "del_lprefix", u.Prefix != "")
 	return text, btn
 }
 
@@ -659,18 +602,7 @@ func (m *SettingsModule) buildSuffixMenu(u *types.UserSettings) (string, *telegr
 		suffix)
 
 	btn := telegram.NewButtonMaker()
-	if u.Suffix != "" {
-		btn.IButton("Change Suffix", fmt.Sprintf("userset %d edit_lsuffix", u.UserID))
-		btn.IButtonStyled("Delete Suffix", fmt.Sprintf("userset %d del_lsuffix", u.UserID), "danger")
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Suffix", fmt.Sprintf("userset %d edit_lsuffix", u.UserID), "success")
-		btn.Row()
-	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "Suffix", "edit_lsuffix", "del_lsuffix", u.Suffix != "")
 	return text, btn
 }
 
@@ -686,18 +618,7 @@ func (m *SettingsModule) buildAutoRenameMenu(u *types.UserSettings) (string, *te
 		tmpl)
 
 	btn := telegram.NewButtonMaker()
-	if u.RemnameAuto != "" {
-		btn.IButton("Change Template", fmt.Sprintf("userset %d edit_lremname_auto", u.UserID))
-		btn.IButtonStyled("Delete Template", fmt.Sprintf("userset %d del_lremname_auto", u.UserID), "danger")
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Template", fmt.Sprintf("userset %d edit_lremname_auto", u.UserID), "success")
-		btn.Row()
-	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "AutoRename", "edit_lremname_auto", "del_lremname_auto", u.RemnameAuto != "")
 	return text, btn
 }
 
@@ -713,18 +634,7 @@ func (m *SettingsModule) buildRegexMenu(u *types.UserSettings) (string, *telegra
 		regexVal)
 
 	btn := telegram.NewButtonMaker()
-	if u.RemnameRegex != "" {
-		btn.IButton("Change Regex", fmt.Sprintf("userset %d edit_lremname_regex", u.UserID))
-		btn.IButtonStyled("Delete Regex", fmt.Sprintf("userset %d del_lremname_regex", u.UserID), "danger")
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Regex", fmt.Sprintf("userset %d edit_lremname_regex", u.UserID), "success")
-		btn.Row()
-	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "Remname", "edit_lremname_regex", "del_lremname_regex", u.RemnameRegex != "")
 	return text, btn
 }
 
@@ -740,18 +650,7 @@ func (m *SettingsModule) buildDumpMenu(u *types.UserSettings) (string, *telegram
 		dumpStr)
 
 	btn := telegram.NewButtonMaker()
-	if u.DumpChatID != 0 {
-		btn.IButton("Change Dump ID", fmt.Sprintf("userset %d edit_ldump", u.UserID))
-		btn.IButtonStyled("Delete Dump ID", fmt.Sprintf("userset %d del_ldump", u.UserID), "danger")
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Dump ID", fmt.Sprintf("userset %d edit_ldump", u.UserID), "success")
-		btn.Row()
-	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "User Dump", "edit_ldump", "del_ldump", u.DumpChatID != 0)
 	return text, btn
 }
 
@@ -767,18 +666,7 @@ func (m *SettingsModule) buildMetadataMenu(u *types.UserSettings) (string, *tele
 		metaAll)
 
 	btn := telegram.NewButtonMaker()
-	if metaAll != "Not Exists" {
-		btn.IButton("Change Metadata", fmt.Sprintf("userset %d edit_lmeta", u.UserID))
-		btn.IButtonStyled("Delete Metadata", fmt.Sprintf("userset %d del_lmeta", u.UserID), "danger")
-		btn.Row()
-	} else {
-		btn.IButtonStyled("Set Metadata", fmt.Sprintf("userset %d edit_lmeta", u.UserID), "success")
-		btn.Row()
-	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-	btn.Row()
-
+	stdMenuButtons(btn, u.UserID, "Metadata", "edit_lmeta", "del_lmeta", u.Metadata != nil && u.Metadata["all"] != "")
 	return text, btn
 }
 
@@ -787,7 +675,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 	if len(parts) >= 2 {
 		targetUID, err := strconv.ParseInt(parts[1], 10, 64)
 		if err == nil && targetUID != fromUserID {
-			_ = m.sender.AnswerCallback(ctx, queryID, "⚠️ It's not your settings panel! Use /us to open your own.", true)
+			_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 			return
 		}
 	}
@@ -798,7 +686,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	targetUID, _ := strconv.ParseInt(parts[1], 10, 64)
 	if targetUID != fromUserID {
-		_ = m.sender.AnswerCallback(ctx, queryID, "⚠️ It's not your settings panel! Use /us to open your own.", true)
+		_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 		return
 	}
 
@@ -946,7 +834,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"Please send a <b>photo</b> or image document within the next <b>2 minutes</b>.\n\n" +
 			"<i>Once received, it will be automatically saved as your custom thumbnail and this menu will update.</i>"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d thumb", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d thumb", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send your photo...", false)
@@ -1010,10 +898,12 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "edit_split":
 		ext.SetPendingSettingSession(targetUID, "split_size", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Custom Split Size</u></b>\n\n" +
-			"Send custom size (e.g. <code>1.5GB</code>, <code>500MB</code>, <code>2000000000</code>) within <b>60 seconds</b>:"
+		prompt := fmt.Sprintf("㊂ <b><u>Leech Splits Settings :</u></b>\n\n"+
+			"Send Leech split size in any comfortable size, like <code>2GB</code>, <code>500MB</code> or <code>1.46GB</code>.\n"+
+			"<b>Max:</b> <code>%s</code> (4GB needs a premium user session)\n<b>Timeout:</b> 60 sec",
+			ext.GetReadableFileSize(config.GetMaxSplitSize()))
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d split_size", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d split_size", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new split size...", false)
@@ -1030,7 +920,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"Send new caption template within <b>60 seconds</b>.\n\n" +
 			"<b>Tags:</b> <code>{filename}</code>, <code>{size}</code>, <code>{duration}</code>, <code>{quality}</code>, <code>{languages}</code>"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lcaption", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d lcaption", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new caption template...", false)
@@ -1053,7 +943,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		prompt := "㊂ <b><u>Set Leech Prefix</u></b>\n\n" +
 			"Send prefix text to prepend to filenames within <b>60 seconds</b> (e.g. <code>[AZML] </code>):"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lprefix", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d lprefix", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new prefix...", false)
@@ -1076,7 +966,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		prompt := "㊂ <b><u>Set Leech Suffix</u></b>\n\n" +
 			"Send suffix text to append before file extension within <b>60 seconds</b> (e.g. <code> @MyChannel</code>):"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lsuffix", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d lsuffix", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new suffix...", false)
@@ -1101,7 +991,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"<b>Tags:</b> <code>{title}</code>, <code>{season}</code>, <code>{episode}</code>, <code>{quality}</code>\n" +
 			"<b>Example:</b> <code>{title} - S{season}E{episode} [{quality}]</code>"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lremname_auto", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d lremname_auto", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new autorename template...", false)
@@ -1126,7 +1016,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"<b>Format:</b> <code>search_pattern:replacement</code>\n" +
 			"<b>Example:</b> <code>\\[TG\\]:</code>"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lremname_regex", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d lremname_regex", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send new regex rule...", false)
@@ -1150,7 +1040,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			"Send your Channel ID within <b>60 seconds</b> (e.g. <code>-1001234567890</code>).\n\n" +
 			"<i>Make sure the bot has Admin rights with Post Messages permission!</i>"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d ldump", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d ldump", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send Dump Channel ID...", false)
@@ -1221,7 +1111,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		prompt := "㊂ <b><u>Set Excluded Extensions</u></b>\n\n" +
 			"Send the extensions separated by space within <b>60 seconds</b> (e.g. <code>.txt .nfo .jpg</code>):"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lexcluded", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d lexcluded", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send the extensions...", false)
@@ -1238,7 +1128,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		prompt := "㊂ <b><u>Set Video Leech Metadata</u></b>\n\n" +
 			"Send metadata text within <b>60 seconds</b> (e.g. <code>Encoded by MyChannel</code>):"
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lmeta", u.UserID), "danger")
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d lmeta", u.UserID))
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send metadata text...", false)
@@ -1460,15 +1350,23 @@ func (m *SettingsModule) buildExcludedMenu(u *types.UserSettings) (string, *tele
 		"➲ <b>Description :</b> <i>Files with these extensions are not uploaded</i>",
 		excludedText(u.ExcludedExts))
 	btn := telegram.NewButtonMaker()
-	if u.ExcludedExts != "" {
-		btn.IButton("Change", fmt.Sprintf("userset %d edit_lexcluded", u.UserID))
-		btn.IButtonStyled("Delete", fmt.Sprintf("userset %d del_lexcluded", u.UserID), "danger")
-	} else {
-		btn.IButtonStyled("Set Extensions", fmt.Sprintf("userset %d edit_lexcluded", u.UserID), "success")
+	stdMenuButtons(btn, u.UserID, "Excluded Ext", "edit_lexcluded", "del_lexcluded", u.ExcludedExts != "")
+	return text, btn
+}
+
+// stdMenuButtons adds the buttons of a setting page like the Python bot:
+// Set / Change, ↻ Delete when set, then ◀️ and ❌.
+func stdMenuButtons(btn *telegram.ButtonMaker, uid int64, name, editAction, delAction string, isSet bool) {
+	label := "Set " + name
+	if isSet {
+		label = "Change " + name
+	}
+	btn.IButton(label, fmt.Sprintf("userset %d %s", uid, editAction))
+	if isSet {
+		btn.IButton("↻ Delete", fmt.Sprintf("userset %d %s", uid, delAction))
 	}
 	btn.Row()
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
-	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", uid), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", uid), "danger")
 	btn.Row()
-	return text, btn
 }

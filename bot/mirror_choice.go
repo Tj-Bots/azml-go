@@ -101,7 +101,7 @@ func (b *BotApp) handleMirrorCallback(ctx context.Context, peer tg.InputPeerClas
 		return
 	}
 	if owner, err := strconv.ParseInt(parts[1], 10, 64); err != nil || owner != fromUID {
-		_ = b.sender.AnswerCallback(ctx, queryID, "⚠️ This is not your request!", true)
+		_ = b.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 		return
 	}
 	chatID := telegram.PeerToChatID(peer)

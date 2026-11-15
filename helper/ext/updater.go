@@ -88,7 +88,7 @@ func UpdateAndRestart(ctx context.Context, onStatus func(status string), recordR
 				localHash, _ := runCmd(ctx, workDir, "git", "rev-parse", "HEAD")
 				remoteHash, _ := runCmd(ctx, workDir, "git", "rev-parse", "FETCH_HEAD")
 
-				if localHash != "" && remoteHash != "" && localHash != remoteHash {
+				if remoteHash != "" && localHash != remoteHash {
 					onStatus(fmt.Sprintf("• <i>New commits detected (<code>%.7s</code> ➔ <code>%.7s</code>). Pulling latest code...</i>", localHash, remoteHash))
 					if _, rErr := runCmd(ctx, workDir, "git", "reset", "--hard", "FETCH_HEAD"); rErr == nil {
 						updated = true

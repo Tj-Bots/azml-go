@@ -8,7 +8,8 @@ import (
 	"strconv"
 )
 
-// MakeSampleVideo cuts a short sample from the middle of a video (no re-encoding).
+// MakeSampleVideo cuts a short sample from the middle of a video (no re-encoding,
+// so it starts at the nearest keyframe and can be a little longer than asked).
 // It returns the sample path, or "" when the file is not a video.
 func MakeSampleVideo(videoPath string, seconds int) string {
 	if seconds <= 0 {

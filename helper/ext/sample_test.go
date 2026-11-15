@@ -12,7 +12,7 @@ func TestMakeSampleVideo(t *testing.T) {
 		t.Skip("ffmpeg not installed")
 	}
 	src := filepath.Join(t.TempDir(), "movie.mkv")
-	if err := exec.Command("ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=duration=30:size=320x240:rate=10", "-c:v", "libx264", src, "-y").Run(); err != nil {
+	if err := exec.Command("ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=duration=30:size=320x240:rate=10", "-c:v", "libx264", "-g", "10", src, "-y").Run(); err != nil {
 		t.Skip("could not make a test video")
 	}
 	out := MakeSampleVideo(src, 10)

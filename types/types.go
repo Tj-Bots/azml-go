@@ -69,6 +69,7 @@ const (
 	StatusQueuedDL    TaskStatus = "QueueDL"
 	StatusQueuedUP    TaskStatus = "QueueUp"
 	StatusPaused      TaskStatus = "Paused"
+	StatusProcessing  TaskStatus = "Processing" // a step between download and upload (the engine says which)
 )
 
 type DownloadTask interface {

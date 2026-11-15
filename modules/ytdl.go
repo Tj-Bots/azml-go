@@ -217,7 +217,7 @@ func (m *YtdlModule) processYtdl(peer tg.InputPeerClass, msg *types.MessageConte
 	totalSize := fi.Size()
 	uTask.SetName(finalName)
 	uTask.SetSize(totalSize)
-	uTask.SetStatus(types.StatusUploading, "Gotd Uploader")
+	setStep(uTask, "Thumbnail & Cover")
 
 	customThumb := ""
 	if user != nil && user.CustomThumb != "" {
@@ -242,6 +242,7 @@ func (m *YtdlModule) processYtdl(peer tg.InputPeerClass, msg *types.MessageConte
 
 	thumbPath := ext.GenerateThumbnail(downloadedFile, customThumb)
 	coverPath := ext.GenerateVideoCover(downloadedFile, customThumb)
+	uTask.SetStatus(types.StatusUploading, "Gotd Uploader")
 	defer func() {
 		if thumbPath != "" && thumbPath != customThumb {
 			_ = os.Remove(thumbPath)

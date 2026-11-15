@@ -253,7 +253,11 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 
 		sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Name:</b> <code>%s</code>\n", telegram.EscapeHTML(SanitizeFilename(t.Name()))))
 		sb.WriteString(fmt.Sprintf("┠ [%s] <i>%.1f%%</i>\n", bar, pct))
-		sb.WriteString(fmt.Sprintf("┠ <b>Status:</b> <i>%s</i>\n", telegram.EscapeHTML(string(t.Status()))))
+		statusText := string(t.Status())
+		if t.Status() == types.StatusProcessing {
+			statusText = engine // the step itself: Screenshots, Thumbnail, MediaInfo...
+		}
+		sb.WriteString(fmt.Sprintf("┠ <b>Status:</b> <i>%s</i>\n", telegram.EscapeHTML(statusText)))
 		sb.WriteString(fmt.Sprintf("┠ <b>Processed:</b> %s of %s\n", GetReadableFileSize(t.DownloadedBytes()), GetReadableFileSize(t.Size())))
 		sb.WriteString(fmt.Sprintf("┠ <b>Speed:</b> %s/s\n", GetReadableFileSize(int64(t.Speed()))))
 		sb.WriteString(fmt.Sprintf("┠ <b>ETA:</b> %s | <b>Elapsed:</b> %s\n", telegram.EscapeHTML(t.ETA()), telegram.EscapeHTML(elapsed)))

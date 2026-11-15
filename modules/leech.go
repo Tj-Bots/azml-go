@@ -1153,7 +1153,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	ulStartTime = time.Now()
 
-	uTask.SetStatus(types.StatusUploading, "MTProto")
+	setStep(uTask, "Preparing Upload")
 	if notifyID > 0 {
 		text, btn := m.taskMgr.BuildStatusMessage(1)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, notifyID, text, btn, 3)
@@ -1180,7 +1180,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 		// Metadata editing
 		if user != nil && len(user.Metadata) > 0 {
-			uTask.SetStatus(types.StatusFFmpeg, "FFmpeg")
+			setStep(uTask, "Metadata (FFmpeg)")
 			metaDir := filepath.Join(taskDir, "meta_tmp")
 			_ = os.MkdirAll(metaDir, 0755)
 			outMeta := filepath.Join(metaDir, origBase)
@@ -1230,6 +1230,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			if ssCount <= 0 {
 				ssCount = 4
 			}
+			setStep(uTask, "Screenshots (FFmpeg)")
 			ssLinks, _ = ext.TakeScreenshots(curFile, ssCount)
 		}
 
@@ -1258,15 +1259,19 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 
 		if customThumb == "" && autoThumbEnabled {
+			setStep(uTask, "Auto Thumbnail (TMDB)")
 			if tmdbThumb, err := ext.GetAutoThumbnail(ctx, finalName, asDoc, cfg.LeechFilenameRemnameRegex, msg.LangCode); err == nil && tmdbThumb != "" {
 				customThumb = tmdbThumb
 			}
 		}
+		setStep(uTask, "Thumbnail & Cover")
 		thumbPath := ext.GenerateThumbnail(curFile, customThumb)
 		coverPath := ext.GenerateVideoCover(curFile, customThumb)
 
 		// File Splitting
-		uTask.SetStatus(types.StatusSplitting, "7-Zip")
+		if !opt.IsMirror {
+			uTask.SetStatus(types.StatusSplitting, "7-Zip")
+		}
 		maxSplit := config.GetMaxSplitSize()
 		splitSize := cfg.LeechSplitSize
 		if user != nil && user.SplitSize > 0 {
@@ -1345,6 +1350,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		partResults := make([]uploader.UploadResult, len(splitParts))
 		var fileButtons *telegram.ButtonMaker
 		if user != nil && user.MediaInfo {
+			setStep(uTask, "MediaInfo")
 			if miLink := mediaInfoLink(curFile, finalName); miLink != "" {
 				fileButtons = telegram.NewButtonMaker()
 				fileButtons.UButtonStyled("MediaInfo", miLink, "primary")
@@ -1359,6 +1365,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if fileButtons != nil {
 			fileButtons.Row()
 		}
+		uTask.SetStatus(types.StatusUploading, "MTProto")
 		var groupOpt, lastUpOpt uploader.UploadOptions
 		for idx, part := range splitParts {
 			partCaption := caption
@@ -1421,7 +1428,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 		}
 		if user != nil && user.SampleSec > 0 && !opt.IsMirror {
+			setStep(uTask, "Sample Video (FFmpeg)")
 			if samplePath := ext.MakeSampleVideo(curFile, user.SampleSec); samplePath != "" {
+				uTask.SetStatus(types.StatusUploading, "Sample Video")
 				sampleOpt := groupOpt
 				if !useGroup {
 					sampleOpt = lastUpOpt
@@ -1977,4 +1986,10 @@ func captionLinks(btn *telegram.ButtonMaker) string {
 		return ""
 	}
 	return "\n\n◈ " + strings.Join(out, " | ")
+}
+
+// setStep shows a processing step (screenshots, thumbnail...) in the status, with no speed.
+func setStep(t *ext.UnifiedTask, step string) {
+	t.SetStatus(types.StatusProcessing, step)
+	t.SetProgress(t.DownloadedBytes(), t.Size(), 0, "-")
 }

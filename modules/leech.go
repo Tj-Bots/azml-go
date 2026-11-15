@@ -302,9 +302,8 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 
 	elapsed := ext.TimeSinceFormatted(startTime)
 	errMsg := fmt.Sprintf("<i><b>Download Stopped!</b></i>\n"+
-		"<blockquote>╭ <b>Task for:</b> %s</blockquote>\n"+
-		"┃\n"+
-		"<blockquote>╭ <b>Due To:</b> %s\n"+
+		"<blockquote>╭ <b>Task for:</b> %s\n"+
+		"┠ <b>Due To:</b> %s\n"+
 		"┠ <b>Mode:</b> %s\n"+
 		"╰ <b>Elapsed:</b> %s</blockquote>",
 		tag, telegram.EscapeHTML(errStr), mode, elapsed)

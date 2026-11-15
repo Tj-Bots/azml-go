@@ -172,6 +172,7 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 	if totalTasks == 0 {
 		mem := GetMemoryStats()
 		uptime := TimeSinceFormatted(BotStartTime)
+		_, _, diskFree, _ := GetDiskUsage("/")
 		noTaskMsg := fmt.Sprintf("<i>%s</i>\n\n"+
 			"⌬ <b><i>%s</i></b>\n"+
 			"<blockquote>╭ <b>Active Tasks:</b> 0\n"+
@@ -180,7 +181,7 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 			"╰ <b>Disk Free:</b> %s</blockquote>",
 			telegram.ToSmallCaps("No Active Tasks Running!"),
 			"Bot Stats",
-			mem.OSPercent, GetCPUPercent(), uptime, mem.OSFree)
+			mem.OSPercent, GetCPUPercent(), uptime, GetReadableFileSize(int64(diskFree)))
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("⟳ "+telegram.ToSmallCaps("Refresh"), "status ref 1", "primary")
 		btn.Row()

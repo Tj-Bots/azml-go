@@ -112,8 +112,10 @@ func (m *HelpModule) getStatsView(key string, targetUID int64) (string, *telegra
 	if key == "home" {
 		btn.IButton("Bot Stats", fmt.Sprintf("stats %d stbot", targetUID))
 		btn.IButton("OS Stats", fmt.Sprintf("stats %d stsys", targetUID))
+		btn.Row()
 		btn.IButton("Repo Stats", fmt.Sprintf("stats %d strepo", targetUID))
 		btn.IButton("Bot Limits", fmt.Sprintf("stats %d botlimits", targetUID))
+		btn.Row()
 		btn.IButtonStyled("Close", fmt.Sprintf("stats %d close", targetUID), "danger")
 		msg = "⌬ <b><i>Bot & OS Statistics!</i></b>"
 	} else {

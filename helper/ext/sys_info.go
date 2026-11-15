@@ -221,18 +221,18 @@ func RenderBotStats(startTime time.Time) string {
 
 	return fmt.Sprintf("⌬ <b><i>BOT STATISTICS :</i></b>\n"+
 		"<blockquote>╭ <b>Bot Uptime :</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b><i>RAM ( MEMORY ) :</i></b></blockquote>\n"+
-		"┃ %s %.1f%%\n"+
-		"<blockquote>╭ <b>App RAM (AZML-Go) :</b> <code>%.1f MB</code>\n"+
+		"<blockquote>╭ <b><i>RAM ( MEMORY ) :</i></b>\n"+
+		"┠ %s %.1f%%\n"+
+		"┠ <b>App RAM (AZML-Go) :</b> <code>%.1f MB</code>\n"+
 		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b><i>SWAP MEMORY :</i></b></blockquote>\n"+
-		"┃ %s %.1f%%\n"+
-		"<blockquote>╭ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b><i>DISK :</i></b></blockquote>\n"+
-		"┃ %s %.1f%%\n"+
-		"┃ <b>Total Disk Read :</b> %s\n"+
-		"┃ <b>Total Disk Write :</b> %s\n"+
-		"<blockquote>╭ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>",
+		"<blockquote>╭ <b><i>SWAP MEMORY :</i></b>\n"+
+		"┠ %s %.1f%%\n"+
+		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
+		"<blockquote>╭ <b><i>DISK :</i></b>\n"+
+		"┠ %s %.1f%%\n"+
+		"┠ <b>Total Disk Read :</b> %s\n"+
+		"┠ <b>Total Disk Write :</b> %s\n"+
+		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>",
 		botUptime,
 		ramBar, ramPercent,
 		appRAM,
@@ -470,9 +470,9 @@ func RenderSysStats() string {
 		"┠ <b>Pkts Sent:</b> %sk\n"+
 		"┠ <b>Pkts Received:</b> %sk\n"+
 		"╰ <b>Total I/O Data:</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b>CPU :</b></blockquote>\n"+
-		"┃ %s %.1f%%\n"+
-		"<blockquote>╭ <b>CPU Frequency :</b> %s\n"+
+		"<blockquote>╭ <b>CPU :</b>\n"+
+		"┠ %s %.1f%%\n"+
+		"┠ <b>CPU Frequency :</b> %s\n"+
 		"┠ <b>System Avg Load :</b> %s\n"+
 		"┠ <b>P-Core(s) :</b> %d | <b>V-Core(s) :</b> %d\n"+
 		"┠ <b>Total Core(s) :</b> %d\n"+

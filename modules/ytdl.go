@@ -53,14 +53,14 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 
 	tokens := strings.Fields(msg.Text)
 	if len(tokens) <= 1 && (!msg.IsReply || msg.ReplyText == "") {
-		helpMsg := fmt.Sprintf("⌬ <b><u>%s:</u></b>\n\n"+
+		helpMsg := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 			"<b>%s:</b> <code>/ytdl [link] [quality]</code>\n\n"+
 			"<blockquote>╭ <b>%s:</b>\n"+
 			"┠ <code>/ytdl https://youtu.be/...</code>\n"+
 			"╰ <code>/ytdl https://youtu.be/... 720p</code></blockquote>",
-			telegram.ToSmallCaps("YtDlp Media Downloader"),
-			telegram.ToSmallCaps("Usage"),
-			telegram.ToSmallCaps("Examples"))
+			"YtDlp Media Downloader",
+			"Usage",
+			"Examples")
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}

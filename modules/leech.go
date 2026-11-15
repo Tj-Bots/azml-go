@@ -252,7 +252,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		return
 	}
 	if link == "" && !msg.HasMedia && !msg.IsReply {
-		helpMsg := fmt.Sprintf("⌬ <b><u>%s:</u></b>\n\n"+
+		helpMsg := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 			"<b>%s:</b> <code>/leech [link] [flags]</code>\n\n"+
 			"<blockquote>╭ <b>%s:</b>\n"+
 			"┠ <code>-b</code> — %s\n"+
@@ -265,19 +265,19 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			"┠ <code>-med</code> — %s\n"+
 			"┠ <code>-ud</code> — %s\n"+
 			"╰ <code>-st</code> — %s</blockquote>",
-			telegram.ToSmallCaps("Leech Command Usage"),
-			telegram.ToSmallCaps("Usage"),
-			telegram.ToSmallCaps("Available Flags"),
-			telegram.ToSmallCaps("Bulk Leech (reply to links)"),
-			telegram.ToSmallCaps("Custom File Name"),
-			telegram.ToSmallCaps("Compress as Zip"),
-			telegram.ToSmallCaps("Extract Archive"),
-			telegram.ToSmallCaps("Extraction Password"),
-			telegram.ToSmallCaps("Generate Screenshots"),
-			telegram.ToSmallCaps("Upload as Document"),
-			telegram.ToSmallCaps("Upload as Media"),
-			telegram.ToSmallCaps("Custom Dump Chat ID"),
-			telegram.ToSmallCaps("Extract Video Streams"))
+			"Leech Command Usage",
+			"Usage",
+			"Available Flags",
+			"Bulk Leech (reply to links)",
+			"Custom File Name",
+			"Compress as Zip",
+			"Extract Archive",
+			"Extraction Password",
+			"Generate Screenshots",
+			"Upload as Document",
+			"Upload as Media",
+			"Custom Dump Chat ID",
+			"Extract Video Streams")
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}

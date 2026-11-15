@@ -77,7 +77,7 @@ type anilistResponse struct {
 func (m *AnimeModule) HandleAnime(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	parts := strings.Fields(msg.Text)
 	if len(parts) < 2 {
-		helpMsg := "<b>Anime Search Usage:</b>\n" +
+		helpMsg := "㊂ <b><u>Anime Search Usage :</u></b>\n\n" +
 			"• <code>/anime [anime title]</code>\n" +
 			"• <code>/anilist [anime title]</code>"
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))

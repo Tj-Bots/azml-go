@@ -41,7 +41,7 @@ func (m *BroadcastModule) HandleBroadcast(ctx context.Context, peer tg.InputPeer
 		if len(parts) > 1 {
 			replyMsg = strings.Join(parts[1:], " ")
 		} else {
-			helpMsg := "<b>Broadcast Usage:</b>\n" +
+			helpMsg := "㊂ <b><u>Broadcast Usage :</u></b>\n\n" +
 				"• Reply to any message: <code>/broadcast [-q]</code>\n" +
 				"• Send text: <code>/broadcast [Your message here]</code>\n\n" +
 				"<b>Flags:</b>\n" +

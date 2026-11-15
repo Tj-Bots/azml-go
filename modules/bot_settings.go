@@ -76,6 +76,12 @@ var configVarKeys = []string{
 	"TOKEN_TIMEOUT",
 	"UPSTREAM_REPO",
 	"UPSTREAM_BRANCH",
+	"GOFILE_TOKEN",
+	"PIXELDRAIN_KEY",
+	"BUZZHEAVIER_TOKEN",
+	"DEVUPLOADS_KEY",
+	"STREAMTAPE_API",
+	"VIKINGFILE_USER",
 }
 
 var defaultVarValues = map[string]string{
@@ -111,6 +117,12 @@ var defaultVarValues = map[string]string{
 	"TOKEN_TIMEOUT":                "0",
 	"UPSTREAM_REPO":                "https://github.com/Tj-Bots/azml-go",
 	"UPSTREAM_BRANCH":              "main",
+	"GOFILE_TOKEN":                 "",
+	"PIXELDRAIN_KEY":               "",
+	"BUZZHEAVIER_TOKEN":            "",
+	"DEVUPLOADS_KEY":               "",
+	"STREAMTAPE_API":               "",
+	"VIKINGFILE_USER":              "",
 }
 
 func isBoolVar(key string) bool {

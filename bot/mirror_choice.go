@@ -54,9 +54,13 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 		return
 	}
 
+	hosts := ext.AvailableMirrorHosts()
 	btn := telegram.NewButtonMaker()
-	for _, h := range ext.MirrorHosts {
+	for i, h := range hosts {
 		btn.IButton(h.Name, fmt.Sprintf("mirror %d %s", msgCtx.UserID, h.ID))
+		if i%2 == 1 {
+			btn.Row()
+		}
 	}
 	btn.Row()
 	btn.IButtonStyled("Cancel", fmt.Sprintf("mirror %d cancel", msgCtx.UserID), "danger")
@@ -66,7 +70,7 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	promptID, err := b.sender.SendMessageWithButtons(ctx, peer, prompt, msgCtx.MessageID, btn, 2)
 	if err != nil || promptID == 0 {
 		// no buttons possible: fall back to the first host
-		msgCtx.MirrorHost = ext.MirrorHosts[0].ID
+		msgCtx.MirrorHost = hosts[0].ID
 		b.leechHandler(ctx, peer, msgCtx, false, false)
 		return
 	}

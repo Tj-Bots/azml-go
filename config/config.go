@@ -89,6 +89,12 @@ type Config struct {
 	UpstreamRepo              string
 	UpstreamBranch            string
 	UpdateOnStartup           bool
+	GoFileToken               string
+	PixelDrainKey             string
+	BuzzHeavierToken          string
+	DevUploadsKey             string
+	StreamTapeAPI             string // "login:key"
+	VikingFileUser            string
 }
 
 var (
@@ -211,6 +217,12 @@ func LoadConfig(path string) (*Config, error) {
 		UpstreamRepo:              getEnv("UPSTREAM_REPO", "https://github.com/Tj-Bots/azml-go"),
 		UpstreamBranch:            getEnv("UPSTREAM_BRANCH", "main"),
 		UpdateOnStartup:           getEnvBool("UPDATE_ON_STARTUP", false),
+		GoFileToken:               getEnv("GOFILE_TOKEN", ""),
+		PixelDrainKey:             getEnv("PIXELDRAIN_KEY", ""),
+		BuzzHeavierToken:          getEnv("BUZZHEAVIER_TOKEN", ""),
+		DevUploadsKey:             getEnv("DEVUPLOADS_KEY", ""),
+		StreamTapeAPI:             getEnv("STREAMTAPE_API", ""),
+		VikingFileUser:            getEnv("VIKINGFILE_USER", ""),
 	}
 
 	// Resolve main bot token
@@ -458,6 +470,18 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.UpstreamRepo = strings.TrimSpace(val)
 	case "UPSTREAM_BRANCH":
 		GlobalConfig.UpstreamBranch = strings.TrimSpace(val)
+	case "GOFILE_TOKEN":
+		GlobalConfig.GoFileToken = strings.TrimSpace(val)
+	case "PIXELDRAIN_KEY":
+		GlobalConfig.PixelDrainKey = strings.TrimSpace(val)
+	case "BUZZHEAVIER_TOKEN":
+		GlobalConfig.BuzzHeavierToken = strings.TrimSpace(val)
+	case "DEVUPLOADS_KEY":
+		GlobalConfig.DevUploadsKey = strings.TrimSpace(val)
+	case "STREAMTAPE_API":
+		GlobalConfig.StreamTapeAPI = strings.TrimSpace(val)
+	case "VIKINGFILE_USER":
+		GlobalConfig.VikingFileUser = strings.TrimSpace(val)
 	}
 
 	_ = os.Setenv(key, val)
@@ -528,8 +552,8 @@ func GetConfigMap() map[string]string {
 
 	return map[string]string{
 		"OWNER_USERNAME":               GlobalConfig.OwnerUsername,
-		"USER_SESSION_STRING":         MaskSession(GlobalConfig.UserSessionString),
-		"DUMP_CHAT_ID":                strconv.FormatInt(GlobalConfig.DumpChatID, 10),
+		"USER_SESSION_STRING":          MaskSession(GlobalConfig.UserSessionString),
+		"DUMP_CHAT_ID":                 strconv.FormatInt(GlobalConfig.DumpChatID, 10),
 		"LEECH_LOG_ID":                 strconv.FormatInt(GlobalConfig.LeechLogID, 10),
 		"STATUS_LIMIT":                 strconv.Itoa(GlobalConfig.StatusLimit),
 		"STATUS_UPDATE_INTERVAL":       strconv.Itoa(GlobalConfig.StatusUpdateInterval),
@@ -559,5 +583,11 @@ func GetConfigMap() map[string]string {
 		"TOKEN_TIMEOUT":                strconv.FormatInt(GlobalConfig.TokenTimeout, 10),
 		"UPSTREAM_REPO":                GlobalConfig.UpstreamRepo,
 		"UPSTREAM_BRANCH":              GlobalConfig.UpstreamBranch,
+		"GOFILE_TOKEN":                 GlobalConfig.GoFileToken,
+		"PIXELDRAIN_KEY":               GlobalConfig.PixelDrainKey,
+		"BUZZHEAVIER_TOKEN":            GlobalConfig.BuzzHeavierToken,
+		"DEVUPLOADS_KEY":               GlobalConfig.DevUploadsKey,
+		"STREAMTAPE_API":               GlobalConfig.StreamTapeAPI,
+		"VIKINGFILE_USER":              GlobalConfig.VikingFileUser,
 	}
 }

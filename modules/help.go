@@ -51,7 +51,7 @@ func (m *HelpModule) getHelpGuideText() string {
 		"┠ <code>/leech%s [link]</code> — Direct, Magnet, Torrent, Mega, TG media\n"+
 		"┠ <code>/zipleech%s [link]</code> — Zip contents before uploading\n"+
 		"┠ <code>/unzipleech%s [link]</code> — Extract zip/rar/7z archives\n"+
-		"┠ <code>/mirror%s [link]</code> — Download and upload to a host you choose (<code>-up gofile</code>), get a link\n"+
+		"┠ <code>/mirror%s [link]</code> — Upload to GoFile, VikingFile, PixelDrain, BuzzHeavier, DevUploads or StreamTape (<code>-up gofile</code>)\n"+
 		"╰ <code>/ytdl%s [link]</code> — Download video/audio via yt-dlp</blockquote>\n\n"+
 		"<blockquote>╭ <b>User Configuration:</b>\n"+
 		"┠ <code>/us%s</code> — User settings (Prefix, Suffix, Caption, AutoRename)\n"+

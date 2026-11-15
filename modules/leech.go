@@ -446,6 +446,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var totalSize int64
 	var uploadedNames []string
 	var mirrorLinks []string
+	mirrorSess := &ext.MirrorSession{}
 	modeStr := "#Leech | #Aria2"
 	if ext.IsMagnet(link) || strings.HasSuffix(strings.ToLower(link), ".torrent") {
 		modeStr = "#Leech | #Torrent"
@@ -1251,7 +1252,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 			uTask.SetStatus(types.StatusUploading, hostName)
 			mirrorStart := time.Now()
-			link, gErr := ext.UploadToHost(ctx, hostID, curFile, func(sent, total int64) {
+			link, gErr := ext.UploadToHost(ctx, hostID, curFile, mirrorSess, func(sent, total int64) {
 				secs := time.Since(mirrorStart).Seconds()
 				if secs < 0.5 {
 					return
@@ -1400,11 +1401,24 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	finishBtn := telegram.NewButtonMaker()
 	if opt.IsMirror {
-		for idx, link := range mirrorLinks {
+		seen := map[string]bool{}
+		var uniq []string
+		for _, link := range mirrorLinks {
+			if !seen[link] {
+				seen[link] = true
+				uniq = append(uniq, link)
+			}
+		}
+		for idx, link := range uniq {
 			if idx >= 3 {
 				break
 			}
-			finishBtn.UButtonStyled(fmt.Sprintf("◈ %s %d", mirrorHostName(opt.MirrorHost), idx+1), link, "primary")
+			label := "◈ " + mirrorHostName(opt.MirrorHost)
+			if len(uniq) > 1 {
+				label = fmt.Sprintf("%s %d", label, idx+1)
+			}
+			finishBtn.UButtonStyled(label, link, "primary")
+			finishBtn.Row()
 		}
 	} else {
 		finishBtn.UButtonStyled("◈ "+telegram.ToSmallCaps("View in Bot PM"), fmt.Sprintf("https://t.me/%s", botUser), "primary")

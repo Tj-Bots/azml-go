@@ -648,8 +648,10 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		SenderName: senderName,
 		Username:   senderUsername,
 		Text:       text,
-		HasMedia:   m.Media != nil,
-		RawMedia:   m.Media,
+		HasMedia:   isFileMedia(m.Media),
+	}
+	if msgCtx.HasMedia {
+		msgCtx.RawMedia = m.Media
 	}
 
 	if m.ReplyTo != nil {
@@ -658,7 +660,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 			msgCtx.ReplyToID = header.ReplyToMsgID
 
 			// 1. Direct media attached to reply header if provided by Telegram
-			if header.ReplyMedia != nil {
+			if isFileMedia(header.ReplyMedia) {
 				msgCtx.HasMedia = true
 				msgCtx.RawMedia = header.ReplyMedia
 			}
@@ -682,7 +684,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 				}
 				if repliedMsg != nil {
 					msgCtx.ReplyText = repliedMsg.Message
-					if repliedMsg.Media != nil {
+					if isFileMedia(repliedMsg.Media) {
 						msgCtx.HasMedia = true
 						msgCtx.RawMedia = repliedMsg.Media
 					}

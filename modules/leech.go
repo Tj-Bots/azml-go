@@ -1344,14 +1344,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if user != nil && user.MediaInfo {
 			if miLink := mediaInfoLink(curFile, finalName); miLink != "" {
 				fileButtons = telegram.NewButtonMaker()
-				fileButtons.UButton("MediaInfo", miLink)
+				fileButtons.UButtonStyled("MediaInfo", miLink, "primary")
 			}
 		}
 		if len(ssLinks) > 0 {
 			if fileButtons == nil {
 				fileButtons = telegram.NewButtonMaker()
 			}
-			fileButtons.UButton("ScreenShots", ssLinks[0])
+			fileButtons.UButtonStyled("ScreenShots", ssLinks[0], "primary")
 		}
 		if fileButtons != nil {
 			fileButtons.Row()

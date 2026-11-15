@@ -70,8 +70,7 @@ func TestRenderAllMenus(t *testing.T) {
 		out.WriteString(render("us mhost", tx, b, 2))
 		tx, b = sm.buildChoiceMenu(u, "Screenshots", "Screenshots", shotsText(u.Screenshots), "d", "setshots", "shots", u.Screenshots, []int{0, 3, 5, 8, 10})
 		out.WriteString(render("us shots", tx, b, 3))
-		tx, b = sm.buildDDLServersMenu(u)
-		out.WriteString(render("us ddl", tx, b, 2))
+
 		tx, b = sm.buildDDLHostMenu(u, "streamtape")
 		out.WriteString(render("us ddl host", tx, b, 2))
 		tx, b = sm.buildExcludedMenu(u)

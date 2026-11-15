@@ -202,8 +202,12 @@ func (m *MediaInfoModule) sendMediaInfo(ctx context.Context, peer tg.InputPeerCl
 		return
 	}
 
-	respText := fmt.Sprintf("㊂ <b><u>MediaInfo :</u></b>\n\n<blockquote>╭ <b>Name :</b> <code>%s</code>\n╰ <b>Link :</b> <a href=\"%s\">MediaInfo</a></blockquote>", telegram.EscapeHTML(fileName), pageURL)
-	_ = m.sender.EditMessage(ctx, peer, waitID, respText, telegram.CloseMarkup(userID))
+	respText := fmt.Sprintf("㊂ <b><u>MediaInfo :</u></b>\n\n<blockquote>◈ <b>Name :</b> <code>%s</code></blockquote>", telegram.EscapeHTML(fileName))
+	btn := telegram.NewButtonMaker()
+	btn.UButtonStyled("MediaInfo", pageURL, "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", userID), "danger")
+	btn.Row()
+	_ = m.sender.EditMessage(ctx, peer, waitID, respText, btn.BuildMenu(2))
 }
 
 func runMediaInfo(filePath string) string {

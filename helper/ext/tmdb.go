@@ -147,7 +147,7 @@ type tmdbImagesResult struct {
 }
 
 // GetTMDBPosterLink queries TMDB API to find poster or landscape backdrop URL
-func GetTMDBPosterLink(ctx context.Context, title, year string, asDoc bool) (string, error) {
+func GetTMDBPosterLink(ctx context.Context, title, year string, asDoc bool, lang string) (string, error) {
 	cfg := config.Get()
 	token := strings.TrimSpace(cfg.TMDBAccessToken)
 	if token == "" {
@@ -221,7 +221,7 @@ func GetTMDBPosterLink(ctx context.Context, title, year string, asDoc bool) (str
 	// Fetch image sets for media
 	imgURL := fmt.Sprintf("https://api.themoviedb.org/3/%s/%d/images", bestItem.MediaType, bestItem.ID)
 	iq := url.Values{}
-	iq.Set("include_image_languages", "en,null")
+	iq.Set("include_image_languages", imageLanguages(lang))
 	if len(token) < 50 {
 		iq.Set("api_key", token)
 	}
@@ -237,7 +237,7 @@ func GetTMDBPosterLink(ctx context.Context, title, year string, asDoc bool) (str
 			if imgResp.StatusCode == http.StatusOK {
 				var imagesRes tmdbImagesResult
 				if err := json.NewDecoder(imgResp.Body).Decode(&imagesRes); err == nil {
-					imgPath := selectBestImagePath(imagesRes, asDoc)
+					imgPath := selectBestImagePath(imagesRes, asDoc, lang)
 					if imgPath != "" {
 						return "https://image.tmdb.org/t/p/original" + imgPath, nil
 					}
@@ -261,64 +261,70 @@ func GetTMDBPosterLink(ctx context.Context, title, year string, asDoc bool) (str
 	return "", nil
 }
 
-func selectBestImagePath(res tmdbImagesResult, asDoc bool) string {
-	var enBackdrops, nullBackdrops, allBackdrops []string
-	for _, b := range res.Backdrops {
-		if b.ISO6391 != nil && *b.ISO6391 == "en" {
-			enBackdrops = append(enBackdrops, b.FilePath)
-		} else if b.ISO6391 == nil {
-			nullBackdrops = append(nullBackdrops, b.FilePath)
-		}
-		allBackdrops = append(allBackdrops, b.FilePath)
+// imageLanguages: the user's language first, then English and images without text.
+func imageLanguages(lang string) string {
+	lang = shortLang(lang)
+	if lang == "" || lang == "en" {
+		return "en,null"
 	}
+	return lang + ",en,null"
+}
 
-	var enPosters, nullPosters, allPosters []string
-	for _, p := range res.Posters {
-		if p.ISO6391 != nil && *p.ISO6391 == "en" {
-			enPosters = append(enPosters, p.FilePath)
-		} else if p.ISO6391 == nil {
-			nullPosters = append(nullPosters, p.FilePath)
-		}
-		allPosters = append(allPosters, p.FilePath)
+func shortLang(lang string) string {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	if i := strings.IndexAny(lang, "-_"); i > 0 {
+		lang = lang[:i]
 	}
+	return lang
+}
 
+// selectBestImagePath: posters for documents, backdrops (16:9) for videos;
+// in each, the user's language first, then English, then no text, then any.
+func selectBestImagePath(res tmdbImagesResult, asDoc bool, lang string) string {
+	langs := []string{"en"}
+	if l := shortLang(lang); l != "" && l != "en" {
+		langs = []string{l, "en"}
+	}
+	pick := func(items []tmdbImageItem, code string, noText bool) string {
+		for _, it := range items {
+			if noText && it.ISO6391 == nil {
+				return it.FilePath
+			}
+			if !noText && it.ISO6391 != nil && *it.ISO6391 == code {
+				return it.FilePath
+			}
+		}
+		return ""
+	}
+	order := func(first, second []tmdbImageItem) string {
+		for _, l := range langs {
+			if p := pick(first, l, false); p != "" {
+				return p
+			}
+		}
+		if p := pick(first, "", true); p != "" {
+			return p
+		}
+		if len(first) > 0 {
+			return first[0].FilePath
+		}
+		for _, l := range langs {
+			if p := pick(second, l, false); p != "" {
+				return p
+			}
+		}
+		if p := pick(second, "", true); p != "" {
+			return p
+		}
+		if len(second) > 0 {
+			return second[0].FilePath
+		}
+		return ""
+	}
 	if asDoc {
-		// Document priorities: poster first
-		if len(enPosters) > 0 {
-			return enPosters[0]
-		}
-		if len(nullPosters) > 0 {
-			return nullPosters[0]
-		}
-		if len(allPosters) > 0 {
-			return allPosters[0]
-		}
-		if len(enBackdrops) > 0 {
-			return enBackdrops[0]
-		}
-		if len(nullBackdrops) > 0 {
-			return nullBackdrops[0]
-		}
-	} else {
-		// Video priorities: 16:9 backdrop first for cover
-		if len(enBackdrops) > 0 {
-			return enBackdrops[0]
-		}
-		if len(nullBackdrops) > 0 {
-			return nullBackdrops[0]
-		}
-		if len(allBackdrops) > 0 {
-			return allBackdrops[0]
-		}
-		if len(enPosters) > 0 {
-			return enPosters[0]
-		}
-		if len(allPosters) > 0 {
-			return allPosters[0]
-		}
+		return order(res.Posters, res.Backdrops)
 	}
-
-	return ""
+	return order(res.Backdrops, res.Posters)
 }
 
 // DownloadImage downloads an image URL directly to destPath
@@ -351,13 +357,13 @@ func DownloadImage(ctx context.Context, imageURL, destPath string) error {
 }
 
 // GetAutoThumbnail searches TMDB for title and returns a local high-res poster file path
-func GetAutoThumbnail(ctx context.Context, rawFilename string, asDoc bool, renameRegex string) (string, error) {
+func GetAutoThumbnail(ctx context.Context, rawFilename string, asDoc bool, renameRegex string, lang string) (string, error) {
 	title, _, year := FormatCleanPosterTitle(rawFilename, renameRegex)
 	if len(title) < 2 {
 		return "", nil
 	}
 
-	posterURL, err := GetTMDBPosterLink(ctx, title, year, asDoc)
+	posterURL, err := GetTMDBPosterLink(ctx, title, year, asDoc, lang)
 	if err != nil || posterURL == "" {
 		return "", err
 	}

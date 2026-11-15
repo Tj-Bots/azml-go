@@ -520,6 +520,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	senderID := chatID
 	senderName := "User"
 	senderUsername := ""
+	senderLang := ""
 
 	if m.FromID != nil {
 		if uPeer, ok := m.FromID.(*tg.PeerUser); ok {
@@ -527,6 +528,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 			if uObj, exists := entities.Users[senderID]; exists {
 				senderName = uObj.FirstName
 				senderUsername = uObj.Username
+				senderLang = uObj.LangCode
 				b.cacheAccessHash(senderID, uObj.AccessHash)
 			}
 		}
@@ -535,6 +537,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		if uObj, exists := entities.Users[senderID]; exists {
 			senderName = uObj.FirstName
 			senderUsername = uObj.Username
+			senderLang = uObj.LangCode
 			b.cacheAccessHash(senderID, uObj.AccessHash)
 		}
 	}
@@ -647,6 +650,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		UserID:     senderID,
 		SenderName: senderName,
 		Username:   senderUsername,
+		LangCode:   senderLang,
 		Text:       text,
 		HasMedia:   isFileMedia(m.Media),
 	}

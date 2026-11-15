@@ -32,7 +32,7 @@ func RestoreThumbnails(userMap *types.SafeUserMap) {
 }
 
 // maxThumbBytes: bigger images are not kept in the database (MongoDB documents are limited to 16 MB).
-const maxThumbBytes = 1 << 20
+const maxThumbBytes = 5 << 20
 
 // ThumbBytes reads a thumbnail to keep it in the database, nil when missing or too big.
 func ThumbBytes(path string) []byte {

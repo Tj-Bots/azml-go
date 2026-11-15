@@ -118,6 +118,7 @@ type MessageContext struct {
 	UserID      int64
 	SenderName  string
 	Username    string
+	LangCode    string // Telegram language of the sender (e.g. "he")
 	Text        string
 	ReplyToID   int
 	ReplyText   string

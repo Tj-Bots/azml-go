@@ -235,7 +235,7 @@ func (m *YtdlModule) processYtdl(peer tg.InputPeerClass, msg *types.MessageConte
 	}
 
 	if customThumb == "" && autoThumbEnabled {
-		if tmdbThumb, err := ext.GetAutoThumbnail(ctx, finalName, asDoc, cfg.LeechFilenameRemnameRegex); err == nil && tmdbThumb != "" {
+		if tmdbThumb, err := ext.GetAutoThumbnail(ctx, finalName, asDoc, cfg.LeechFilenameRemnameRegex, msg.LangCode); err == nil && tmdbThumb != "" {
 			customThumb = tmdbThumb
 		}
 	}

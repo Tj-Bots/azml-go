@@ -1302,6 +1302,12 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			continue
 		}
 
+		useGroup := len(splitParts) > 1 && cfg.MediaGroup
+		if user != nil {
+			useGroup = len(splitParts) > 1 && user.MediaGroup
+		}
+		partResults := make([]uploader.UploadResult, len(splitParts))
+		var groupOpt uploader.UploadOptions
 		for idx, part := range splitParts {
 			partCaption := caption
 			if len(splitParts) > 1 {
@@ -1335,12 +1341,26 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				},
 			}
 
+			if useGroup {
+				upOpt.SkipDelivery = true
+				upOpt.Result = &partResults[idx]
+				groupOpt = upOpt
+			}
 			_, upErr := m.uploader.UploadFile(ctx, peer, upOpt)
 			if upErr != nil {
 				log.Printf("[AZML-Go Leech] Upload error for %s: %v", part, upErr)
 				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("Upload Failed: %v", upErr), modeStr, taskStartTime)
 				return
 			}
+		}
+		if useGroup {
+			var done []uploader.UploadResult
+			for _, r := range partResults {
+				if r.MsgID > 0 {
+					done = append(done, r)
+				}
+			}
+			m.uploader.SendAlbum(ctx, done, groupOpt)
 		}
 
 		if thumbPath != "" && thumbPath != customThumb {

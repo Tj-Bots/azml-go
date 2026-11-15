@@ -170,6 +170,17 @@ type UploadOptions struct {
 	IsPremium      bool
 	GID            string
 	OnProgress     UploadProgressFunc
+	// SkipDelivery: only upload to the dump / log chat, do not copy to the user's PM or dumps
+	// (used for media groups: the album is delivered afterwards by SendAlbum).
+	SkipDelivery bool
+	// Result, when set, receives where the file was sent.
+	Result *UploadResult
+}
+
+// UploadResult is where an uploaded file landed.
+type UploadResult struct {
+	ChatID int64
+	MsgID  int
 }
 
 func isTransientUploadError(err error) bool {
@@ -937,6 +948,13 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 	log.Printf("[AZML-Go Uploader] Successfully sent uploaded media for %s to peer %T!", opt.FileName, uploadPeer)
 
 	msgID := telegram.ExtractMessageID(res)
+	if opt.Result != nil {
+		opt.Result.ChatID = actualDestChatID
+		opt.Result.MsgID = msgID
+	}
+	if opt.SkipDelivery {
+		return &res, nil
+	}
 	if msgID > 0 {
 		botToken := ""
 		if cfg != nil {

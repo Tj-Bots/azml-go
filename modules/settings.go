@@ -365,17 +365,17 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 
 	caption := "Not Exists"
 	if u.Caption != "" {
-		caption = u.Caption
+		caption = telegram.EscapeHTML(u.Caption)
 	}
 
 	prefix := "Not Exists"
 	if u.Prefix != "" {
-		prefix = u.Prefix
+		prefix = telegram.EscapeHTML(u.Prefix)
 	}
 
 	suffix := "Not Exists"
 	if u.Suffix != "" {
-		suffix = u.Suffix
+		suffix = telegram.EscapeHTML(u.Suffix)
 	}
 
 	dumps := "Not Exists"
@@ -385,12 +385,12 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 
 	remnameAuto := "Not Exists"
 	if u.RemnameAuto != "" {
-		remnameAuto = u.RemnameAuto
+		remnameAuto = telegram.EscapeHTML(u.RemnameAuto)
 	}
 
 	remnameRegex := "Not Exists"
 	if u.RemnameRegex != "" {
-		remnameRegex = u.RemnameRegex
+		remnameRegex = telegram.EscapeHTML(u.RemnameRegex)
 	}
 
 	renameMethod := "Auto Rename"
@@ -410,7 +410,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 
 	metadata := "Not Exists"
 	if u.Metadata != nil && u.Metadata["all"] != "" {
-		metadata = u.Metadata["all"]
+		metadata = telegram.EscapeHTML(u.Metadata["all"])
 	}
 
 	// Exact AZML text format with small caps header
@@ -579,7 +579,7 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 func (m *SettingsModule) buildCaptionMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
 	caption := "Not Exists (Default)"
 	if u.Caption != "" {
-		caption = u.Caption
+		caption = telegram.EscapeHTML(u.Caption)
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
@@ -612,7 +612,7 @@ func (m *SettingsModule) buildCaptionMenu(u *types.UserSettings) (string, *teleg
 func (m *SettingsModule) buildPrefixMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
 	prefix := "Not Exists"
 	if u.Prefix != "" {
-		prefix = u.Prefix
+		prefix = telegram.EscapeHTML(u.Prefix)
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
@@ -640,7 +640,7 @@ func (m *SettingsModule) buildPrefixMenu(u *types.UserSettings) (string, *telegr
 func (m *SettingsModule) buildSuffixMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
 	suffix := "Not Exists"
 	if u.Suffix != "" {
-		suffix = u.Suffix
+		suffix = telegram.EscapeHTML(u.Suffix)
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
@@ -668,7 +668,7 @@ func (m *SettingsModule) buildSuffixMenu(u *types.UserSettings) (string, *telegr
 func (m *SettingsModule) buildAutoRenameMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
 	tmpl := "Not Exists"
 	if u.RemnameAuto != "" {
-		tmpl = u.RemnameAuto
+		tmpl = telegram.EscapeHTML(u.RemnameAuto)
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
@@ -700,7 +700,7 @@ func (m *SettingsModule) buildAutoRenameMenu(u *types.UserSettings) (string, *te
 func (m *SettingsModule) buildRegexMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
 	regexVal := "Not Exists"
 	if u.RemnameRegex != "" {
-		regexVal = u.RemnameRegex
+		regexVal = telegram.EscapeHTML(u.RemnameRegex)
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
@@ -756,7 +756,7 @@ func (m *SettingsModule) buildDumpMenu(u *types.UserSettings) (string, *telegram
 func (m *SettingsModule) buildMetadataMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
 	metaAll := "Not Exists"
 	if u.Metadata != nil && u.Metadata["all"] != "" {
-		metaAll = u.Metadata["all"]
+		metaAll = telegram.EscapeHTML(u.Metadata["all"])
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+

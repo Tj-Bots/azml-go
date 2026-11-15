@@ -9,6 +9,8 @@ import (
 )
 
 type UserSettings struct {
+	YtOpt          string            `json:"yt_opt,omitempty" bson:"yt_opt,omitempty"`         // extra yt-dlp options
+	YtCookies      string            `json:"yt_cookies,omitempty" bson:"yt_cookies,omitempty"` // the user's cookies.txt
 	UserID         int64             `json:"user_id" bson:"_id"`
 	Name           string            `json:"name" bson:"name"`
 	IsAuth         bool              `json:"is_auth" bson:"is_auth"`

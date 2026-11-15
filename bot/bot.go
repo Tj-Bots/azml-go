@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -150,7 +151,7 @@ func (h *botUpdateHandler) Handle(ctx context.Context, u tg.UpdatesClass) error 
 		switch upd := u.(type) {
 		case *tg.Updates:
 			for _, chat := range upd.Chats {
-				if ch, ok := chat.(*tg.Channel); ok && ch.AccessHash != 0 {
+				if ch, ok := chat.(*tg.Channel); ok && ch.AccessHash != 0 && !ch.Min {
 					h.app.cacheChannelAccessHash(ch.ID, ch.AccessHash)
 				}
 			}
@@ -161,7 +162,7 @@ func (h *botUpdateHandler) Handle(ctx context.Context, u tg.UpdatesClass) error 
 			}
 		case *tg.UpdatesCombined:
 			for _, chat := range upd.Chats {
-				if ch, ok := chat.(*tg.Channel); ok && ch.AccessHash != 0 {
+				if ch, ok := chat.(*tg.Channel); ok && ch.AccessHash != 0 && !ch.Min {
 					h.app.cacheChannelAccessHash(ch.ID, ch.AccessHash)
 				}
 			}
@@ -497,7 +498,7 @@ func (b *BotApp) registerDispatcher() {
 
 	b.dispatcher.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, update *tg.UpdateNewChannelMessage) error {
 		for chID, ch := range e.Channels {
-			if ch.AccessHash != 0 {
+			if ch.AccessHash != 0 && !ch.Min {
 				b.cacheChannelAccessHash(chID, ch.AccessHash)
 			}
 		}
@@ -511,7 +512,7 @@ func (b *BotApp) registerDispatcher() {
 
 	b.dispatcher.OnBotCallbackQuery(func(ctx context.Context, e tg.Entities, update *tg.UpdateBotCallbackQuery) error {
 		for chID, ch := range e.Channels {
-			if ch.AccessHash != 0 {
+			if ch.AccessHash != 0 && !ch.Min {
 				b.cacheChannelAccessHash(chID, ch.AccessHash)
 			}
 		}
@@ -573,7 +574,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	}
 
 	// Check if user is in an active pending setting prompt session (e.g. from /us)
-	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil {
+	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !(sess.Key == "ycookies" && m.Media != nil) {
 		inMsgID := m.ID
 		if text == "/cancel" {
 			ext.ClearPendingSettingSession(senderID)
@@ -1272,7 +1273,7 @@ func (b *BotApp) getPeerWithEntities(p tg.PeerClass, entities tg.Entities) tg.In
 	case *tg.PeerChat:
 		return &tg.InputPeerChat{ChatID: v.ChatID}
 	case *tg.PeerChannel:
-		if ch, ok := entities.Channels[v.ChannelID]; ok && ch.AccessHash != 0 {
+		if ch, ok := entities.Channels[v.ChannelID]; ok && ch.AccessHash != 0 && !ch.Min {
 			b.cacheChannelAccessHash(ch.ID, ch.AccessHash)
 			return ch.AsInputPeer()
 		}
@@ -1355,6 +1356,28 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				}
 			}
 			lowerName := strings.ToLower(fileName)
+
+			// 1. the user's own cookies.txt from /us → Universal → YT-DLP Cookies
+			if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && sess.Key == "ycookies" {
+				if !strings.HasSuffix(lowerName, ".txt") || doc.Size > 2<<20 {
+					_, _ = b.sender.SendMessage(ctx, peer, "Send a <code>cookies.txt</code> file (up to 2MB).", m.ID, nil)
+					return true
+				}
+				ext.ClearPendingSettingSession(senderID)
+				var buf bytes.Buffer
+				if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
+					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading cookies: %v", err), m.ID, nil)
+					return true
+				}
+				u := b.userMap.GetOrCreate(senderID)
+				u.YtCookies = buf.String()
+				_ = ext.DB.SaveUser(u)
+				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID})
+				if sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
+					b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, u, "ycookies")
+				}
+				return true
+			}
 
 			// 1A. Private files for Owner / Sudo
 			switch lowerName {
@@ -1581,6 +1604,17 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 	}
 	var fieldName string
 	switch key {
+	case "ytopt":
+		if strings.EqualFold(val, "clear") || strings.EqualFold(val, "none") {
+			u.YtOpt = ""
+			val = "Cleared"
+		} else {
+			u.YtOpt = val
+		}
+		fieldName = "YT-DLP Options"
+	case "ycookies":
+		// cookies come as a file (handled with the incoming documents)
+		return
 	case "lexcluded":
 		if strings.EqualFold(val, "clear") || strings.EqualFold(val, "none") {
 			u.ExcludedExts = ""

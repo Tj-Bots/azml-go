@@ -137,7 +137,12 @@ func (m *YtdlModule) showQualities(peer tg.InputPeerClass, msg *types.MessageCon
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	info, err := downloader.NewYtDlpDownloader().GetFormats(ctx, link)
+	var extra []string
+	if cf := writeUserCookies(m.userMap.Get(msg.UserID)); cf != "" {
+		defer os.Remove(cf)
+		extra = append(extra, "--cookies", cf)
+	}
+	info, err := downloader.NewYtDlpDownloader().GetFormats(ctx, link, extra...)
 	if err != nil {
 		text := fmt.Sprintf("㊂ <b><u>YT-DLP Error :</u></b>\n\n<blockquote>%s</blockquote>", telegram.EscapeHTML(trimErr(err.Error())))
 		if waitID > 0 {
@@ -265,6 +270,15 @@ func (m *LeechModule) StartYtdl(peer tg.InputPeerClass, msg *types.MessageContex
 	opt.Ytdl = true
 	opt.YtdlFormat, opt.YtdlArgs = downloader.YtQuality(quality)
 	msg.YtdlQuality = quality
+	cookieFile := ""
+	if u := m.userMap.Get(msg.UserID); u != nil {
+		extra, _ := safeYtOpts(u.YtOpt)
+		opt.YtdlArgs = append(append([]string{}, opt.YtdlArgs...), extra...)
+		cookieFile = writeUserCookies(u)
+		if cookieFile != "" {
+			opt.YtdlArgs = append(opt.YtdlArgs, "--cookies", cookieFile)
+		}
+	}
 
 	taskDir := filepath.Join(cfg.DownloadDir, fmt.Sprintf("yt_%d_%s", msg.UserID, ext.RandomHex(4)))
 	if err := os.MkdirAll(taskDir, 0777); err != nil {
@@ -285,7 +299,69 @@ func (m *LeechModule) StartYtdl(peer tg.InputPeerClass, msg *types.MessageContex
 			m.sender.AutoDeleteMessage(peer, notifyID, 4)
 		}
 	}
-	go m.processLeechPipeline(peer, msg, opt, link, taskDir, notifyID)
+	go func() {
+		m.processLeechPipeline(peer, msg, opt, link, taskDir, notifyID)
+		if cookieFile != "" {
+			_ = os.Remove(cookieFile)
+		}
+	}()
+}
+
+// writeUserCookies puts the user's cookies.txt in a temp file (outside the task folder).
+func writeUserCookies(u *types.UserSettings) string {
+	if u == nil || u.YtCookies == "" {
+		return ""
+	}
+	f, err := os.CreateTemp("", "ytc_*.txt")
+	if err != nil {
+		return ""
+	}
+	_, _ = f.WriteString(u.YtCookies)
+	_ = f.Close()
+	return f.Name()
+}
+
+// safeYtOpts splits the user's yt-dlp options and drops the ones that could run commands,
+// read or write files on the server.
+func safeYtOpts(s string) (allowed, dropped []string) {
+	blocked := []string{"--exec", "--config", "--batch-file", "--output", "--paths", "--load-info",
+		"--plugin", "--external-downloader", "--downloader", "--postprocessor-args", "--ppa",
+		"--cookies", "--print-to-file", "--write", "--cache-dir", "--ffmpeg-location", "--netrc",
+		"--use-postprocessor", "--alias", "--download-archive", "--compat-options", "--update", "-U"}
+	okShort := map[string]bool{"-f": true, "-S": true, "-x": true, "-k": true, "-N": true, "-R": true,
+		"-r": true, "-4": true, "-6": true, "-i": true, "-w": true, "-F": false}
+	tokens := splitArgsRespectingQuotes("x " + s)[1:]
+	skipValue := false
+	for _, t := range tokens {
+		if !strings.HasPrefix(t, "-") {
+			if skipValue {
+				dropped = append(dropped, t)
+				continue
+			}
+			allowed = append(allowed, t)
+			continue
+		}
+		skipValue = false
+		bad := false
+		if strings.HasPrefix(t, "--") {
+			name := strings.ToLower(strings.SplitN(t, "=", 2)[0])
+			for _, b := range blocked {
+				if strings.HasPrefix(name, b) {
+					bad = true
+					break
+				}
+			}
+		} else if !okShort[t] {
+			bad = true
+		}
+		if bad {
+			dropped = append(dropped, t)
+			skipValue = true // its value goes too
+			continue
+		}
+		allowed = append(allowed, t)
+	}
+	return allowed, dropped
 }
 
 func trimErr(s string) string {

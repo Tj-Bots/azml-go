@@ -25,6 +25,7 @@ import (
 
 	tdDownloader "github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 )
 
 type LeechModule struct {
@@ -1829,6 +1830,17 @@ func channelMessageLink(chatID int64, msgID int) string {
 // userChannelPeer finds the dump channel as the user session sees it (its own access hash).
 func userChannelPeer(ctx context.Context, client *tg.Client, chatID int64) (*tg.InputPeerChannel, error) {
 	raw := pool.RawChannelID(chatID)
+	if h := telegram.UserSessionChannelHash(raw); h != 0 {
+		return &tg.InputPeerChannel{ChannelID: raw, AccessHash: h}, nil
+	}
+	p, err := lookupUserChannel(ctx, client, raw, chatID)
+	if err == nil {
+		telegram.CacheUserSessionChannel(raw, p.AccessHash)
+	}
+	return p, err
+}
+
+func lookupUserChannel(ctx context.Context, client *tg.Client, raw, chatID int64) (*tg.InputPeerChannel, error) {
 	if chats, err := client.ChannelsGetChannels(ctx, []tg.InputChannelClass{&tg.InputChannel{ChannelID: raw}}); err == nil {
 		var list []tg.ChatClass
 		switch c := chats.(type) {
@@ -1838,7 +1850,7 @@ func userChannelPeer(ctx context.Context, client *tg.Client, chatID int64) (*tg.
 			list = c.Chats
 		}
 		for _, ch := range list {
-			if c, ok := ch.(*tg.Channel); ok && c.ID == raw {
+			if c, ok := ch.(*tg.Channel); ok && c.ID == raw && !c.Min {
 				return &tg.InputPeerChannel{ChannelID: raw, AccessHash: c.AccessHash}, nil
 			}
 		}
@@ -1855,7 +1867,7 @@ func userChannelPeer(ctx context.Context, client *tg.Client, chatID int64) (*tg.
 		list = d.Chats
 	}
 	for _, ch := range list {
-		if c, ok := ch.(*tg.Channel); ok && c.ID == raw {
+		if c, ok := ch.(*tg.Channel); ok && c.ID == raw && !c.Min {
 			return &tg.InputPeerChannel{ChannelID: raw, AccessHash: c.AccessHash}, nil
 		}
 	}
@@ -1872,6 +1884,14 @@ func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeer
 	}
 	botDump := &tg.InputPeerChannel{ChannelID: rawDump, AccessHash: botHash}
 	fwdID, err := telegram.ForwardToChannelWithFloodWait(ctx, m.rawAPI, peer, botDump, msgID)
+	if err != nil && tgerr.Is(err, "CHANNEL_INVALID", "CHANNEL_PRIVATE", "PEER_ID_INVALID") {
+		// a stale hash (e.g. after a restart): resolve it again and retry once
+		telegram.ForgetChannelAccessHash(rawDump)
+		if botHash = telegram.ResolveChannelAccessHash(ctx, m.rawAPI, dumpChatID); botHash != 0 {
+			botDump = &tg.InputPeerChannel{ChannelID: rawDump, AccessHash: botHash}
+			fwdID, err = telegram.ForwardToChannelWithFloodWait(ctx, m.rawAPI, peer, botDump, msgID)
+		}
+	}
 	if err != nil || fwdID <= 0 {
 		return fmt.Errorf("forward to dump failed: %v", err)
 	}
@@ -1903,7 +1923,14 @@ func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeer
 	}
 	doc, err := fetchDoc()
 	if err != nil {
-		return err
+		// the saved user-session hash may be stale: look the channel up again once
+		telegram.CacheUserSessionChannel(pool.RawChannelID(dumpChatID), 0)
+		if userDump, err = userChannelPeer(ctx, m.userRawAPI, dumpChatID); err != nil {
+			return err
+		}
+		if doc, err = fetchDoc(); err != nil {
+			return err
+		}
 	}
 	// fastest: a multi-connection pool opened right on the DC that holds the file
 	if dcClients, closeFn := dcDownloadClients(ctx, telegram.ActiveUserTD(), doc.DCID); len(dcClients) > 0 {
@@ -2069,7 +2096,14 @@ func dcDownloadClients(ctx context.Context, client *td.Client, dc int) ([]*tg.Cl
 	if client == nil || dc <= 0 {
 		return nil, func() {}
 	}
-	inv, err := client.DC(ctx, dc, dcPoolSize)
+	var inv td.CloseInvoker
+	var err error
+	if client.Config().ThisDC == dc {
+		// the file is on the account's own DC: exporting auth there fails (DC_ID_INVALID)
+		inv, err = client.Pool(dcPoolSize)
+	} else {
+		inv, err = client.DC(ctx, dc, dcPoolSize)
+	}
 	if err != nil {
 		log.Printf("[LEECH] Could not open connections on DC%d: %v", dc, err)
 		return nil, func() {}

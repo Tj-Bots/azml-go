@@ -38,14 +38,104 @@ func CacheChannelAccessHash(channelID, hash int64) {
 		return
 	}
 	accessHashMu.Lock()
+	changed := channelAccessHashes[channelID] != hash
 	channelAccessHashes[channelID] = hash
 	accessHashMu.Unlock()
+	if changed {
+		savePeer(fmt.Sprintf("c:%d", channelID), hash)
+	}
 }
 
 func GetChannelAccessHash(channelID int64) int64 {
 	accessHashMu.RLock()
 	defer accessHashMu.RUnlock()
 	return channelAccessHashes[channelID]
+}
+
+// ForgetChannelAccessHash drops a hash Telegram refused (CHANNEL_INVALID).
+func ForgetChannelAccessHash(channelID int64) {
+	accessHashMu.Lock()
+	_, had := channelAccessHashes[channelID]
+	delete(channelAccessHashes, channelID)
+	accessHashMu.Unlock()
+	if had {
+		savePeer(fmt.Sprintf("c:%d", channelID), 0)
+	}
+}
+
+// ---- peer store: the hashes are saved (MongoDB or peers.json) and loaded at startup ----
+
+var (
+	peerSaverMu sync.RWMutex
+	peerSaver   func(key string, hash int64)
+
+	userSessChannels = make(map[int64]int64) // channel access hashes of the user session
+)
+
+// SetPeerStore wires saving to the database.
+func SetPeerStore(save func(key string, hash int64)) {
+	peerSaverMu.Lock()
+	peerSaver = save
+	peerSaverMu.Unlock()
+}
+
+func savePeer(key string, hash int64) {
+	peerSaverMu.RLock()
+	save := peerSaver
+	peerSaverMu.RUnlock()
+	if save != nil {
+		go save(key, hash)
+	}
+}
+
+// LoadPeers fills the caches from saved hashes.
+func LoadPeers(peers map[string]int64) {
+	accessHashMu.Lock()
+	defer accessHashMu.Unlock()
+	for k, h := range peers {
+		var id int64
+		switch {
+		case strings.HasPrefix(k, "uc:"):
+			if _, err := fmt.Sscanf(k, "uc:%d", &id); err == nil {
+				userSessChannels[id] = h
+			}
+		case strings.HasPrefix(k, "c:"):
+			if _, err := fmt.Sscanf(k, "c:%d", &id); err == nil {
+				channelAccessHashes[id] = h
+			}
+		case strings.HasPrefix(k, "u:"):
+			if _, err := fmt.Sscanf(k, "u:%d", &id); err == nil {
+				userAccessHashes[id] = h
+			}
+		}
+	}
+}
+
+// UserSessionChannelHash / CacheUserSessionChannel: the user account has its own hashes.
+func UserSessionChannelHash(channelID int64) int64 {
+	accessHashMu.RLock()
+	defer accessHashMu.RUnlock()
+	return userSessChannels[channelID]
+}
+
+func CacheUserSessionChannel(channelID, hash int64) {
+	if hash == 0 {
+		accessHashMu.Lock()
+		_, had := userSessChannels[channelID]
+		delete(userSessChannels, channelID)
+		accessHashMu.Unlock()
+		if had {
+			savePeer(fmt.Sprintf("uc:%d", channelID), 0)
+		}
+		return
+	}
+	accessHashMu.Lock()
+	changed := userSessChannels[channelID] != hash
+	userSessChannels[channelID] = hash
+	accessHashMu.Unlock()
+	if changed {
+		savePeer(fmt.Sprintf("uc:%d", channelID), hash)
+	}
 }
 
 // ResolveChannelAccessHash attempts to fetch and cache the AccessHash for a channel if not already cached.
@@ -86,7 +176,7 @@ func ResolveChannelAccessHash(ctx context.Context, client *tg.Client, chatID int
 			chatList = c.Chats
 		}
 		for _, chat := range chatList {
-			if ch, ok := chat.(*tg.Channel); ok && ch.ID == raw && ch.AccessHash != 0 {
+			if ch, ok := chat.(*tg.Channel); ok && ch.ID == raw && ch.AccessHash != 0 && !ch.Min {
 				CacheChannelAccessHash(raw, ch.AccessHash)
 				return ch.AccessHash
 			}
@@ -103,7 +193,7 @@ func ResolveChannelAccessHash(ctx context.Context, client *tg.Client, chatID int
 			chatList = c.Chats
 		}
 		for _, chat := range chatList {
-			if ch, ok := chat.(*tg.Channel); ok && ch.ID == raw && ch.AccessHash != 0 {
+			if ch, ok := chat.(*tg.Channel); ok && ch.ID == raw && ch.AccessHash != 0 && !ch.Min {
 				CacheChannelAccessHash(raw, ch.AccessHash)
 				return ch.AccessHash
 			}
@@ -170,8 +260,12 @@ func CacheUserAccessHash(userID, hash int64) {
 		return
 	}
 	accessHashMu.Lock()
+	changed := userAccessHashes[userID] != hash
 	userAccessHashes[userID] = hash
 	accessHashMu.Unlock()
+	if changed {
+		savePeer(fmt.Sprintf("u:%d", userID), hash)
+	}
 }
 
 func GetUserAccessHash(userID int64) int64 {

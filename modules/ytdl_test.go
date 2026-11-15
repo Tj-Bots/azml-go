@@ -86,3 +86,14 @@ func TestYtdlResult(t *testing.T) {
 		t.Fatal("playlist should return folder")
 	}
 }
+
+func TestSafeYtOpts(t *testing.T) {
+	ok, bad := safeYtOpts(`--embed-subs --sub-langs en,he --exec "rm -rf /" -o /etc/x -S res:720 --config-locations /tmp/c --write-thumbnail -x`)
+	got := strings.Join(ok, " ")
+	if got != "--embed-subs --sub-langs en,he -S res:720 -x" {
+		t.Fatalf("allowed: %q", got)
+	}
+	if !strings.Contains(strings.Join(bad, " "), "--exec") || !strings.Contains(strings.Join(bad, " "), "rm -rf /") {
+		t.Fatalf("dropped: %v", bad)
+	}
+}

@@ -29,6 +29,8 @@ type TelegramChunkDownloader struct {
 	globalFloodUntil atomic.Int64
 	lastReqTime      atomic.Int64
 	minIntervalNs    atomic.Int64
+	baseIntervalNs   int64
+	gate             *flowGate
 }
 
 func NewTelegramChunkDownloader(client *tg.Client) *TelegramChunkDownloader {
@@ -38,6 +40,7 @@ func NewTelegramChunkDownloader(client *tg.Client) *TelegramChunkDownloader {
 	// Default minimum interval between chunk requests: 50ms (~20 MB/s line capacity).
 	// Keeps throughput fast while avoiding MTProto connection queue drop.
 	d.minIntervalNs.Store(50 * int64(time.Millisecond))
+	d.baseIntervalNs = 50 * int64(time.Millisecond)
 	return d
 }
 
@@ -61,6 +64,7 @@ func NewTelegramChunkDownloaderPool(clients []*tg.Client) *TelegramChunkDownload
 		interval = int64(5 * time.Millisecond)
 	}
 	d.minIntervalNs.Store(interval)
+	d.baseIntervalNs = interval
 	return d
 }
 
@@ -73,9 +77,12 @@ func (d *TelegramChunkDownloader) clientFor(worker int) *tg.Client {
 
 func (d *TelegramChunkDownloader) decayPacing() {
 	curr := d.minIntervalNs.Load()
-	base := int64(50 * time.Millisecond)
-	if curr > base {
-		d.minIntervalNs.Store(curr - int64(5*time.Millisecond))
+	if curr > d.baseIntervalNs {
+		next := curr - int64(5*time.Millisecond)
+		if next < d.baseIntervalNs {
+			next = d.baseIntervalNs
+		}
+		d.minIntervalNs.Store(next)
 	}
 }
 
@@ -256,6 +263,15 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 	log.Printf("[TG Chunk DL] Starting download: %s (%s), %d parts, %d workers",
 		filepath.Base(destPath), ext.GetReadableFileSize(fileSize), totalParts, numWorkers)
 
+	// how many requests may be in flight: starts at numWorkers, halves on FloodWait,
+	// grows back slowly while Telegram accepts the rate (finds the account's limit by itself)
+	d.gate = newFlowGate(numWorkers)
+	defer func() {
+		lim, floods := d.gate.stats()
+		log.Printf("[TG Chunk DL] Finished %s: %d FloodWait(s), last parallel limit %d/%d",
+			filepath.Base(destPath), floods, lim, numWorkers)
+	}()
+
 	var wg sync.WaitGroup
 	for w := 0; w < numWorkers; w++ {
 		wg.Add(1)
@@ -359,6 +375,11 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 			return nil, err
 		}
 
+		if d.gate != nil {
+			if err := d.gate.acquire(ctx); err != nil {
+				return nil, err
+			}
+		}
 		partCtx, partCancel := context.WithTimeout(ctx, 60*time.Second)
 		res, err := client.UploadGetFile(partCtx, &tg.UploadGetFileRequest{
 			Precise:      false,
@@ -368,6 +389,10 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 			Limit:        limit,
 		})
 		partCancel()
+		if d.gate != nil {
+			_, isFlood := tgerr.AsFloodWait(err)
+			d.gate.release(err == nil, isFlood)
+		}
 
 		if err == nil {
 			switch f := res.(type) {
@@ -391,24 +416,21 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 			}
 		}
 
-		// 1. FloodWait — pause ALL workers globally, adaptively increase pacing interval
+		// 1. FloodWait: wait it out; the gate already lowered the parallel limit
 		if waitDur, ok := tgerr.AsFloodWait(err); ok {
 			if waitDur < 1*time.Second {
 				waitDur = 1 * time.Second
 			}
 			jitter := time.Duration(rand.Intn(300)) * time.Millisecond
 			totalWait := waitDur + jitter
-			log.Printf("[TG Chunk DL] Part %d/%d FloodWait %v. Pausing all workers for %v...",
-				partIndex+1, totalParts, waitDur, totalWait)
-
-			d.triggerGlobalFlood(totalWait)
-
-			// Adaptively back off pacing to match Telegram's current session quota
-			currInterval := d.minIntervalNs.Load()
-			if currInterval < int64(450*time.Millisecond) {
-				d.minIntervalNs.Store(currInterval + int64(40*time.Millisecond))
+			if d.gate == nil || d.gate.shouldLogFlood() {
+				lim := 0
+				if d.gate != nil {
+					lim, _ = d.gate.stats()
+				}
+				log.Printf("[TG Chunk DL] FloodWait %v at part %d/%d, parallel limit now %d", waitDur, partIndex+1, totalParts, lim)
 			}
-
+			d.triggerGlobalFlood(totalWait)
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -516,4 +538,90 @@ func (t *TelegramDownloadTask) Cancel() error {
 		t.cancelFn()
 	}
 	return nil
+}
+
+// flowGate limits the requests in flight with AIMD: half on FloodWait, +1 after a run of successes.
+type flowGate struct {
+	mu       sync.Mutex
+	cond     *sync.Cond
+	limit    int
+	max      int
+	inFlight int
+	okStreak int
+	floods   int
+	lastCut  time.Time
+	lastLog  time.Time
+}
+
+func newFlowGate(max int) *flowGate {
+	if max < 1 {
+		max = 1
+	}
+	g := &flowGate{limit: max, max: max}
+	g.cond = sync.NewCond(&g.mu)
+	return g
+}
+
+func (g *flowGate) acquire(ctx context.Context) error {
+	stop := context.AfterFunc(ctx, func() {
+		g.mu.Lock()
+		g.cond.Broadcast()
+		g.mu.Unlock()
+	})
+	defer stop()
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for g.inFlight >= g.limit {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		g.cond.Wait()
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	g.inFlight++
+	return nil
+}
+
+func (g *flowGate) release(ok, flood bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.inFlight--
+	switch {
+	case flood:
+		g.floods++
+		g.okStreak = 0
+		// one cut per burst: many requests flood together
+		if time.Since(g.lastCut) > 2*time.Second {
+			g.limit /= 2
+			if g.limit < 1 {
+				g.limit = 1
+			}
+			g.lastCut = time.Now()
+		}
+	case ok:
+		g.okStreak++
+		if g.okStreak >= 3*g.limit+8 && g.limit < g.max {
+			g.limit++
+			g.okStreak = 0
+		}
+	}
+	g.cond.Broadcast()
+}
+
+func (g *flowGate) stats() (int, int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.limit, g.floods
+}
+
+func (g *flowGate) shouldLogFlood() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if time.Since(g.lastLog) < 10*time.Second {
+		return false
+	}
+	g.lastLog = time.Now()
+	return true
 }

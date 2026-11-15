@@ -254,11 +254,12 @@ type YtFormatInfo struct {
 }
 
 // GetFormats reads the formats of a link (yt-dlp -J).
-func (y *YtDlpDownloader) GetFormats(ctx context.Context, link string) (*YtFormatInfo, error) {
+func (y *YtDlpDownloader) GetFormats(ctx context.Context, link string, extraArgs ...string) (*YtFormatInfo, error) {
 	args := []string{"-J", "--no-warnings", "--flat-playlist"}
 	if _, err := os.Stat("cookies.txt"); err == nil {
 		args = append(args, "--cookies", "cookies.txt")
 	}
+	args = append(args, extraArgs...)
 	args = append(args, link)
 	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 	var stderr strings.Builder

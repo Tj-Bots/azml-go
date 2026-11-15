@@ -1122,6 +1122,40 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
+	case "ytopt", "ycookies":
+		text, btn := m.buildYtdlSettingMenu(u, action, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "edit_ytopt", "edit_ycookies":
+		key := strings.TrimPrefix(action, "edit_")
+		ext.SetPendingSettingSession(targetUID, key, 0, msgID, 60*time.Second)
+		prompt := "➲ <i>Send yt-dlp options (command line style) within 60 seconds, e.g.</i>\n<code>--embed-subs --sub-langs en,he --embed-thumbnail</code>"
+		if key == "ycookies" {
+			prompt = "➲ <i>Send your <code>cookies.txt</code> file (Netscape format) within 60 seconds.</i>"
+		}
+		text, _ := m.buildYtdlSettingMenu(u, key, "")
+		btn := telegram.NewButtonMaker()
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d %s", u.UserID, key))
+		btn.Row()
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d universal", u.UserID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n"+prompt, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "del_ytopt", "del_ycookies":
+		key := strings.TrimPrefix(action, "del_")
+		if key == "ytopt" {
+			u.YtOpt = ""
+		} else {
+			u.YtCookies = ""
+		}
+		_ = ext.DB.SaveUser(u)
+		text, btn := m.buildYtdlSettingMenu(u, key, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Deleted", false)
+
 	case "mediainfo":
 		u.MediaInfo = !u.MediaInfo
 		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
@@ -1256,6 +1290,8 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 		return
 	}
 	switch key {
+	case "ytopt", "ycookies":
+		text, btn = m.buildYtdlSettingMenu(u, key, "")
 	case "lexcluded":
 		text, btn = m.buildExcludedMenu(u)
 	case "lprefix":
@@ -1577,9 +1613,22 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 	text := fmt.Sprintf("㊂ <b><u>Universal Settings : <a href=\"tg://user?id=%d\">%s</a></u></b>\n\n"+
 		"<blockquote>╭ <b>Daily Tasks :</b> <code>%d</code> today\n"+
 		"┠ <b>Daily Leech :</b> <code>%s</code> today\n"+
+		"┠ <b>YT-DLP Options :</b> <i>%s</i>\n"+
+		"┠ <b>YT-DLP Cookies :</b> <i>%s</i>\n"+
 		"╰ <b>MediaInfo Mode :</b> <i>%s</i></blockquote>",
-		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), onOff(u.MediaInfo))
+		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), existsText(u.YtOpt != ""), existsText(u.YtCookies != ""), onOff(u.MediaInfo))
 	btn := telegram.NewButtonMaker()
+	if u.YtOpt != "" {
+		btn.IButtonStyled("✓ YT-DLP Options", fmt.Sprintf("userset %d ytopt", u.UserID), "success")
+	} else {
+		btn.IButton("YT-DLP Options", fmt.Sprintf("userset %d ytopt", u.UserID))
+	}
+	if u.YtCookies != "" {
+		btn.IButtonStyled("✓ YT-DLP Cookies", fmt.Sprintf("userset %d ycookies", u.UserID), "success")
+	} else {
+		btn.IButton("YT-DLP Cookies", fmt.Sprintf("userset %d ycookies", u.UserID))
+	}
+	btn.Row()
 	if u.MediaInfo {
 		btn.IButtonStyled("✓ MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID), "success")
 	} else {
@@ -1587,6 +1636,52 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 	}
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+func existsText(ok bool) string {
+	if ok {
+		return "Exists"
+	}
+	return "Not Exists"
+}
+
+// buildYtdlSettingMenu: YT-DLP Options / YT-DLP Cookies pages (Universal Settings).
+func (m *SettingsModule) buildYtdlSettingMenu(u *types.UserSettings, key, note string) (string, *telegram.ButtonMaker) {
+	btn := telegram.NewButtonMaker()
+	var text string
+	if key == "ycookies" {
+		val := "Not Exists"
+		if u.YtCookies != "" {
+			val = fmt.Sprintf("Exists (%d lines)", strings.Count(u.YtCookies, "\n")+1)
+		}
+		text = "㊂ <b><u>YT-DLP Cookies :</u></b>\n\n" +
+			"<blockquote>╭ <b>Cookies :</b> <i>" + val + "</i>\n" +
+			"╰ <b>Description :</b> <i>Your own cookies.txt for /ytdl (YouTube sign-in, age limits, private videos). Without it the bot's cookies.txt is used.</i></blockquote>"
+		btn.IButton(map[bool]string{true: "Change Cookies", false: "Set Cookies"}[u.YtCookies != ""], fmt.Sprintf("userset %d edit_ycookies", u.UserID))
+		if u.YtCookies != "" {
+			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ycookies", u.UserID))
+		}
+	} else {
+		val := "Not Exists"
+		if u.YtOpt != "" {
+			val = "<code>" + telegram.EscapeHTML(u.YtOpt) + "</code>"
+		}
+		text = "㊂ <b><u>YT-DLP Options :</u></b>\n\n" +
+			"<blockquote>╭ <b>Options :</b> " + val + "\n" +
+			"╰ <b>Description :</b> <i>Extra yt-dlp options added to every /ytdl task.</i></blockquote>"
+		btn.IButton(map[bool]string{true: "Change Options", false: "Set Options"}[u.YtOpt != ""], fmt.Sprintf("userset %d edit_ytopt", u.UserID))
+		if u.YtOpt != "" {
+			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ytopt", u.UserID))
+		}
+	}
+	if note != "" {
+		text += "\n\n" + note
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d universal", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn

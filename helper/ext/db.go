@@ -20,6 +20,7 @@ type DatabaseManager struct {
 	client            *mongo.Client
 	usersCol          *mongo.Collection
 	settingsCol       *mongo.Collection
+	peersCol          *mongo.Collection
 	isMongo           bool
 	localFile         string
 	localSettingsFile string
@@ -53,6 +54,7 @@ func InitDB() *DatabaseManager {
 				mgr.client = client
 				mgr.usersCol = client.Database("azml").Collection("users")
 				mgr.settingsCol = client.Database("azml").Collection("settings")
+				mgr.peersCol = client.Database("azml").Collection("peers")
 				mgr.isMongo = true
 				log.Println("[DB] Connected to MongoDB successfully")
 			} else {
@@ -250,4 +252,80 @@ func (d *DatabaseManager) GetBotSetting(key string) (string, error) {
 		return "", err
 	}
 	return settings[key], nil
+}
+
+// ---- peers: Telegram access hashes, kept so channels/users resolve right after a restart ----
+
+const localPeersFile = "peers.json"
+
+// LoadPeers returns every saved access hash ("c:<id>" bot channels, "u:<id>" users,
+// "uc:<id>" channels seen by the user session).
+func (d *DatabaseManager) LoadPeers() map[string]int64 {
+	out := map[string]int64{}
+	if d == nil {
+		return out
+	}
+	if d.isMongo && d.peersCol != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		cur, err := d.peersCol.Find(ctx, bson.M{})
+		if err != nil {
+			log.Printf("[DB] Loading peers failed: %v", err)
+			return out
+		}
+		defer cur.Close(ctx)
+		for cur.Next(ctx) {
+			var doc struct {
+				Key  string `bson:"_id"`
+				Hash int64  `bson:"hash"`
+			}
+			if cur.Decode(&doc) == nil && doc.Key != "" && doc.Hash != 0 {
+				out[doc.Key] = doc.Hash
+			}
+		}
+		return out
+	}
+	d.fileLock.Lock()
+	defer d.fileLock.Unlock()
+	if data, err := os.ReadFile(localPeersFile); err == nil {
+		_ = json.Unmarshal(data, &out)
+	}
+	return out
+}
+
+// SavePeer stores one access hash (0 removes it).
+func (d *DatabaseManager) SavePeer(key string, hash int64) {
+	if d == nil || key == "" {
+		return
+	}
+	if d.isMongo && d.peersCol != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var err error
+		if hash == 0 {
+			_, err = d.peersCol.DeleteOne(ctx, bson.M{"_id": key})
+		} else {
+			_, err = d.peersCol.UpdateOne(ctx, bson.M{"_id": key},
+				bson.M{"$set": bson.M{"hash": hash, "updated_at": time.Now()}},
+				options.Update().SetUpsert(true))
+		}
+		if err != nil {
+			log.Printf("[DB] Saving peer %s failed: %v", key, err)
+		}
+		return
+	}
+	d.fileLock.Lock()
+	defer d.fileLock.Unlock()
+	peers := map[string]int64{}
+	if data, err := os.ReadFile(localPeersFile); err == nil {
+		_ = json.Unmarshal(data, &peers)
+	}
+	if hash == 0 {
+		delete(peers, key)
+	} else {
+		peers[key] = hash
+	}
+	if data, err := json.Marshal(peers); err == nil {
+		_ = os.WriteFile(localPeersFile, data, 0644)
+	}
 }

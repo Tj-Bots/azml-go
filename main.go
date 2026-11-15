@@ -102,6 +102,11 @@ func main() {
 	// Initialize Database (MongoDB or local JSON fallback)
 	ext.InitDB()
 	if db := ext.GetDB(); db != nil {
+		// access hashes saved in the database: channels and users resolve right after a restart
+		peers := db.LoadPeers()
+		telegram.LoadPeers(peers)
+		telegram.SetPeerStore(db.SavePeer)
+		log.Printf("[DB] Loaded %d saved peers", len(peers))
 		if dbSettings, err := db.LoadAllBotSettings(); err == nil && len(dbSettings) > 0 {
 			for k, v := range dbSettings {
 				if v != "" {

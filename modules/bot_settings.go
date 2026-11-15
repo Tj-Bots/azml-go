@@ -209,14 +209,17 @@ func (m *BotSettingsModule) HandleBotSettings(ctx context.Context, peer tg.Input
 func (m *BotSettingsModule) buildMainMenu() (string, *telegram.ButtonMaker) {
 	text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n<i>Select a category below to view or edit configuration:</i>", telegram.ToSmallCaps("Bot Settings"))
 	btn := telegram.NewButtonMaker()
-	btn.IButton("Config Variables", "botset var 0")
-	btn.IButton("User Session (4GB+)", "botset session")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Config Variables"), "botset var 0", "primary")
 	btn.Row()
-	btn.IButton("Aria2c Settings", "botset aria")
-	btn.IButton("Shortener Settings", "botset shortener")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("User Session (4GB+)"), "botset session", "primary")
 	btn.Row()
-	btn.IButton("Private Files", "botset private")
-	btn.IButtonStyled("Close", "botset close", "danger")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Private Files"), "botset private", "primary")
+	btn.Row()
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Aria2c Settings"), "botset aria", "primary")
+	btn.Row()
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Shortener Settings"), "botset shortener", "primary")
+	btn.Row()
+	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 	btn.Row()
 	return text, btn
 }
@@ -242,11 +245,11 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-		"<blockquote>╭ <b>Status:</b> %s\n"+
+		"┠ <b>Status:</b> %s\n"+
 		"┠ <b>Max Split Size:</b> <code>%s</code>\n"+
 		"┠ <b>Dump Channel:</b> %s\n"+
 		"┠ <b>Session String:</b> <code>%s</code>\n"+
-		"╰ <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code></blockquote>\n\n"+
+		"┖ <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code>\n\n"+
 		"<i>Supported session string formats: Pyrogram (v1, v2), Pyrofork, Telethon, gotd</i>\n\n"+
 		"<i>Click <b>Set Session String</b> to save/update your user session for 4GB uploads:</i>",
 		telegram.ToSmallCaps("User Session Settings"),
@@ -257,15 +260,15 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 	)
 
 	btn := telegram.NewButtonMaker()
-	btn.IButton("Set Session String", "botset prompt_session")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Set Session String"), "botset prompt_session", "primary")
 	if hasSession {
-		btn.IButtonStyled("Reset Session", "botset resetsession", "danger")
+		btn.IButtonStyled("• "+telegram.ToSmallCaps("Reset Session"), "botset resetsession", "danger")
 	}
 	btn.Row()
-	btn.IButton("Set Dump Channel", "botset prompt_dump")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Set Dump Channel"), "botset prompt_dump", "primary")
 	btn.Row()
-	btn.IButton("◀️ Back", "botset back")
-	btn.IButtonStyled("Close", "botset close", "danger")
+	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
+	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 	btn.Row()
 
 	return text, btn
@@ -302,7 +305,7 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 		}
 		sb.WriteString(fmt.Sprintf("┠ <b>%s:</b> <code>%s</code>\n", k, v))
 
-		btn.IButton(k, fmt.Sprintf("botset editvar %s %d", k, page))
+		btn.IButtonStyled("◈ "+telegram.ToSmallCaps(k), fmt.Sprintf("botset editvar %s %d", k, page), "primary")
 		if (i-start)%2 == 1 || i == end-1 {
 			btn.Row()
 		}
@@ -321,8 +324,8 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 		}
 	}
 
-	btn.IButton("◀️ Back", "botset back")
-	btn.IButtonStyled("Close", "botset close", "danger")
+	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
+	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 	btn.Row()
 
 	return sb.String(), btn
@@ -339,45 +342,45 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 
 	if isBoolVar(key) {
 		text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-			"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
+			"┠ <b>Variable:</b> <code>%s</code>\n"+
+			"┖ <b>Current Value:</b> <code>%s</code>\n\n"+
 			"<i>Choose a valid value for the above Var:</i>",
 			telegram.ToSmallCaps("Boolean Configuration"), key, v)
 
-		btn.IButtonStyled("✓ "+"True", fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
-		btn.IButtonStyled("False", fmt.Sprintf("botset boolvar %s false %d", key, page), "danger")
+		btn.IButtonStyled("✓ "+telegram.ToSmallCaps("True"), fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("False"), fmt.Sprintf("botset boolvar %s false %d", key, page), "danger")
 		btn.Row()
-		btn.IButton("◀️ Back", fmt.Sprintf("botset var %d", page))
-		btn.IButtonStyled("Close", "botset close", "danger")
+		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), fmt.Sprintf("botset var %d", page), "primary")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 		btn.Row()
 		return text, btn
 	}
 
 	if editing {
 		text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-			"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
+			"┠ <b>Variable:</b> <code>%s</code>\n"+
+			"┖ <b>Current Value:</b> <code>%s</code>\n\n"+
 			"<i>Send a valid value for the above Var in chat.</i> <b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
 			telegram.ToSmallCaps("Edit Variable"), key, v)
 
-		btn.IButtonStyled("Cancel Edit", fmt.Sprintf("botset editvar %s %d", key, page), "danger")
-		btn.IButton("◀️ Back", fmt.Sprintf("botset var %d", page))
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel Edit"), fmt.Sprintf("botset editvar %s %d", key, page), "danger")
+		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), fmt.Sprintf("botset var %d", page), "primary")
 		btn.Row()
 		return text, btn
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-		"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-		"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
+		"┠ <b>Variable:</b> <code>%s</code>\n"+
+		"┖ <b>Current Value:</b> <code>%s</code>\n\n"+
 		"<i>Click <b>Edit Value</b> to update this setting directly:</i>",
 		telegram.ToSmallCaps("Variable Details"), key, v)
 
-	btn.IButtonStyled("Edit Value", fmt.Sprintf("botset editvar_prompt %s %d", key, page), "success")
-	btn.IButtonStyled("Reset", fmt.Sprintf("botset resetvar %s %d", key, page), "danger")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Edit Value"), fmt.Sprintf("botset editvar_prompt %s %d", key, page), "success")
+	btn.IButtonStyled("• "+telegram.ToSmallCaps("Reset"), fmt.Sprintf("botset resetvar %s %d", key, page), "danger")
 	btn.Row()
-	btn.IButton("◀️ Back", fmt.Sprintf("botset var %d", page))
-	btn.IButtonStyled("Close", "botset close", "danger")
+	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), fmt.Sprintf("botset var %d", page), "primary")
+	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 	btn.Row()
 
 	return text, btn
@@ -509,8 +512,8 @@ func (m *BotSettingsModule) buildAriaMenu() (string, *telegram.ButtonMaker) {
 		"<i>Optimized for peak network throughput on free tier VPS servers.</i>"
 
 	btn := telegram.NewButtonMaker()
-	btn.IButton("◀️ Back", "botset back")
-	btn.IButtonStyled("Close", "botset close", "danger")
+	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
+	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 	btn.Row()
 	return text, btn
 }
@@ -518,18 +521,18 @@ func (m *BotSettingsModule) buildAriaMenu() (string, *telegram.ButtonMaker) {
 func (m *BotSettingsModule) buildPrivateMenu() (string, *telegram.ButtonMaker) {
 	text := fmt.Sprintf("⌬ <b><u>%s:</u></b>\n\n"+
 		"<i>Send any of these private files as a document directly to the bot:</i>\n\n"+
-		"<blockquote>╭ <code>token.pickle</code> — Google Drive OAuth token (automatically loaded)\n"+
+		"┠ <code>token.pickle</code> — Google Drive OAuth token (automatically loaded)\n"+
 		"┠ <code>config.env</code> — Bot environment variables (auto reloaded)\n"+
 		"┠ <code>cookies.txt</code> — Netscape cookies for yt-dlp & aria2c\n"+
 		"┠ <code>shorteners.txt</code> — Multi-shortener routing file (auto reloaded)\n"+
-		"╰ <code>accounts.zip</code> — Service accounts archive</blockquote>\n\n"+
+		"┖ <code>accounts.zip</code> — Service accounts archive\n\n"+
 		"<b>Automatic Processing:</b>\n"+
 		"When you share <code>token.pickle</code> or <code>shorteners.txt</code> to the bot, they are automatically saved and reloaded immediately.",
 		telegram.ToSmallCaps("Private Files"))
 
 	btn := telegram.NewButtonMaker()
-	btn.IButton("◀️ Back", "botset back")
-	btn.IButtonStyled("Close", "botset close", "danger")
+	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
+	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 	btn.Row()
 	return text, btn
 }
@@ -641,7 +644,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			"<b>Timeout:</b> 60 sec\n<i>Send /cancel to abort.</i>",
 			telegram.ToSmallCaps("Set User Session String"))
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", "botset session", "danger")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset session", "danger")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send session string in chat...", false)
@@ -666,7 +669,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			"<b>Timeout:</b> 60 sec\n<i>Send /cancel to abort.</i>",
 			telegram.ToSmallCaps("Set Dump Channel"))
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", "botset session", "danger")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset session", "danger")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 1)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send Dump Channel ID in chat...", false)
@@ -720,14 +723,14 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		}
 		ext.SetPendingBotSettingSession(fromUID, "SHORTENER", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"<blockquote>╭ <b>Current Domain:</b> <code>%s</code></blockquote>\n\n"+
+			"┠ <b>Current Domain:</b> <code>%s</code>\n\n"+
 			"<i>Send the shortener domain (e.g. <code>droplink.co</code> or <code>https://api.shareus.io/short?api=%%s&url=%%s</code>).</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
 			telegram.ToSmallCaps("Set Shortener Domain"), cur)
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", "botset shortener", "danger")
-		btn.IButton("◀️ Back", "botset shortener")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset shortener", "danger")
+		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset shortener", "primary")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, promptText, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send shortener domain within 60s...", false)
@@ -737,14 +740,14 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		cur := maskAPI(cfg.ShortenerAPI)
 		ext.SetPendingBotSettingSession(fromUID, "SHORTENER_API", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"<blockquote>╭ <b>Current API Key:</b> <code>%s</code></blockquote>\n\n"+
+			"┠ <b>Current API Key:</b> <code>%s</code>\n\n"+
 			"<i>Send your shortener API key in chat.</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
 			telegram.ToSmallCaps("Set Shortener API Key"), cur)
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", "botset shortener", "danger")
-		btn.IButton("◀️ Back", "botset shortener")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset shortener", "danger")
+		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset shortener", "primary")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, promptText, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send shortener API key within 60s...", false)
@@ -754,14 +757,14 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		cur := ext.GetReadableTime(cfg.TokenTimeout)
 		ext.SetPendingBotSettingSession(fromUID, "TOKEN_TIMEOUT", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"<blockquote>╭ <b>Current Validity:</b> <code>%s</code></blockquote>\n\n"+
+			"┠ <b>Current Validity:</b> <code>%s</code>\n\n"+
 			"<i>Send custom validity duration in seconds (e.g. <code>86400</code>) or with suffix (e.g. <code>24h</code>, <code>12h</code>, <code>2d</code>).</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
 			telegram.ToSmallCaps("Custom Token Validity"), cur)
 		btn := telegram.NewButtonMaker()
-		btn.IButtonStyled("Cancel", "botset shortener", "danger")
-		btn.IButton("◀️ Back", "botset shortener")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), "botset shortener", "danger")
+		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset shortener", "primary")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, promptText, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Send validity duration within 60s...", false)
@@ -792,10 +795,10 @@ func (m *BotSettingsModule) buildShortenerMenu() (string, *telegram.ButtonMaker)
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
-		"<blockquote>╭ <b>Shortener Access :</b> <code>%s</code>\n"+
+		"┎ <b>Shortener Access :</b> <code>%s</code>\n"+
 		"┠ <b>Token Validity :</b> <code>%s</code>\n"+
 		"┠ <b>Default Domain :</b> <code>%s</code>\n"+
-		"╰ <b>Default API Key :</b> <code>%s</code></blockquote>\n\n",
+		"┖ <b>Default API Key :</b> <code>%s</code>\n\n",
 		telegram.ToSmallCaps("Shortener Settings"), stEmoji, valStr, shDomain, shAPI))
 
 	if shrtsCount > 0 {
@@ -815,26 +818,26 @@ func (m *BotSettingsModule) buildShortenerMenu() (string, *telegram.ButtonMaker)
 
 	btn := telegram.NewButtonMaker()
 	if isActive {
-		btn.IButtonStyled("Disable Shortener", "botset toggleshrt", "danger")
+		btn.IButtonStyled("× "+telegram.ToSmallCaps("Disable Shortener"), "botset toggleshrt", "danger")
 	} else {
-		btn.IButtonStyled("✓ "+"Enable Shortener (24h)", "botset toggleshrt", "success")
+		btn.IButtonStyled("✓ "+telegram.ToSmallCaps("Enable Shortener (24h)"), "botset toggleshrt", "success")
 	}
 	btn.Row()
 
-	btn.IButton("24 Hours", "botset setshrt 86400")
-	btn.IButton("12 Hours", "botset setshrt 43200")
-	btn.IButton("6 Hours", "botset setshrt 21600")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("24 Hours"), "botset setshrt 86400", "primary")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("12 Hours"), "botset setshrt 43200", "primary")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("6 Hours"), "botset setshrt 21600", "primary")
 	btn.Row()
 
-	btn.IButton("Set Domain", "botset prompt_shrt_domain")
-	btn.IButton("Set API Key", "botset prompt_shrt_api")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Set Domain"), "botset prompt_shrt_domain", "primary")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Set API Key"), "botset prompt_shrt_api", "primary")
 	btn.Row()
 
-	btn.IButton("Custom Validity", "botset prompt_shrt_val")
+	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Custom Validity"), "botset prompt_shrt_val", "primary")
 	btn.Row()
 
-	btn.IButton("◀️ Back", "botset back")
-	btn.IButtonStyled("Close", "botset close", "danger")
+	btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "botset back", "primary")
+	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "botset close", "danger")
 	btn.Row()
 
 	return sb.String(), btn

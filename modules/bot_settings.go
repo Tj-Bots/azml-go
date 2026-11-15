@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -82,6 +83,53 @@ var configVarKeys = []string{
 	"DEVUPLOADS_KEY",
 	"STREAMTAPE_API",
 	"VIKINGFILE_USER",
+	"BOT_TOKEN",
+	"OWNER_ID",
+	"TELEGRAM_API",
+	"TELEGRAM_HASH",
+	"DATABASE_URL",
+	"DOWNLOAD_DIR",
+	"CMD_SUFFIX",
+	"AUTHORIZED_CHATS",
+	"SUDO_USERS",
+	"BLACKLIST_USERS",
+	"BOT_PM",
+	"CAP_FONT",
+	"LEECH_FILENAME_REMNAME",
+	"LEECH_FILENAME_REMNAME_AUTO",
+	"LEECH_FILENAME_REMNAME_REGEX",
+	"LINKS_LOG_ID",
+	"ARIA2_PORT",
+	"BASE_URL_PORT",
+	"MEGA_EMAIL",
+	"MEGA_PASSWORD",
+	"LOGIN_PASS",
+	"TOKEN_IN_PM",
+	"SCREENSHOTS_MODE",
+	"SHOW_MEDIAINFO",
+	"SAVE_MSG",
+	"SOURCE_LINK",
+	"METADATA",
+	"TITLE_NAME",
+	"AUTHOR_NAME",
+	"AUTHOR_URL",
+	"BOT_THEME",
+	"SHOW_EXTRA_CMDS",
+	"TIMEZONE",
+	"ENABLE_FFMPEG_CMDS",
+	"FFMPEG_ENCODING",
+	"TMDB_ACCESS_TOKEN",
+	"COVER_IMAGE",
+	"DDL_API",
+	"THUNDER_API",
+	"QUEUE_ALL",
+	"QUEUE_DOWNLOAD",
+	"QUEUE_UPLOAD",
+	"ARCHIVE_LIMIT",
+	"EXTRACT_LIMIT",
+	"STORAGE_THRESHOLD",
+	"UPDATE_ON_STARTUP",
+	"MULTI_TOKENS",
 }
 
 var defaultVarValues = map[string]string{
@@ -125,9 +173,19 @@ var defaultVarValues = map[string]string{
 	"VIKINGFILE_USER":              "",
 }
 
+// configValue: the live value, or the environment for vars that apply after a restart.
+func configValue(cfgMap map[string]string, key string) string {
+	if v, ok := cfgMap[key]; ok {
+		return v
+	}
+	return os.Getenv(key)
+}
+
 func isBoolVar(key string) bool {
 	switch key {
-	case "AS_DOCUMENT", "AUTO_THUMBNAIL", "EQUAL_SPLITS", "MEDIA_GROUP", "SHORTENER_ENABLED":
+	case "AS_DOCUMENT", "AUTO_THUMBNAIL", "EQUAL_SPLITS", "MEDIA_GROUP", "SHORTENER_ENABLED",
+		"BOT_PM", "TOKEN_IN_PM", "SCREENSHOTS_MODE", "SHOW_MEDIAINFO", "SAVE_MSG", "SOURCE_LINK",
+		"SHOW_EXTRA_CMDS", "ENABLE_FFMPEG_CMDS", "QUEUE_ALL", "UPDATE_ON_STARTUP":
 		return true
 	default:
 		return false
@@ -136,7 +194,8 @@ func isBoolVar(key string) bool {
 
 // isSecretVar: values that should not be shown in full in the chat.
 func isSecretVar(key string) bool {
-	if strings.Contains(key, "SESSION_STRING") || strings.Contains(key, "PASSWORD") {
+	if strings.Contains(key, "SESSION_STRING") || strings.Contains(key, "PASSWORD") ||
+		strings.HasSuffix(key, "_HASH") || key == "DATABASE_URL" || key == "LOGIN_PASS" || strings.HasSuffix(key, "_TOKENS") {
 		return true
 	}
 	for _, w := range []string{"_TOKEN", "_KEY", "_API"} {
@@ -303,7 +362,7 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 	cfgMap := config.GetConfigMap()
 	keys := configVarKeys
 
-	limit := 8
+	limit := 10
 	totalPages := (len(keys) + limit - 1) / limit
 	if page < 0 {
 		page = 0
@@ -324,7 +383,7 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 	btn := telegram.NewButtonMaker()
 	for i := start; i < end; i++ {
 		k := keys[i]
-		v := cfgMap[k]
+		v := configValue(cfgMap, k)
 		if v == "" {
 			v = "Not Set"
 		} else if isSecretVar(k) {
@@ -373,9 +432,16 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 
 func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing bool) (string, *telegram.ButtonMaker) {
 	cfgMap := config.GetConfigMap()
-	v, exists := cfgMap[key]
-	if !exists || v == "" {
+	_, live := cfgMap[key]
+	liveNote := ""
+	if !live {
+		liveNote = "\n<i>Applies after /restart</i>"
+	}
+	v := configValue(cfgMap, key)
+	if v == "" {
 		v = "Not Set"
+	} else if isSecretVar(key) {
+		v = maskAPI(v)
 	}
 
 	btn := telegram.NewButtonMaker()
@@ -383,9 +449,9 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 	if isBoolVar(key) {
 		text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-			"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
+			"╰ <b>Current Value:</b> <code>%s</code></blockquote>%s\n\n"+
 			"<i>Choose a valid value for the above Var:</i>",
-			"Boolean Configuration", key, v)
+			"Boolean Configuration", key, v, liveNote)
 
 		btn.IButtonStyled("✓ "+"True", fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
 		btn.IButtonStyled("False", fmt.Sprintf("botset boolvar %s false %d", key, page), "danger")
@@ -399,10 +465,10 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 	if editing {
 		text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-			"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
+			"╰ <b>Current Value:</b> <code>%s</code></blockquote>%s\n\n"+
 			"<i>Send a valid value for the above Var in chat.</i> <b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
-			"Edit Variable", key, v)
+			"Edit Variable", key, v, liveNote)
 
 		btn.IButtonStyled("Cancel Edit", fmt.Sprintf("botset editvar %s %d", key, page), "danger")
 		btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
@@ -412,9 +478,9 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 
 	text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 		"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-		"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
+		"╰ <b>Current Value:</b> <code>%s</code></blockquote>%s\n\n"+
 		"<i>Click <b>Edit Value</b> to update this setting directly:</i>",
-		"Variable Details", key, v)
+		"Variable Details", key, v, liveNote)
 
 	btn.IButtonStyled("Edit Value", fmt.Sprintf("botset editvar_prompt %s %d", key, page), "success")
 	btn.IButtonStyled("Reset", fmt.Sprintf("botset resetvar %s %d", key, page), "danger")

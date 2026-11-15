@@ -112,6 +112,10 @@ func main() {
 				}
 			}
 			log.Printf("[DB] Restored %d persistent setting(s) from database", len(dbSettings))
+			// rebuild the config so the vars edited in /bs that are read only at start apply too
+			if reloaded, rErr := config.LoadConfig("config.env"); rErr == nil && reloaded != nil {
+				cfg = reloaded
+			}
 		}
 		// Ensure default repository and branch are persisted in DB
 		if repo, _ := db.GetBotSetting("UPSTREAM_REPO"); repo == "" {

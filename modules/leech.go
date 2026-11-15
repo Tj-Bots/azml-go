@@ -1837,7 +1837,14 @@ func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeer
 	if err != nil {
 		return err
 	}
-	chunkDL := downloader.NewTelegramChunkDownloader(m.userRawAPI)
+	clients := []*tg.Client{m.userRawAPI}
+	for _, c := range telegram.ActiveUserPool() {
+		if c != m.userRawAPI {
+			clients = append(clients, c)
+		}
+	}
+	log.Printf("[LEECH] User session download over %d connection(s)", len(clients))
+	chunkDL := downloader.NewTelegramChunkDownloaderPool(clients)
 	return chunkDL.DownloadToFile(ctx, doc.AsInputDocumentFileLocation(""), size, destPath, onProgress, func() ([]byte, error) {
 		d, err := fetchDoc()
 		if err != nil {

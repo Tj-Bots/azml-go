@@ -267,6 +267,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 
 	sessionStr = strings.TrimSpace(sessionStr)
 	if sessionStr == "" {
+		telegram.SetActiveUserPool(nil)
 		if b.userPool != nil {
 			b.userPool.Close()
 			b.userPool = nil
@@ -336,6 +337,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 			return "", 0, false, fmt.Errorf("session login failed: %w", res.err)
 		}
 
+		telegram.SetActiveUserPool(nil)
 		if b.userPool != nil {
 			b.userPool.Close()
 			b.userPool = nil
@@ -371,6 +373,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 			uPool, pErr := telegram.StartUserClientPool(uCtx, cfg.TelegramAPI, cfg.TelegramHash, sData, b.userRawAPI, poolSize)
 			if pErr == nil && uPool != nil {
 				b.userPool = uPool
+				telegram.SetActiveUserPool(uPool.Clients())
 				if b.uploader != nil {
 					b.uploader.SetUserClientPool(b.userRawAPI, uPool.Clients())
 				}

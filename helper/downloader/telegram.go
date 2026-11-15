@@ -25,6 +25,7 @@ type DownloadProgressFunc func(curr, total int64, speed float64, eta string)
 
 type TelegramChunkDownloader struct {
 	client           *tg.Client
+	clients          []*tg.Client // extra connections of the same account, used in parallel
 	globalFloodUntil atomic.Int64
 	lastReqTime      atomic.Int64
 	minIntervalNs    atomic.Int64
@@ -38,6 +39,36 @@ func NewTelegramChunkDownloader(client *tg.Client) *TelegramChunkDownloader {
 	// Keeps throughput fast while avoiding MTProto connection queue drop.
 	d.minIntervalNs.Store(50 * int64(time.Millisecond))
 	return d
+}
+
+// NewTelegramChunkDownloaderPool downloads over several connections of the same account
+// (the user session pool), every worker on its own connection.
+func NewTelegramChunkDownloaderPool(clients []*tg.Client) *TelegramChunkDownloader {
+	var valid []*tg.Client
+	for _, c := range clients {
+		if c != nil {
+			valid = append(valid, c)
+		}
+	}
+	if len(valid) == 0 {
+		return NewTelegramChunkDownloader(nil)
+	}
+	d := NewTelegramChunkDownloader(valid[0])
+	d.clients = valid
+	// the pause between requests is per account; with more sockets it can be shorter
+	interval := 50 * int64(time.Millisecond) / int64(len(valid))
+	if interval < int64(5*time.Millisecond) {
+		interval = int64(5 * time.Millisecond)
+	}
+	d.minIntervalNs.Store(interval)
+	return d
+}
+
+func (d *TelegramChunkDownloader) clientFor(worker int) *tg.Client {
+	if len(d.clients) > 0 {
+		return d.clients[worker%len(d.clients)]
+	}
+	return d.client
 }
 
 func (d *TelegramChunkDownloader) decayPacing() {
@@ -140,13 +171,19 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 	_ = out.Truncate(fileSize)
 
 	numWorkers := 5
+	maxWorkers := 8
+	if len(d.clients) > 1 {
+		// two requests in flight per connection
+		numWorkers = len(d.clients) * 2
+		maxWorkers = 32
+	}
 	if envVal := os.Getenv("DOWNLOAD_THREADS"); envVal != "" {
 		if val, pErr := strconv.Atoi(envVal); pErr == nil && val > 0 {
 			numWorkers = val
 		}
 	}
-	if numWorkers > 8 {
-		numWorkers = 8
+	if numWorkers > maxWorkers {
+		numWorkers = maxWorkers
 	}
 	if numWorkers < 2 {
 		numWorkers = 2
@@ -239,7 +276,7 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 				// Sending the actual remaining size (e.g. 73123) causes LIMIT_INVALID error.
 				requestLimit := int(partSize)
 
-				data, partErr := d.getPartWithRetry(ctx, loc, offset, requestLimit, partIndex, totalParts, refreshRef)
+				data, partErr := d.getPartWithRetry(ctx, d.clientFor(workerID), loc, offset, requestLimit, partIndex, totalParts, refreshRef)
 				if partErr != nil {
 					errOnce.Do(func() {
 						firstErr = fmt.Errorf("download failed at part %d/%d (offset %d): %w", partIndex+1, totalParts, offset, partErr)
@@ -294,6 +331,7 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 
 func (d *TelegramChunkDownloader) getPartWithRetry(
 	ctx context.Context,
+	client *tg.Client,
 	loc tg.InputFileLocationClass,
 	offset int64,
 	limit int,
@@ -322,7 +360,7 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 		}
 
 		partCtx, partCancel := context.WithTimeout(ctx, 60*time.Second)
-		res, err := d.client.UploadGetFile(partCtx, &tg.UploadGetFileRequest{
+		res, err := client.UploadGetFile(partCtx, &tg.UploadGetFileRequest{
 			Precise:      false,
 			CDNSupported: false,
 			Location:     loc,

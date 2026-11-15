@@ -132,3 +132,22 @@ func (p *UserClientPool) Close() {
 	p.clients = nil
 	p.primary = nil
 }
+
+var (
+	activePoolMu      sync.RWMutex
+	activePoolClients []*tg.Client
+)
+
+// SetActiveUserPool keeps the user session connections for downloads too.
+func SetActiveUserPool(clients []*tg.Client) {
+	activePoolMu.Lock()
+	activePoolClients = clients
+	activePoolMu.Unlock()
+}
+
+// ActiveUserPool returns the user session connections (nil when there is no pool).
+func ActiveUserPool() []*tg.Client {
+	activePoolMu.RLock()
+	defer activePoolMu.RUnlock()
+	return append([]*tg.Client(nil), activePoolClients...)
+}

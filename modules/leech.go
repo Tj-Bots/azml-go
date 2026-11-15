@@ -234,7 +234,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	if link == "" && !msg.HasMedia && !msg.IsReply {
 		helpMsg := fmt.Sprintf("⌬ <b><u>%s:</u></b>\n\n"+
 			"<b>%s:</b> <code>/leech [link] [flags]</code>\n\n"+
-			"┎ <b>%s:</b>\n"+
+			"<blockquote>╭ <b>%s:</b>\n"+
 			"┠ <code>-b</code> — %s\n"+
 			"┠ <code>-n</code> — %s\n"+
 			"┠ <code>-z</code> — %s\n"+
@@ -244,7 +244,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			"┠ <code>-d</code> — %s\n"+
 			"┠ <code>-med</code> — %s\n"+
 			"┠ <code>-ud</code> — %s\n"+
-			"┖ <code>-st</code> — %s",
+			"╰ <code>-st</code> — %s</blockquote>",
 			telegram.ToSmallCaps("Leech Command Usage"),
 			telegram.ToSmallCaps("Usage"),
 			telegram.ToSmallCaps("Available Flags"),
@@ -300,11 +300,11 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 
 	elapsed := ext.TimeSinceFormatted(startTime)
 	errMsg := fmt.Sprintf("<i><b>Download Stopped!</b></i>\n"+
-		"┠ <b>Task for:</b> %s\n"+
+		"<blockquote>╭ <b>Task for:</b> %s</blockquote>\n"+
 		"┃\n"+
-		"┠ <b>Due To:</b> %s\n"+
+		"<blockquote>╭ <b>Due To:</b> %s\n"+
 		"┠ <b>Mode:</b> %s\n"+
-		"┖ <b>Elapsed:</b> %s",
+		"╰ <b>Elapsed:</b> %s</blockquote>",
 		tag, telegram.EscapeHTML(errStr), mode, elapsed)
 
 	if notifyID > 0 {
@@ -1341,21 +1341,21 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if len(uploadedNames) > 0 {
 		mainName = uploadedNames[0]
 	}
-	sb.WriteString(fmt.Sprintf("<b>%s</b>\n|\n", mainName))
-	sb.WriteString(fmt.Sprintf("├── <b>Size:</b> %s\n", ext.GetReadableFileSize(totalSize)))
-	sb.WriteString(fmt.Sprintf("├── <b>Elapsed:</b> %s\n", ext.GetReadableTime(int64(overallElapsed.Seconds()))))
-	sb.WriteString(fmt.Sprintf("├── <b>Avg DL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(avgDLSpeed))))
-	sb.WriteString(fmt.Sprintf("├── <b>Avg UL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(avgULSpeed))))
-	sb.WriteString(fmt.Sprintf("├── <b>Mode:</b> %s\n", modeStr))
-	sb.WriteString(fmt.Sprintf("├── <b>Max DL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(maxDLSpeed))))
-	sb.WriteString(fmt.Sprintf("├── <b>Max UL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(maxULSpeed))))
-	sb.WriteString(fmt.Sprintf("├── <b>Total Files:</b> %d\n", len(uploadedNames)))
+	sb.WriteString(fmt.Sprintf("<b>%s</b>\n", mainName))
+	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Size:</b> %s\n", ext.GetReadableFileSize(totalSize)))
+	sb.WriteString(fmt.Sprintf("┠ <b>Elapsed:</b> %s\n", ext.GetReadableTime(int64(overallElapsed.Seconds()))))
+	sb.WriteString(fmt.Sprintf("┠ <b>Avg DL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(avgDLSpeed))))
+	sb.WriteString(fmt.Sprintf("┠ <b>Avg UL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(avgULSpeed))))
+	sb.WriteString(fmt.Sprintf("┠ <b>Mode:</b> %s\n", modeStr))
+	sb.WriteString(fmt.Sprintf("┠ <b>Max DL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(maxDLSpeed))))
+	sb.WriteString(fmt.Sprintf("┠ <b>Max UL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(maxULSpeed))))
+	sb.WriteString(fmt.Sprintf("┠ <b>Total Files:</b> %d\n", len(uploadedNames)))
 
 	userTag := fmt.Sprintf("@%s", msg.Username)
 	if msg.Username == "" {
 		userTag = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, msg.SenderName)
 	}
-	sb.WriteString(fmt.Sprintf("└── <b>By:</b> %s\n\n", userTag))
+	sb.WriteString(fmt.Sprintf("╰ <b>By:</b> %s</blockquote>\n\n", userTag))
 
 	botPM := cfg.BotPM || (user != nil && user.BotPM) || (msg.ChatID != msg.UserID)
 	if opt.IsMirror {

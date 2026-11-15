@@ -462,20 +462,20 @@ func RenderSysStats() string {
 
 	return fmt.Sprintf("⌬ <b><i>OS SYSTEM :</i></b>\n"+
 		"<blockquote>╭ <b>OS Uptime :</b> %s\n"+
-		"┊ <b>OS Version :</b> %s\n"+
+		"┠ <b>OS Version :</b> %s\n"+
 		"╰ <b>OS Arch :</b> %s</blockquote>\n\n"+
 		"⌬ <b><i>NETWORK STATS :</i></b>\n"+
 		"<blockquote>╭ <b>Upload Data:</b> %s\n"+
-		"┊ <b>Download Data:</b> %s\n"+
-		"┊ <b>Pkts Sent:</b> %sk\n"+
-		"┊ <b>Pkts Received:</b> %sk\n"+
+		"┠ <b>Download Data:</b> %s\n"+
+		"┠ <b>Pkts Sent:</b> %sk\n"+
+		"┠ <b>Pkts Received:</b> %sk\n"+
 		"╰ <b>Total I/O Data:</b> %s</blockquote>\n\n"+
 		"<blockquote>╭ <b>CPU :</b></blockquote>\n"+
 		"┃ %s %.1f%%\n"+
 		"<blockquote>╭ <b>CPU Frequency :</b> %s\n"+
-		"┊ <b>System Avg Load :</b> %s\n"+
-		"┊ <b>P-Core(s) :</b> %d | <b>V-Core(s) :</b> %d\n"+
-		"┊ <b>Total Core(s) :</b> %d\n"+
+		"┠ <b>System Avg Load :</b> %s\n"+
+		"┠ <b>P-Core(s) :</b> %d | <b>V-Core(s) :</b> %d\n"+
+		"┠ <b>Total Core(s) :</b> %d\n"+
 		"╰ <b>Usable CPU(s) :</b> %d</blockquote>",
 		osUptime, osVersion, osArch,
 		upData, dlData, pktSent, pktRecv, tlData,
@@ -510,8 +510,8 @@ func RenderRepoStats() string {
 
 	return fmt.Sprintf("⌬ <b><i>REPO STATISTICS :</i></b>\n"+
 		"<blockquote>╭ <b>Bot Updated :</b> %s\n"+
-		"┊ <b>Current Version :</b> %s\n"+
-		"┊ <b>Latest Version :</b> %s\n"+
+		"┠ <b>Current Version :</b> %s\n"+
+		"┠ <b>Latest Version :</b> %s\n"+
 		"╰ <b>Last ChangeLog :</b> %s</blockquote>\n\n"+
 		"⌬ <b>REMARKS :</b> <code>%s</code>",
 		lastCommit, botVersion, latVersion, changeLog, remarks)
@@ -586,16 +586,16 @@ func RenderBotLimits() string {
 
 	return fmt.Sprintf("⌬ <b><i>BOT LIMITATIONS :</i></b>\n"+
 		"<blockquote>╭ <b>Direct Limit :</b> %s GB\n"+
-		"┊ <b>Torrent Limit :</b> %s GB\n"+
-		"┊ <b>YT-DLP Limit :</b> %s GB\n"+
-		"┊ <b>Mega Limit :</b> %s GB\n"+
-		"┊ <b>Archive Limit :</b> %s GB\n"+
-		"┊ <b>Extract Limit :</b> %s GB\n"+
-		"┊ <b>Daily Leech Limit :</b> %s\n"+
-		"┊ <b>Storage Threshold :</b> %s GB\n"+
+		"┠ <b>Torrent Limit :</b> %s GB\n"+
+		"┠ <b>YT-DLP Limit :</b> %s GB\n"+
+		"┠ <b>Mega Limit :</b> %s GB\n"+
+		"┠ <b>Archive Limit :</b> %s GB\n"+
+		"┠ <b>Extract Limit :</b> %s GB\n"+
+		"┠ <b>Daily Leech Limit :</b> %s\n"+
+		"┠ <b>Storage Threshold :</b> %s GB\n"+
 		"╰ <b>Leech Limit :</b> %s GB</blockquote>\n\n"+
 		"<blockquote>╭ <b>Token Validity :</b> %s\n"+
-		"┊ <b>User Parallel Tasks :</b> %s\n"+
+		"┠ <b>User Parallel Tasks :</b> %s\n"+
 		"╰ <b>Bot Parallel Tasks :</b> %s</blockquote>",
 		dl, tl, yl, ml, al, el, daily, st, ll, tv, ut, bt)
 }

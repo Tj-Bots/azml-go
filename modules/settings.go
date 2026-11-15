@@ -416,20 +416,20 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	// Exact AZML text format with small caps header
 	text := fmt.Sprintf("⌬ <b><u>%s :</u></b> %s\n\n"+
 		"<blockquote>╭ <b>Daily Leech :</b> <code>%s</code> per day\n"+
-		"┊ <b>Leech Type :</b> <i>%s</i>\n"+
-		"┊ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
-		"┊ <b>Leech Split Size :</b> <code>%s</code>\n"+
-		"┊ <b>Equal Splits :</b> <i>%s</i>\n"+
-		"┊ <b>Media Group :</b> <i>%s</i>\n"+
-		"┊ <b>Leech Caption :</b> <code>%s</code>\n"+
-		"┊ <b>Leech Prefix :</b> <code>%s</code>\n"+
-		"┊ <b>Leech Suffix :</b> <code>%s</code>\n"+
-		"┊ <b>Leech Dumps :</b> <code>%s</code>\n"+
-		"┊ <b>AutoRename Template :</b> <code>%s</code>\n"+
-		"┊ <b>Regex Remname :</b> <code>%s</code>\n"+
-		"┊ <b>Rename Method :</b> <i>%s</i>\n"+
-		"┊ <b>AutoRename :</b> <i>%s</i>\n"+
-		"┊ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
+		"┠ <b>Leech Type :</b> <i>%s</i>\n"+
+		"┠ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
+		"┠ <b>Leech Split Size :</b> <code>%s</code>\n"+
+		"┠ <b>Equal Splits :</b> <i>%s</i>\n"+
+		"┠ <b>Media Group :</b> <i>%s</i>\n"+
+		"┠ <b>Leech Caption :</b> <code>%s</code>\n"+
+		"┠ <b>Leech Prefix :</b> <code>%s</code>\n"+
+		"┠ <b>Leech Suffix :</b> <code>%s</code>\n"+
+		"┠ <b>Leech Dumps :</b> <code>%s</code>\n"+
+		"┠ <b>AutoRename Template :</b> <code>%s</code>\n"+
+		"┠ <b>Regex Remname :</b> <code>%s</code>\n"+
+		"┠ <b>Rename Method :</b> <i>%s</i>\n"+
+		"┠ <b>AutoRename :</b> <i>%s</i>\n"+
+		"┠ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
 		"╰ <b>Leech Metadata :</b> <code>%s</code></blockquote>",
 		telegram.ToSmallCaps("Leech Settings"),
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
@@ -540,7 +540,7 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
 		"<blockquote>╭ <b>Current Split Size:</b> <code>%s</code>\n"+
-		"┊ <b>Equal Splits:</b> <i>%s</i>\n"+
+		"┠ <b>Equal Splits:</b> <i>%s</i>\n"+
 		"╰ <b>Media Group:</b> <i>%s</i></blockquote>\n\n"+
 		"<i>Files larger than this limit will be automatically split before uploading.</i>",
 		telegram.ToSmallCaps("Leech Split Settings"), splitSize, eqStatus, mgStatus)

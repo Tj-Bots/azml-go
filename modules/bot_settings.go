@@ -243,9 +243,9 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
 		"<blockquote>╭ <b>Status:</b> %s\n"+
-		"┊ <b>Max Split Size:</b> <code>%s</code>\n"+
-		"┊ <b>Dump Channel:</b> %s\n"+
-		"┊ <b>Session String:</b> <code>%s</code>\n"+
+		"┠ <b>Max Split Size:</b> <code>%s</code>\n"+
+		"┠ <b>Dump Channel:</b> %s\n"+
+		"┠ <b>Session String:</b> <code>%s</code>\n"+
 		"╰ <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code></blockquote>\n\n"+
 		"<i>Supported session string formats: Pyrogram (v1, v2), Pyrofork, Telethon, gotd</i>\n\n"+
 		"<i>Click <b>Set Session String</b> to save/update your user session for 4GB uploads:</i>",
@@ -519,9 +519,9 @@ func (m *BotSettingsModule) buildPrivateMenu() (string, *telegram.ButtonMaker) {
 	text := fmt.Sprintf("⌬ <b><u>%s:</u></b>\n\n"+
 		"<i>Send any of these private files as a document directly to the bot:</i>\n\n"+
 		"<blockquote>╭ <code>token.pickle</code> — Google Drive OAuth token (automatically loaded)\n"+
-		"┊ <code>config.env</code> — Bot environment variables (auto reloaded)\n"+
-		"┊ <code>cookies.txt</code> — Netscape cookies for yt-dlp & aria2c\n"+
-		"┊ <code>shorteners.txt</code> — Multi-shortener routing file (auto reloaded)\n"+
+		"┠ <code>config.env</code> — Bot environment variables (auto reloaded)\n"+
+		"┠ <code>cookies.txt</code> — Netscape cookies for yt-dlp & aria2c\n"+
+		"┠ <code>shorteners.txt</code> — Multi-shortener routing file (auto reloaded)\n"+
 		"╰ <code>accounts.zip</code> — Service accounts archive</blockquote>\n\n"+
 		"<b>Automatic Processing:</b>\n"+
 		"When you share <code>token.pickle</code> or <code>shorteners.txt</code> to the bot, they are automatically saved and reloaded immediately.",
@@ -793,8 +793,8 @@ func (m *BotSettingsModule) buildShortenerMenu() (string, *telegram.ButtonMaker)
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
 		"<blockquote>╭ <b>Shortener Access :</b> <code>%s</code>\n"+
-		"┊ <b>Token Validity :</b> <code>%s</code>\n"+
-		"┊ <b>Default Domain :</b> <code>%s</code>\n"+
+		"┠ <b>Token Validity :</b> <code>%s</code>\n"+
+		"┠ <b>Default Domain :</b> <code>%s</code>\n"+
 		"╰ <b>Default API Key :</b> <code>%s</code></blockquote>\n\n",
 		telegram.ToSmallCaps("Shortener Settings"), stEmoji, valStr, shDomain, shAPI))
 

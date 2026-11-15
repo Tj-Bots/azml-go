@@ -175,8 +175,8 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 		noTaskMsg := fmt.Sprintf("<i>%s</i>\n\n"+
 			"⌬ <b><i>%s</i></b>\n"+
 			"<blockquote>╭ <b>Active Tasks:</b> 0\n"+
-			"┊ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n"+
-			"┊ <b>Uptime:</b> %s\n"+
+			"┠ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n"+
+			"┠ <b>Uptime:</b> %s\n"+
 			"╰ <b>Disk Free:</b> %s</blockquote>",
 			telegram.ToSmallCaps("No Active Tasks Running!"),
 			"Bot Stats",
@@ -251,14 +251,14 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 		engine := strings.SplitN(t.Engine(), " [", 2)[0]
 
 		sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Name:</b> <code>%s</code>\n", telegram.EscapeHTML(SanitizeFilename(t.Name()))))
-		sb.WriteString(fmt.Sprintf("┊ [%s] <i>%.1f%%</i>\n", bar, pct))
-		sb.WriteString(fmt.Sprintf("┊ <b>Status:</b> <i>%s</i>\n", telegram.EscapeHTML(string(t.Status()))))
-		sb.WriteString(fmt.Sprintf("┊ <b>Processed:</b> %s of %s\n", GetReadableFileSize(t.DownloadedBytes()), GetReadableFileSize(t.Size())))
-		sb.WriteString(fmt.Sprintf("┊ <b>Speed:</b> %s/s\n", GetReadableFileSize(int64(t.Speed()))))
-		sb.WriteString(fmt.Sprintf("┊ <b>ETA:</b> %s | <b>Elapsed:</b> %s\n", telegram.EscapeHTML(t.ETA()), telegram.EscapeHTML(elapsed)))
-		sb.WriteString(fmt.Sprintf("┊ <b>Engine:</b> %s\n", telegram.EscapeHTML(engine)))
-		sb.WriteString(fmt.Sprintf("┊ <b>Mode:</b> %s | <b>Out:</b> telegram\n", telegram.EscapeHTML(inMode)))
-		sb.WriteString(fmt.Sprintf("┊ <b>User:</b> <code>%s</code>\n", telegram.EscapeHTML(user)))
+		sb.WriteString(fmt.Sprintf("┠ [%s] <i>%.1f%%</i>\n", bar, pct))
+		sb.WriteString(fmt.Sprintf("┠ <b>Status:</b> <i>%s</i>\n", telegram.EscapeHTML(string(t.Status()))))
+		sb.WriteString(fmt.Sprintf("┠ <b>Processed:</b> %s of %s\n", GetReadableFileSize(t.DownloadedBytes()), GetReadableFileSize(t.Size())))
+		sb.WriteString(fmt.Sprintf("┠ <b>Speed:</b> %s/s\n", GetReadableFileSize(int64(t.Speed()))))
+		sb.WriteString(fmt.Sprintf("┠ <b>ETA:</b> %s | <b>Elapsed:</b> %s\n", telegram.EscapeHTML(t.ETA()), telegram.EscapeHTML(elapsed)))
+		sb.WriteString(fmt.Sprintf("┠ <b>Engine:</b> %s\n", telegram.EscapeHTML(engine)))
+		sb.WriteString(fmt.Sprintf("┠ <b>Mode:</b> %s | <b>Out:</b> telegram\n", telegram.EscapeHTML(inMode)))
+		sb.WriteString(fmt.Sprintf("┠ <b>User:</b> <code>%s</code>\n", telegram.EscapeHTML(user)))
 		sb.WriteString(fmt.Sprintf("╰ /cancel_%s</blockquote>\n\n", telegram.EscapeHTML(t.GID())))
 	}
 
@@ -267,8 +267,8 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 
 	sb.WriteString("⌬ <b><i>Bot Stats</i></b>\n")
 	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Active Tasks:</b> %d\n", totalTasks))
-	sb.WriteString(fmt.Sprintf("┊ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n", mem.OSPercent, GetCPUPercent()))
-	sb.WriteString(fmt.Sprintf("┊ <b>Uptime:</b> %s\n", uptime))
+	sb.WriteString(fmt.Sprintf("┠ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n", mem.OSPercent, GetCPUPercent()))
+	sb.WriteString(fmt.Sprintf("┠ <b>Uptime:</b> %s\n", uptime))
 	sb.WriteString(fmt.Sprintf("╰ <b>DL:</b> %s/s | <b>Ul:</b> %s/s</blockquote>", GetReadableFileSize(int64(totalDL)), GetReadableFileSize(int64(totalUL))))
 
 	btn := telegram.NewButtonMaker()

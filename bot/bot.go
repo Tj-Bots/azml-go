@@ -758,10 +758,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 			b.leechHandler(ctx, peer, msgCtx, isZip, isUnzip)
 		}
 	case telegram.MatchCommand(text, telegram.BotCommands.Mirror, b.botUsername):
-		msgCtx.IsMirror = true
-		if b.leechHandler != nil {
-			b.leechHandler(ctx, peer, msgCtx, false, false)
-		}
+		b.handleMirrorCommand(ctx, peer, msgCtx)
 	case telegram.MatchCommand(text, telegram.BotCommands.Ytdl, b.botUsername):
 		if b.ytdlHandler != nil {
 			b.ytdlHandler(ctx, peer, msgCtx)
@@ -885,6 +882,8 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 		if b.settingsCbHandler != nil {
 			b.settingsCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
+	case strings.HasPrefix(data, "mirror "):
+		b.handleMirrorCallback(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 	case strings.HasPrefix(data, "botset"):
 		if b.bsettingCbHandler != nil {
 			b.bsettingCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)

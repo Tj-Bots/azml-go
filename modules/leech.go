@@ -78,6 +78,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 
 	opt, link := parseLeechArgs(msg.Text)
 	opt.IsMirror = msg.IsMirror
+	opt.MirrorHost = msg.MirrorHost
 	if isZip {
 		opt.IsZip = true
 	}
@@ -223,6 +224,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					ReplyToID:  targetID,
 					IsReply:    true,
 					IsMirror:   msg.IsMirror,
+					MirrorHost: msg.MirrorHost,
 				}
 
 				log.Printf("[LEECH -i] Sequentially triggering download for message ID %d (part %d/%d)", targetID, idx+1, multiCount)
@@ -1240,9 +1242,17 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		uTask.SetProgress(0, itemSize, 0, "-")
 
 		if opt.IsMirror {
-			uTask.SetStatus(types.StatusUploading, "GoFile")
+			hostID := opt.MirrorHost
+			if hostID == "" {
+				hostID = ext.MirrorHosts[0].ID
+			}
+			hostName := hostID
+			if h, ok := ext.FindMirrorHost(hostID); ok {
+				hostName = h.Name
+			}
+			uTask.SetStatus(types.StatusUploading, hostName)
 			mirrorStart := time.Now()
-			link, gErr := ext.UploadToGoFile(ctx, curFile, func(sent, total int64) {
+			link, gErr := ext.UploadToHost(ctx, hostID, curFile, func(sent, total int64) {
 				secs := time.Since(mirrorStart).Seconds()
 				if secs < 0.5 {
 					return
@@ -1258,8 +1268,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				uTask.SetProgress(sent, total, speed, eta)
 			})
 			if gErr != nil {
-				log.Printf("[AZML-Go Mirror] GoFile upload error for %s: %v", curFile, gErr)
-				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("GoFile Upload Failed: %v", gErr), modeStr, taskStartTime)
+				log.Printf("[AZML-Go Mirror] %s upload error for %s: %v", hostName, curFile, gErr)
+				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("%s Upload Failed: %v", hostName, gErr), modeStr, taskStartTime)
 				return
 			}
 			mirrorLinks = append(mirrorLinks, link)
@@ -1359,7 +1369,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 	botPM := cfg.BotPM || (user != nil && user.BotPM) || (msg.ChatID != msg.UserID)
 	if opt.IsMirror {
-		sb.WriteString("➲ <i>Uploaded to GoFile:</i>\n")
+		sb.WriteString(fmt.Sprintf("➲ <i>Uploaded to %s:</i>\n", mirrorHostName(opt.MirrorHost)))
 		for idx, upF := range uploadedNames {
 			if idx >= 10 {
 				sb.WriteString(fmt.Sprintf("<i>...and %d more file(s)</i>\n", len(uploadedNames)-10))
@@ -1395,7 +1405,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			if idx >= 3 {
 				break
 			}
-			finishBtn.UButtonStyled(fmt.Sprintf("◈ GoFile %d", idx+1), link, "primary")
+			finishBtn.UButtonStyled(fmt.Sprintf("◈ %s %d", mirrorHostName(opt.MirrorHost), idx+1), link, "primary")
 		}
 	} else {
 		finishBtn.UButtonStyled("◈ "+telegram.ToSmallCaps("View in Bot PM"), fmt.Sprintf("https://t.me/%s", botUser), "primary")
@@ -1562,4 +1572,15 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 		opt.IsExtract = true
 	}
 	return opt, link
+}
+
+// mirrorHostName is the display name of a /mirror host id (first host when empty).
+func mirrorHostName(id string) string {
+	if id == "" {
+		id = ext.MirrorHosts[0].ID
+	}
+	if h, ok := ext.FindMirrorHost(id); ok {
+		return h.Name
+	}
+	return id
 }

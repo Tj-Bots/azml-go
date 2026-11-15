@@ -32,7 +32,7 @@ func NewButtonMaker() *ButtonMaker {
 
 func (b *ButtonMaker) IButton(text, data string) {
 	btn := InlineButton{
-		Text: text,
+		Text: ToSmallCaps(text), // the small caps font for every button
 		Data: data,
 	}
 	b.buttons = append(b.buttons, btn)
@@ -41,7 +41,7 @@ func (b *ButtonMaker) IButton(text, data string) {
 
 func (b *ButtonMaker) IButtonStyled(text, data, style string) {
 	btn := InlineButton{
-		Text:  text,
+		Text:  ToSmallCaps(text),
 		Data:  data,
 		Style: style,
 	}
@@ -51,7 +51,7 @@ func (b *ButtonMaker) IButtonStyled(text, data, style string) {
 
 func (b *ButtonMaker) UButton(text, url string) {
 	btn := InlineButton{
-		Text: text,
+		Text: ToSmallCaps(text), // the small caps font for every button
 		URL:  url,
 	}
 	b.buttons = append(b.buttons, btn)
@@ -60,7 +60,7 @@ func (b *ButtonMaker) UButton(text, url string) {
 
 func (b *ButtonMaker) UButtonStyled(text, url, style string) {
 	btn := InlineButton{
-		Text:  text,
+		Text:  ToSmallCaps(text),
 		URL:   url,
 		Style: style,
 	}

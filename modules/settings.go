@@ -92,6 +92,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 							_, err := dl.Download(m.rawAPI, loc).ToPath(ctx, destThumb)
 							if err == nil {
 								u.CustomThumb = destThumb
+								u.ThumbData, _ = os.ReadFile(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
 								_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied photo!</b> It will be attached to all your future leeched files.", msg.MessageID, nil)
@@ -109,6 +110,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 							_, err := dl.Download(m.rawAPI, loc).ToPath(ctx, destThumb)
 							if err == nil {
 								u.CustomThumb = destThumb
+								u.ThumbData, _ = os.ReadFile(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
 								_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied document!</b> It will be attached to all your future leeched files.", msg.MessageID, nil)
@@ -851,6 +853,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
+			u.ThumbData = nil
 		}
 		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
 		_ = m.sender.AnswerCallback(ctx, queryID, "All user settings reset to default!", true)
@@ -972,6 +975,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		dest := fmt.Sprintf("Thumbnails/%d.jpg", targetUID)
 		_ = os.Remove(dest)
 		u.CustomThumb = ""
+		u.ThumbData = nil
 		_ = ext.DB.SaveUser(u)
 		text, btn := m.buildThumbnailMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)

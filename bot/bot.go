@@ -984,6 +984,7 @@ func (b *BotApp) Start(ctx context.Context) error {
 		if err := ext.DB.LoadAllUsers(b.userMap); err != nil {
 			log.Printf("[AZML-Go Bot Client] Failed to load persisted user and authorization data: %v", err)
 		}
+		ext.RestoreThumbnails(b.userMap)
 		log.Println("[AZML-Go Bot Client] AZML-Go started and listening for commands!")
 
 		// Trigger startup notification
@@ -1436,6 +1437,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 						if err == nil {
 							u := b.userMap.GetOrCreate(senderID)
 							u.CustomThumb = destThumb
+							u.ThumbData, _ = os.ReadFile(destThumb)
 							_ = ext.DB.SaveUser(u)
 
 							// Always send immediate confirmation to user in current chat
@@ -1509,6 +1511,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 					if err == nil {
 						u := b.userMap.GetOrCreate(senderID)
 						u.CustomThumb = destThumb
+						u.ThumbData, _ = os.ReadFile(destThumb)
 						_ = ext.DB.SaveUser(u)
 
 						// Always send immediate confirmation to user in current chat

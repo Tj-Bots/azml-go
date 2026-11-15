@@ -40,6 +40,7 @@ type UserSettings struct {
 	MirrorHost     string            `json:"mirror_host" bson:"mirror_host"`
 	ExcludedExts   string            `json:"excluded_exts" bson:"excluded_exts"`
 	CapFont        string            `json:"cap_font" bson:"cap_font"`
+	ThumbData      []byte            `json:"thumb_data,omitempty" bson:"thumb_data,omitempty"` // the thumbnail image, so it survives restarts
 }
 
 type TaskStatus string

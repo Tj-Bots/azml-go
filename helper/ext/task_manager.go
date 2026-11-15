@@ -175,8 +175,8 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 		noTaskMsg := fmt.Sprintf("<i>%s</i>\n\n"+
 			"⌬ <b><i>%s</i></b>\n"+
 			"<blockquote>╭ <b>Active Tasks:</b> 0\n"+
-			"┠ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n"+
-			"┠ <b>Uptime:</b> %s\n"+
+			"┊ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n"+
+			"┊ <b>Uptime:</b> %s\n"+
 			"╰ <b>Disk Free:</b> %s</blockquote>",
 			telegram.ToSmallCaps("No Active Tasks Running!"),
 			"Bot Stats",
@@ -267,8 +267,8 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 
 	sb.WriteString("⌬ <b><i>Bot Stats</i></b>\n")
 	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Active Tasks:</b> %d\n", totalTasks))
-	sb.WriteString(fmt.Sprintf("┠ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n", mem.OSPercent, GetCPUPercent()))
-	sb.WriteString(fmt.Sprintf("┠ <b>Uptime:</b> %s\n", uptime))
+	sb.WriteString(fmt.Sprintf("┊ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n", mem.OSPercent, GetCPUPercent()))
+	sb.WriteString(fmt.Sprintf("┊ <b>Uptime:</b> %s\n", uptime))
 	sb.WriteString(fmt.Sprintf("╰ <b>DL:</b> %s/s | <b>Ul:</b> %s/s</blockquote>", GetReadableFileSize(int64(totalDL)), GetReadableFileSize(int64(totalUL))))
 
 	btn := telegram.NewButtonMaker()

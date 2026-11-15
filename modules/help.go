@@ -37,7 +37,7 @@ func (m *HelpModule) getStartText() string {
 
 func (m *HelpModule) getStartButtons() *telegram.ButtonMaker {
 	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Help Guide"), "start_help", "primary")
+	btn.IButton("Help Guide", "start_help")
 	btn.UButtonStyled("◈ "+telegram.ToSmallCaps("Updates"), "https://t.me/TJ_Bots", "primary")
 	btn.Row()
 	return btn
@@ -90,7 +90,7 @@ func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, ms
 func (m *HelpModule) HandleHelp(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	helpText := m.getHelpGuideText()
 	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "start_close", "danger")
+	btn.IButtonStyled("Close", "start_close", "danger")
 	btn.Row()
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, helpText, msg.MessageID, btn, 1)
 }
@@ -109,15 +109,15 @@ func (m *HelpModule) getStatsView(key string, targetUID int64) (string, *telegra
 	var msg string
 
 	if key == "home" {
-		btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Bot Stats"), fmt.Sprintf("stats %d stbot", targetUID), "primary")
-		btn.IButtonStyled("◈ "+telegram.ToSmallCaps("OS Stats"), fmt.Sprintf("stats %d stsys", targetUID), "primary")
-		btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Repo Stats"), fmt.Sprintf("stats %d strepo", targetUID), "primary")
-		btn.IButtonStyled("◈ "+telegram.ToSmallCaps("Bot Limits"), fmt.Sprintf("stats %d botlimits", targetUID), "primary")
-		btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), fmt.Sprintf("stats %d close", targetUID), "danger")
+		btn.IButton("Bot Stats", fmt.Sprintf("stats %d stbot", targetUID))
+		btn.IButton("OS Stats", fmt.Sprintf("stats %d stsys", targetUID))
+		btn.IButton("Repo Stats", fmt.Sprintf("stats %d strepo", targetUID))
+		btn.IButton("Bot Limits", fmt.Sprintf("stats %d botlimits", targetUID))
+		btn.IButtonStyled("Close", fmt.Sprintf("stats %d close", targetUID), "danger")
 		msg = "⌬ <b><i>Bot & OS Statistics!</i></b>"
 	} else {
-		btn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), fmt.Sprintf("stats %d home", targetUID), "primary")
-		btn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), fmt.Sprintf("stats %d close", targetUID), "danger")
+		btn.IButton("◀️ Back", fmt.Sprintf("stats %d home", targetUID))
+		btn.IButtonStyled("Close", fmt.Sprintf("stats %d close", targetUID), "danger")
 
 		switch key {
 		case "stbot":
@@ -145,8 +145,8 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 	if data == "start_help" {
 		helpText := m.getHelpGuideText()
 		helpBtn := telegram.NewButtonMaker()
-		helpBtn.IButtonStyled("« "+telegram.ToSmallCaps("Back"), "start_back", "primary")
-		helpBtn.IButtonStyled("× "+telegram.ToSmallCaps("Close"), "start_close", "danger")
+		helpBtn.IButton("◀️ Back", "start_back")
+		helpBtn.IButtonStyled("Close", "start_close", "danger")
 		helpBtn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, helpText, helpBtn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)

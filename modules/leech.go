@@ -610,13 +610,31 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 						}
 					}
 
+					// User session (premium): the bot copies the file to the dump channel and the
+					// user session downloads it from there (it can't read the bot's own chats).
+					if !dlSuccess && m.userRawAPI != nil && effectiveDumpChatID != 0 {
+						targetMsgID := msg.ReplyToID
+						if targetMsgID == 0 {
+							targetMsgID = msg.MessageID
+						}
+						uTask.SetStatus(types.StatusDownloading, "User Session MTProto")
+						if uErr := m.userSessionDownload(ctx, peer, targetMsgID, effectiveDumpChatID, doc.Size, destPath, func(curr, total int64, speed float64, eta string) {
+							uTask.SetProgress(curr, total, speed, eta)
+						}); uErr == nil {
+							downloadedPath = destPath
+							uTask.SetProgress(doc.Size, doc.Size, 0, "-")
+							dlSuccess = true
+						} else {
+							log.Printf("[LEECH] User session download failed (%v), downloading with the bot", uErr)
+							_ = os.Remove(destPath)
+						}
+					}
+
 					// Fallback to single-client chunk downloader if multi-bot was not active or failed
 					if !dlSuccess {
 						uTask.SetStatus(types.StatusDownloading, "Telegram MTProto")
+						// the bot's own file location: only the bot account can use it
 						downloadClient := m.rawAPI
-						if m.userRawAPI != nil {
-							downloadClient = m.userRawAPI
-						}
 						chunkDL := downloader.NewTelegramChunkDownloader(downloadClient)
 						loc := doc.AsInputDocumentFileLocation("")
 						if loc != nil {
@@ -1738,4 +1756,93 @@ func channelMessageLink(chatID int64, msgID int) string {
 		return ""
 	}
 	return fmt.Sprintf("https://t.me/c/%s/%d", strings.TrimPrefix(id, "-100"), msgID)
+}
+
+// userChannelPeer finds the dump channel as the user session sees it (its own access hash).
+func userChannelPeer(ctx context.Context, client *tg.Client, chatID int64) (*tg.InputPeerChannel, error) {
+	raw := pool.RawChannelID(chatID)
+	if chats, err := client.ChannelsGetChannels(ctx, []tg.InputChannelClass{&tg.InputChannel{ChannelID: raw}}); err == nil {
+		var list []tg.ChatClass
+		switch c := chats.(type) {
+		case *tg.MessagesChats:
+			list = c.Chats
+		case *tg.MessagesChatsSlice:
+			list = c.Chats
+		}
+		for _, ch := range list {
+			if c, ok := ch.(*tg.Channel); ok && c.ID == raw {
+				return &tg.InputPeerChannel{ChannelID: raw, AccessHash: c.AccessHash}, nil
+			}
+		}
+	}
+	dialogs, err := client.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{OffsetPeer: &tg.InputPeerEmpty{}, Limit: 200})
+	if err != nil {
+		return nil, err
+	}
+	var list []tg.ChatClass
+	switch d := dialogs.(type) {
+	case *tg.MessagesDialogs:
+		list = d.Chats
+	case *tg.MessagesDialogsSlice:
+		list = d.Chats
+	}
+	for _, ch := range list {
+		if c, ok := ch.(*tg.Channel); ok && c.ID == raw {
+			return &tg.InputPeerChannel{ChannelID: raw, AccessHash: c.AccessHash}, nil
+		}
+	}
+	return nil, fmt.Errorf("the user session is not a member of the dump channel %d", chatID)
+}
+
+// userSessionDownload: the bot forwards the file to the dump channel, the user session downloads
+// that copy, then the copy is deleted.
+func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeerClass, msgID int, dumpChatID int64, size int64, destPath string, onProgress func(curr, total int64, speed float64, eta string)) error {
+	rawDump := pool.RawChannelID(dumpChatID)
+	botHash := telegram.ResolveChannelAccessHash(ctx, m.rawAPI, dumpChatID)
+	if botHash == 0 {
+		return fmt.Errorf("bot can't access the dump channel")
+	}
+	botDump := &tg.InputPeerChannel{ChannelID: rawDump, AccessHash: botHash}
+	fwdID, err := telegram.ForwardToChannelWithFloodWait(ctx, m.rawAPI, peer, botDump, msgID)
+	if err != nil || fwdID <= 0 {
+		return fmt.Errorf("forward to dump failed: %v", err)
+	}
+	defer func() {
+		_, _ = m.rawAPI.ChannelsDeleteMessages(context.Background(), &tg.ChannelsDeleteMessagesRequest{
+			Channel: &tg.InputChannel{ChannelID: rawDump, AccessHash: botHash},
+			ID:      []int{fwdID},
+		})
+	}()
+
+	userDump, err := userChannelPeer(ctx, m.userRawAPI, dumpChatID)
+	if err != nil {
+		return err
+	}
+	fetchDoc := func() (*tg.Document, error) {
+		umsg, err := telegram.FetchMessage(ctx, m.userRawAPI, userDump, fwdID)
+		if err != nil || umsg == nil {
+			return nil, fmt.Errorf("user session can't read the copy: %v", err)
+		}
+		md, ok := umsg.Media.(*tg.MessageMediaDocument)
+		if !ok {
+			return nil, fmt.Errorf("copy has no document")
+		}
+		d, ok := md.Document.(*tg.Document)
+		if !ok {
+			return nil, fmt.Errorf("copy has no document")
+		}
+		return d, nil
+	}
+	doc, err := fetchDoc()
+	if err != nil {
+		return err
+	}
+	chunkDL := downloader.NewTelegramChunkDownloader(m.userRawAPI)
+	return chunkDL.DownloadToFile(ctx, doc.AsInputDocumentFileLocation(""), size, destPath, onProgress, func() ([]byte, error) {
+		d, err := fetchDoc()
+		if err != nil {
+			return nil, err
+		}
+		return d.FileReference, nil
+	})
 }

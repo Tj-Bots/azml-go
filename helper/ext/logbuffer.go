@@ -35,3 +35,10 @@ func (r *RingLog) Bytes() []byte {
 	defer r.mu.Unlock()
 	return append([]byte(nil), r.data...)
 }
+
+// Reset empties the buffer (/log clear).
+func (r *RingLog) Reset() {
+	r.mu.Lock()
+	r.data = nil
+	r.mu.Unlock()
+}

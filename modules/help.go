@@ -214,12 +214,17 @@ func (m *HelpModule) HandleLog(ctx context.Context, peer tg.InputPeerClass, msg 
 		_, _ = m.sender.SendMessage(ctx, peer, "Only Owner/Sudo can view logs!", msg.MessageID, nil)
 		return
 	}
+	if parts := strings.Fields(msg.Text); len(parts) > 1 && strings.EqualFold(parts[1], "clear") {
+		ext.LogBuffer.Reset()
+		_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Log cleared.</b> /log now shows only what happens from here.", msg.MessageID, telegram.CloseMarkup(msg.UserID))
+		return
+	}
 	data := ext.LogBuffer.Bytes()
 	if len(data) == 0 {
 		_, _ = m.sender.SendMessage(ctx, peer, "⌬ <b>Logs:</b> nothing logged yet.", msg.MessageID, nil)
 		return
 	}
-	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>", msg.MessageID, telegram.CloseMarkup(msg.UserID)); err != nil {
+	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>\n<i>Clear with</i> <code>/log clear</code>", msg.MessageID, telegram.CloseMarkup(msg.UserID)); err != nil {
 		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Could not send the log:</b> <code>%s</code>", telegram.EscapeHTML(err.Error())), msg.MessageID, nil)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"azml-go/helper/ext"
@@ -231,99 +232,127 @@ func runMediaInfo(filePath string) string {
 	return "No MediaInfo could be extracted."
 }
 
+// mediaInfoNode is a Telegraph content node.
+type mediaInfoNode struct {
+	Tag      string        `json:"tag"`
+	Children []interface{} `json:"children,omitempty"`
+}
+
+// formatMediaInfoHTML turns the mediainfo output into Telegraph nodes (JSON):
+// a header for every section (General, Video, Audio, Text, Menu) and its lines in a <pre>.
 func formatMediaInfoHTML(fileName, out string) string {
-	sections := map[string]string{
-		"General":  "◈",
-		"Video":    "◈",
-		"Audio":    "◈",
-		"Text":     "◈",
-		"Subtitle": "◈",
-		"Menu":     "◈",
+	nodes := []mediaInfoNode{{Tag: "h4", Children: []interface{}{"◈ " + fileName}}}
+	var pre strings.Builder
+	flush := func() {
+		if strings.TrimSpace(pre.String()) != "" {
+			nodes = append(nodes, mediaInfoNode{Tag: "pre", Children: []interface{}{strings.TrimRight(pre.String(), "\n")}})
+		}
+		pre.Reset()
 	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("<h4>◈ %s</h4><br>", fileName))
-
-	lines := strings.Split(out, "\n")
-	inPre := false
-
-	for _, line := range lines {
+	for _, line := range strings.Split(out, "\n") {
 		trimmed := strings.TrimSpace(line)
-		isHeader := false
-		for sec, emoji := range sections {
-			if strings.HasPrefix(trimmed, sec) {
-				if inPre {
-					sb.WriteString("</pre><br>")
-				}
-				sb.WriteString(fmt.Sprintf("<h4>%s %s</h4><br><pre>", emoji, trimmed))
-				inPre = true
-				isHeader = true
+		header := false
+		for _, sec := range []string{"General", "Video", "Audio", "Text", "Subtitle", "Menu", "Image"} {
+			if strings.HasPrefix(trimmed, sec) && !strings.Contains(trimmed, ":") {
+				flush()
+				nodes = append(nodes, mediaInfoNode{Tag: "h4", Children: []interface{}{"◈ " + trimmed}})
+				header = true
 				break
 			}
 		}
-		if !isHeader {
-			if !inPre {
-				sb.WriteString("<pre>")
-				inPre = true
-			}
-			sb.WriteString(line + "\n")
+		if !header {
+			pre.WriteString(line + "\n")
 		}
 	}
-
-	if inPre {
-		sb.WriteString("</pre>")
-	}
-	return sb.String()
+	flush()
+	b, _ := json.Marshal(nodes)
+	return string(b)
 }
 
-func createTelegraphPage(title, htmlContent string) (string, error) {
-	apiURL := "https://api.graph.org/createPage"
+var (
+	telegraphMu    sync.Mutex
+	telegraphToken string
+)
 
-	type telegraphNode struct {
-		Tag      string          `json:"tag"`
-		Children []interface{}   `json:"children,omitempty"`
-		Attrs    json.RawMessage `json:"attrs,omitempty"`
+// telegraphAPIs: telegra.ph first, graph.org (same API) when it is not reachable.
+var telegraphAPIs = []string{"https://api.telegra.ph", "https://api.graph.org"}
+
+func telegraphCall(method string, form url.Values) (json.RawMessage, string, error) {
+	var lastErr error
+	for _, api := range telegraphAPIs {
+		resp, err := http.PostForm(api+"/"+method, form)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		var res struct {
+			OK     bool            `json:"ok"`
+			Error  string          `json:"error"`
+			Result json.RawMessage `json:"result"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		_ = resp.Body.Close()
+		if err == nil && res.OK {
+			return res.Result, api, nil
+		}
+		lastErr = fmt.Errorf("telegraph %s: %s", method, res.Error)
 	}
+	return nil, "", lastErr
+}
 
-	// Create page with Telegraph / Graph.org API
-	postData := url.Values{}
-	postData.Set("access_token", "d3b25feccb89e508a9114afb82aa421fe2a9712b963b387cc62ac036ee2b")
-	postData.Set("title", title)
-	postData.Set("author_name", "MediaInfo")
-	postData.Set("author_url", "https://t.me/TJ_Bots")
-
-	contentNodes := []telegraphNode{
-		{
-			Tag:      "p",
-			Children: []interface{}{htmlContent},
-		},
+// getTelegraphToken creates the bot's own Telegraph account once.
+func getTelegraphToken() (string, error) {
+	telegraphMu.Lock()
+	defer telegraphMu.Unlock()
+	if telegraphToken != "" {
+		return telegraphToken, nil
 	}
-	contentJSON, _ := json.Marshal(contentNodes)
-	postData.Set("content", string(contentJSON))
-	postData.Set("return_content", "false")
-
-	resp, err := http.PostForm(apiURL, postData)
+	form := url.Values{}
+	form.Set("short_name", "MediaInfo")
+	form.Set("author_name", "MediaInfo")
+	raw, _, err := telegraphCall("createAccount", form)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
-
-	var result struct {
-		OK     bool `json:"ok"`
-		Result struct {
-			Path string `json:"path"`
-			URL  string `json:"url"`
-		} `json:"result"`
+	var acc struct {
+		AccessToken string `json:"access_token"`
 	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && result.OK {
-		if result.Result.URL != "" {
-			return result.Result.URL, nil
-		}
-		return "https://graph.org/" + result.Result.Path, nil
+	if err := json.Unmarshal(raw, &acc); err != nil || acc.AccessToken == "" {
+		return "", fmt.Errorf("telegraph account not created")
 	}
+	telegraphToken = acc.AccessToken
+	return telegraphToken, nil
+}
 
-	return "", fmt.Errorf("telegraph create page failed")
+// createTelegraphPage publishes a page; content is a JSON array of Telegraph nodes.
+func createTelegraphPage(title, content string) (string, error) {
+	token, err := getTelegraphToken()
+	if err != nil {
+		return "", err
+	}
+	form := url.Values{}
+	form.Set("access_token", token)
+	form.Set("title", title)
+	form.Set("author_name", "MediaInfo")
+	form.Set("content", content)
+	raw, api, err := telegraphCall("createPage", form)
+	if err != nil {
+		return "", err
+	}
+	var page struct {
+		URL  string `json:"url"`
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(raw, &page); err != nil {
+		return "", err
+	}
+	if page.URL != "" {
+		return page.URL, nil
+	}
+	if strings.Contains(api, "graph.org") {
+		return "https://graph.org/" + page.Path, nil
+	}
+	return "https://telegra.ph/" + page.Path, nil
 }
 
 func truncateString(s string, maxLen int) string {

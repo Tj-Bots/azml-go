@@ -1123,6 +1123,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	for _, curFile := range filesToUpload {
+		if user != nil && isExcludedFile(curFile, user.ExcludedExts) {
+			log.Printf("[AZML-Go Leech] Skipping excluded file: %s", filepath.Base(curFile))
+			continue
+		}
 		origBase := filepath.Base(curFile)
 		origBase = strings.TrimPrefix(origBase, "meta_")
 		origBase = strings.TrimPrefix(origBase, "ff_")
@@ -1143,6 +1147,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 		// File Renaming
 		finalName, caption := ext.FormatFilename(origBase, user, curFile)
+		if user != nil && caption != "" {
+			caption = applyCaptionFont(caption, user.CapFont)
+		}
 		if opt.CustomName != "" && len(filesToUpload) == 1 {
 			finalName = opt.CustomName
 		}
@@ -1596,4 +1603,27 @@ func mirrorHostName(id string) string {
 		return h.Name
 	}
 	return id
+}
+
+// applyCaptionFont wraps the caption in the user's Caption Font tag.
+func applyCaptionFont(caption, font string) string {
+	tag := map[string]string{"b": "b", "i": "i", "u": "u", "s": "s", "code": "code", "spoiler": "tg-spoiler"}[font]
+	if tag == "" {
+		return caption
+	}
+	return fmt.Sprintf("<%s>%s</%s>", tag, caption, tag)
+}
+
+// isExcludedFile reports whether the file's extension is in the user's excluded list.
+func isExcludedFile(path, excluded string) bool {
+	if strings.TrimSpace(excluded) == "" {
+		return false
+	}
+	name := strings.ToLower(filepath.Base(path))
+	for _, e := range strings.Fields(strings.ToLower(excluded)) {
+		if strings.HasSuffix(name, e) {
+			return true
+		}
+	}
+	return false
 }

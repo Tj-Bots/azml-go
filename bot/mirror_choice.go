@@ -48,6 +48,15 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	}
 	text, host := splitMirrorHost(msgCtx.Text)
 	msgCtx.Text = text
+	if host == "" && b.userMap != nil {
+		if u := b.userMap.Get(msgCtx.UserID); u != nil && u.MirrorHost != "" {
+			for _, h := range ext.AvailableMirrorHosts() {
+				if h.ID == u.MirrorHost {
+					host = h.ID
+				}
+			}
+		}
+	}
 	if host != "" {
 		msgCtx.MirrorHost = host
 		b.leechHandler(ctx, peer, msgCtx, false, false)

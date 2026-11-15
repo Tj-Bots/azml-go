@@ -1121,6 +1121,9 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 		addCmd(bc.Leech[4], fmt.Sprintf("or /%s Leech and Unzip [links/media]", bc.Leech[5]))
 	}
 
+	if len(bc.Mirror) > 1 {
+		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Upload to GoFile, PixelDrain and more", bc.Mirror[1]))
+	}
 	if len(bc.Ytdl) > 1 {
 		addCmd(bc.Ytdl[0], fmt.Sprintf("or /%s Leech yt-dlp supported links", bc.Ytdl[1]))
 	}
@@ -1168,6 +1171,18 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 	if len(bc.Log) > 0 {
 		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
+	}
+	if len(bc.Authorize) > 1 {
+		addCmd(bc.Authorize[0], fmt.Sprintf("or /%s Authorize a user or chat (Owner/Sudo)", bc.Authorize[1]))
+	}
+	if len(bc.UnAuthorize) > 1 {
+		addCmd(bc.UnAuthorize[0], fmt.Sprintf("or /%s Unauthorize a user or chat (Owner/Sudo)", bc.UnAuthorize[1]))
+	}
+	if len(bc.Users) > 0 {
+		addCmd(bc.Users[0], "Users, Sudo and Blacklist lists (Owner/Sudo)")
+	}
+	if len(bc.Blacklist) > 1 {
+		addCmd(bc.Blacklist[0], fmt.Sprintf("or /%s Blacklist a user (Owner/Sudo)", bc.Blacklist[1]))
 	}
 
 	req := &tg.BotsSetBotCommandsRequest{
@@ -1527,6 +1542,23 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 	}
 	var fieldName string
 	switch key {
+	case "lexcluded":
+		if strings.EqualFold(val, "clear") || strings.EqualFold(val, "none") {
+			u.ExcludedExts = ""
+			val = "Cleared"
+		} else {
+			var exts []string
+			for _, e := range strings.Fields(strings.ReplaceAll(val, ",", " ")) {
+				e = strings.ToLower(strings.TrimSpace(e))
+				if !strings.HasPrefix(e, ".") {
+					e = "." + e
+				}
+				exts = append(exts, e)
+			}
+			u.ExcludedExts = strings.Join(exts, " ")
+			val = u.ExcludedExts
+		}
+		fieldName = "Excluded Extensions"
 	case "lprefix":
 		if strings.EqualFold(val, "clear") || strings.EqualFold(val, "none") {
 			u.Prefix = ""

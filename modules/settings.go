@@ -317,14 +317,21 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 	return u.Prefix != "" || u.Suffix != "" || u.Caption != "" ||
 		u.RemnameAuto != "" || u.RemnameRegex != "" || u.SplitSize != 0 ||
 		u.Autorename || u.AutoThumb || u.EqualSplits || u.MediaGroup ||
-		u.AsDoc != config.Get().AsDocument || u.CustomThumb != ""
+		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
+		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" || u.BotPM
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
 	if userName == "" {
 		userName = fmt.Sprintf("User_%d", u.UserID)
 	}
-	nameTag := fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", u.UserID, userName)
+	if userName == "" {
+		userName = u.Name
+	}
+	if userName == "" {
+		userName = fmt.Sprintf("%d", u.UserID)
+	}
+	nameTag := fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", u.UserID, telegram.EscapeHTML(userName))
 
 	// Daily leech usage and limit
 	_, dailyBytes := ext.GetUserDailyStats(u.UserID)
@@ -414,7 +421,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	}
 
 	// Exact AZML text format with small caps header
-	text := fmt.Sprintf("㊂ <b><u>%s :</u></b> %s\n\n"+
+	text := fmt.Sprintf("㊂ <b><u>%s for %s</u></b>\n\n"+
 		"<blockquote>╭ <b>Daily Leech :</b> <code>%s</code> per day\n"+
 		"┠ <b>Leech Type :</b> <i>%s</i>\n"+
 		"┠ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
@@ -430,11 +437,15 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		"┠ <b>Rename Method :</b> <i>%s</i>\n"+
 		"┠ <b>AutoRename :</b> <i>%s</i>\n"+
 		"┠ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
-		"╰ <b>Leech Metadata :</b> <code>%s</code></blockquote>",
+		"┠ <b>Leech Metadata :</b> <code>%s</code>\n"+
+		"┠ <b>Caption Font :</b> <i>%s</i>\n"+
+		"┠ <b>Excluded Ext :</b> <code>%s</code>\n"+
+		"┠ <b>Mirror Host :</b> <i>%s</i>\n"+
+		"╰ <b>Bot PM :</b> <i>%s</i></blockquote>",
 		"Leech Settings",
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
 		caption, prefix, suffix, dumps, remnameAuto, remnameRegex, renameMethod,
-		autorename, autoThumb, metadata)
+		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts), mirrorHostText(u.MirrorHost), onOff(u.BotPM))
 
 	btn := telegram.NewButtonMaker()
 	docLabel := "Send As Document"
@@ -466,6 +477,12 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	toggle("AutoRename", u.Autorename, fmt.Sprintf("userset %d autorename", u.UserID))
 	toggle("Auto Thumbnail", u.AutoThumb, fmt.Sprintf("userset %d auto_thumb", u.UserID))
 	btn.Row()
+	btn.IButton("Caption Font", fmt.Sprintf("userset %d capfont", u.UserID))
+	btn.IButton("Excluded Ext", fmt.Sprintf("userset %d lexcluded", u.UserID))
+	btn.Row()
+	btn.IButton("Mirror Host", fmt.Sprintf("userset %d mhost", u.UserID))
+	toggle("Bot PM", u.BotPM, fmt.Sprintf("userset %d botpm", u.UserID))
+	btn.Row()
 	if u.RenameMethod == "regex" {
 		btn.IButton("Rename Method: Regex", fmt.Sprintf("userset %d rename_method", u.UserID))
 	} else {
@@ -496,10 +513,9 @@ func (m *SettingsModule) buildThumbnailMenu(u *types.UserSettings, banner ...str
 		bannerText = banner[0] + "\n\n"
 	}
 
-	text := fmt.Sprintf("%s㊂ <b><u>Custom Thumbnail Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
-		"╰ <b>Set it :</b> reply to a photo with <code>/us thumb</code></blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Custom thumbnail used for your leeched files.</i>",
+	text := fmt.Sprintf("%s㊂ <b><u>Thumbnail Settings :</u></b>\n\n"+
+		"➲ <b>Custom Thumbnail :</b> <i>%s</i>\n\n"+
+		"➲ <b>Description :</b> <i>Custom Thumbnail to appear on the Leeched files uploaded by the bot</i>",
 		bannerText, status)
 
 	btn := telegram.NewButtonMaker()
@@ -536,11 +552,11 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 		mgStatus = "Enabled"
 	}
 
-	text := fmt.Sprintf("㊂ <b><u>Leech Split Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Leech Split Size :</b> <code>%s</code>\n"+
-		"┠ <b>Equal Splits :</b> <i>%s</i>\n"+
-		"╰ <b>Media Group :</b> <i>%s</i></blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Files larger than this size are split before uploading.</i>",
+	text := fmt.Sprintf("㊂ <b><u>Leech Splits Settings :</u></b>\n\n"+
+		"➲ <b>Leech Split Size :</b> <i>%s</i>\n\n"+
+		"➲ <b>Equal Splits :</b> <i>%s</i>\n\n"+
+		"➲ <b>Media Group :</b> <i>%s</i>\n\n"+
+		"➲ <b>Description :</b> <i>Leech Splits Size is the size to split the Leeched File before uploading</i>",
 		splitSize, eqStatus, mgStatus)
 
 	btn := telegram.NewButtonMaker()
@@ -580,12 +596,9 @@ func (m *SettingsModule) buildCaptionMenu(u *types.UserSettings) (string, *teleg
 		caption = telegram.EscapeHTML(u.Caption)
 	}
 
-	text := fmt.Sprintf("㊂ <b><u>Leech Caption Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Leech Caption :</b> <code>%s</code>\n"+
-		"┠ <code>{filename}</code> name · <code>{size}</code> size\n"+
-		"┠ <code>{duration}</code> duration · <code>{quality}</code> quality\n"+
-		"╰ <code>{languages}</code> audio · <code>{subtitles}</code> subtitles</blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Caption of your leeched files. You can use the tags above.</i>",
+	text := fmt.Sprintf("㊂ <b><u>Caption Settings :</u></b>\n\n"+
+		"➲ <b>Leech Filename Caption :</b> %s\n\n"+
+		"➲ <b>Description :</b> <i>Leech Caption is the Custom Caption on the Leech Files Uploaded by the bot</i>",
 		caption)
 
 	btn := telegram.NewButtonMaker()
@@ -610,10 +623,9 @@ func (m *SettingsModule) buildPrefixMenu(u *types.UserSettings) (string, *telegr
 		prefix = telegram.EscapeHTML(u.Prefix)
 	}
 
-	text := fmt.Sprintf("㊂ <b><u>Leech Prefix Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Leech Prefix :</b> <code>%s</code>\n"+
-		"╰ <b>Example :</b> <code>[TJ] </code></blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Text added at the start of your leeched filenames.</i>",
+	text := fmt.Sprintf("㊂ <b><u>Prefix Settings :</u></b>\n\n"+
+		"➲ <b>Leech Filename Prefix :</b> %s\n\n"+
+		"➲ <b>Description :</b> <i>Leech Filename Prefix is the Front Part attacted with the Filename of the Leech Files.</i>",
 		prefix)
 
 	btn := telegram.NewButtonMaker()
@@ -638,10 +650,9 @@ func (m *SettingsModule) buildSuffixMenu(u *types.UserSettings) (string, *telegr
 		suffix = telegram.EscapeHTML(u.Suffix)
 	}
 
-	text := fmt.Sprintf("㊂ <b><u>Leech Suffix Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Leech Suffix :</b> <code>%s</code>\n"+
-		"╰ <b>Example :</b> <code> @MyChannel</code></blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Text added before the extension of your leeched filenames.</i>",
+	text := fmt.Sprintf("㊂ <b><u>Suffix Settings :</u></b>\n\n"+
+		"➲ <b>Leech Filename Suffix :</b> %s\n\n"+
+		"➲ <b>Description :</b> <i>Leech Filename Suffix is the End Part attached with the Filename of the Leech Files</i>",
 		suffix)
 
 	btn := telegram.NewButtonMaker()
@@ -667,10 +678,8 @@ func (m *SettingsModule) buildAutoRenameMenu(u *types.UserSettings) (string, *te
 	}
 
 	text := fmt.Sprintf("㊂ <b><u>AutoRename Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Template :</b> <code>%s</code>\n"+
-		"┠ <code>{title}</code> · <code>{season}</code> · <code>{episode}</code> · <code>{quality}</code>\n"+
-		"╰ <b>Example :</b> <code>{title} - S{season}E{episode} [{quality}]</code></blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>New name for your leeched files, built from the tags above.</i>",
+		"➲ <b>AutoRename Template :</b> %s\n\n"+
+		"➲ <b>Description :</b> <i>AutoRename Template builds a new Filename for the Leech Files from {title} {season} {episode} {quality}</i>",
 		tmpl)
 
 	btn := telegram.NewButtonMaker()
@@ -695,11 +704,9 @@ func (m *SettingsModule) buildRegexMenu(u *types.UserSettings) (string, *telegra
 		regexVal = telegram.EscapeHTML(u.RemnameRegex)
 	}
 
-	text := fmt.Sprintf("㊂ <b><u>Regex Remname Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Regex Remname :</b> <code>%s</code>\n"+
-		"┠ <b>Format :</b> <code>search_regex:replacement</code>\n"+
-		"╰ <b>Example :</b> <code>\\[TG\\]:</code> removes [TG]</blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Changes or removes parts of your filenames.</i>",
+	text := fmt.Sprintf("㊂ <b><u>Remname Settings :</u></b>\n\n"+
+		"➲ <b>Leech Filename Remname :</b> %s\n\n"+
+		"➲ <b>Description :</b> <i>Leech Filename Remname is combination of Regex(s) used for removing or manipulating Filename of the Leech Files</i>",
 		regexVal)
 
 	btn := telegram.NewButtonMaker()
@@ -724,10 +731,9 @@ func (m *SettingsModule) buildDumpMenu(u *types.UserSettings) (string, *telegram
 		dumpStr = fmt.Sprintf("%d", u.DumpChatID)
 	}
 
-	text := fmt.Sprintf("㊂ <b><u>Leech Dump Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Dump Channel :</b> <code>%s</code>\n"+
-		"╰ <b>Note :</b> the bot must be an admin there</blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Your leeched files are also sent to this channel.</i>",
+	text := fmt.Sprintf("㊂ <b><u>User Dump Settings :</u></b>\n\n"+
+		"➲ <b>Leech Filename User Dump :</b> %s\n\n"+
+		"➲ <b>Description :</b> <i>Leech Files User Dump for Personal Use as a Storage.</i>",
 		dumpStr)
 
 	btn := telegram.NewButtonMaker()
@@ -752,10 +758,9 @@ func (m *SettingsModule) buildMetadataMenu(u *types.UserSettings) (string, *tele
 		metaAll = telegram.EscapeHTML(u.Metadata["all"])
 	}
 
-	text := fmt.Sprintf("㊂ <b><u>Leech Metadata Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Leech Metadata :</b> <code>%s</code>\n"+
-		"╰ <b>Example :</b> <code>Encoded by TJ</code></blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Title written into the metadata of your leeched videos.</i>",
+	text := fmt.Sprintf("㊂ <b><u>Metadata Settings :</u></b>\n\n"+
+		"➲ <b>Leech Filename Metadata :</b> %s\n\n"+
+		"➲ <b>Description :</b> <i>Your Channel Name that will be used while editing metadata of the Video File</i>",
 		metaAll)
 
 	btn := telegram.NewButtonMaker()
@@ -815,6 +820,10 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.EqualSplits = false
 		u.MediaGroup = false
 		u.AsDoc = config.Get().AsDocument
+		u.CapFont = ""
+		u.ExcludedExts = ""
+		u.MirrorHost = ""
+		u.BotPM = false
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1131,6 +1140,71 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
+	case "botpm":
+		u.BotPM = !u.BotPM
+		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Bot PM is now "+onOff(u.BotPM), false)
+		text, btn := m.buildLeechMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+
+	case "capfont":
+		text, btn := m.buildCapFontMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "setfont":
+		if len(parts) > 3 {
+			if parts[3] == "none" {
+				u.CapFont = ""
+			} else if _, ok := captionFonts[parts[3]]; ok {
+				u.CapFont = parts[3]
+			}
+			go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
+		}
+		_ = m.sender.AnswerCallback(ctx, queryID, "Caption Font: "+capFontName(u.CapFont), false)
+		text, btn := m.buildCapFontMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+
+	case "mhost":
+		text, btn := m.buildMirrorHostMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "sethost":
+		if len(parts) > 3 {
+			if parts[3] == "none" {
+				u.MirrorHost = ""
+			} else if h, ok := ext.FindMirrorHost(parts[3]); ok {
+				u.MirrorHost = h.ID
+			}
+			go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
+		}
+		_ = m.sender.AnswerCallback(ctx, queryID, "Mirror Host: "+mirrorHostText(u.MirrorHost), false)
+		text, btn := m.buildMirrorHostMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+
+	case "lexcluded":
+		text, btn := m.buildExcludedMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "edit_lexcluded":
+		ext.SetPendingSettingSession(targetUID, "lexcluded", 0, msgID, 60*time.Second)
+		prompt := "㊂ <b><u>Set Excluded Extensions</u></b>\n\n" +
+			"Send the extensions separated by space within <b>60 seconds</b> (e.g. <code>.txt .nfo .jpg</code>):"
+		btn := telegram.NewButtonMaker()
+		btn.IButtonStyled("Cancel", fmt.Sprintf("userset %d lexcluded", u.UserID), "danger")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Send the extensions...", false)
+
+	case "del_lexcluded":
+		u.ExcludedExts = ""
+		_ = ext.DB.SaveUser(u)
+		text, btn := m.buildExcludedMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Excluded extensions deleted", false)
+
 	case "edit_lmeta":
 		ext.SetPendingSettingSession(targetUID, "lmeta", 0, msgID, 60*time.Second)
 		prompt := "㊂ <b><u>Set Video Leech Metadata</u></b>\n\n" +
@@ -1163,6 +1237,8 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 	var text string
 	var btn *telegram.ButtonMaker
 	switch key {
+	case "lexcluded":
+		text, btn = m.buildExcludedMenu(u)
 	case "lprefix":
 		text, btn = m.buildPrefixMenu(u)
 	case "lsuffix":
@@ -1245,4 +1321,117 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 		_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
 		return
 	}
+}
+
+// captionFonts are the Caption Font choices (same as the Python bot).
+var captionFonts = map[string]string{
+	"b": "Bold", "i": "Italic", "u": "Underline", "s": "Strike", "code": "Mono", "spoiler": "Spoiler",
+}
+
+var captionFontOrder = []string{"b", "i", "u", "s", "code", "spoiler"}
+
+func capFontName(f string) string {
+	if n, ok := captionFonts[f]; ok {
+		return n
+	}
+	return "Default"
+}
+
+func onOff(b bool) string {
+	if b {
+		return "Enabled"
+	}
+	return "Disabled"
+}
+
+func excludedText(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "Not Exists"
+	}
+	return telegram.EscapeHTML(s)
+}
+
+func mirrorHostText(id string) string {
+	if id == "" {
+		return "Ask every time"
+	}
+	if h, ok := ext.FindMirrorHost(id); ok {
+		return h.Name
+	}
+	return id
+}
+
+func (m *SettingsModule) buildCapFontMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+	text := fmt.Sprintf("㊂ <b><u>Caption Font Settings :</u></b>\n\n"+
+		"➲ <b>Caption Font :</b> <i>%s</i>\n\n"+
+		"➲ <b>Description :</b> <i>Font of the caption of your leeched files</i>",
+		capFontName(u.CapFont))
+	btn := telegram.NewButtonMaker()
+	for i, f := range append([]string{"none"}, captionFontOrder...) {
+		label := "Default"
+		if f != "none" {
+			label = captionFonts[f]
+		}
+		if (f == "none" && u.CapFont == "") || f == u.CapFont {
+			btn.IButtonStyled("✓ "+label, fmt.Sprintf("userset %d setfont %s", u.UserID, f), "success")
+		} else {
+			btn.IButton(label, fmt.Sprintf("userset %d setfont %s", u.UserID, f))
+		}
+		if i%2 == 1 {
+			btn.Row()
+		}
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+	text := fmt.Sprintf("㊂ <b><u>Mirror Host Settings :</u></b>\n\n"+
+		"➲ <b>Mirror Host :</b> <i>%s</i>\n\n"+
+		"➲ <b>Description :</b> <i>Where /mirror uploads your files. Hosts that need a key show up after the owner sets it in /bs.</i>",
+		mirrorHostText(u.MirrorHost))
+	btn := telegram.NewButtonMaker()
+	if u.MirrorHost == "" {
+		btn.IButtonStyled("✓ Ask every time", fmt.Sprintf("userset %d sethost none", u.UserID), "success")
+	} else {
+		btn.IButton("Ask every time", fmt.Sprintf("userset %d sethost none", u.UserID))
+	}
+	btn.Row()
+	for i, h := range ext.AvailableMirrorHosts() {
+		if h.ID == u.MirrorHost {
+			btn.IButtonStyled("✓ "+h.Name, fmt.Sprintf("userset %d sethost %s", u.UserID, h.ID), "success")
+		} else {
+			btn.IButton(h.Name, fmt.Sprintf("userset %d sethost %s", u.UserID, h.ID))
+		}
+		if i%2 == 1 {
+			btn.Row()
+		}
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+func (m *SettingsModule) buildExcludedMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+	text := fmt.Sprintf("㊂ <b><u>Excluded Extensions Settings :</u></b>\n\n"+
+		"➲ <b>Excluded Extensions :</b> <code>%s</code>\n\n"+
+		"➲ <b>Description :</b> <i>Files with these extensions are not uploaded</i>",
+		excludedText(u.ExcludedExts))
+	btn := telegram.NewButtonMaker()
+	if u.ExcludedExts != "" {
+		btn.IButton("Change", fmt.Sprintf("userset %d edit_lexcluded", u.UserID))
+		btn.IButtonStyled("Delete", fmt.Sprintf("userset %d del_lexcluded", u.UserID), "danger")
+	} else {
+		btn.IButtonStyled("Set Extensions", fmt.Sprintf("userset %d edit_lexcluded", u.UserID), "success")
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
 }

@@ -60,6 +60,12 @@ func TestRenderAllMenus(t *testing.T) {
 			tx, b := fn(u)
 			out.WriteString(render("us "+name, tx, b, 2))
 		}
+		tx, b = sm.buildCapFontMenu(u)
+		out.WriteString(render("us capfont", tx, b, 2))
+		tx, b = sm.buildMirrorHostMenu(u)
+		out.WriteString(render("us mhost", tx, b, 2))
+		tx, b = sm.buildExcludedMenu(u)
+		out.WriteString(render("us excluded", tx, b, 2))
 		tx, b = sm.buildThumbnailMenu(u)
 		out.WriteString(render("us thumb", tx, b, 2))
 	}

@@ -407,7 +407,7 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 	// Page jump buttons (AZML style numbered jump bar, up to 6 per row)
 	for p := 0; p < totalPages; p++ {
 		if p == page {
-			btn.IButtonStyled(fmt.Sprintf("« %d »", p+1), fmt.Sprintf("botset var %d", p), "success")
+			btn.IButtonStyled(fmt.Sprintf("» %d «", p+1), fmt.Sprintf("botset var %d", p), "success")
 		} else {
 			btn.IButtonStyled(fmt.Sprintf("%d", p+1), fmt.Sprintf("botset var %d", p), "primary")
 		}
@@ -423,30 +423,43 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 	return sb.String(), btn
 }
 
-func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing bool) (string, *telegram.ButtonMaker) {
+func isPrivatePeer(peer tg.InputPeerClass) bool {
+	_, ok := peer.(*tg.InputPeerUser)
+	return ok
+}
+
+// varPageText is the variable page like the Python bot: Variable, Description, Value (spoiler).
+// In groups secret values stay masked.
+func varPageText(key, value string, private bool, live bool) string {
+	desc := varDescriptions[key]
+	if desc == "" {
+		desc = "No Description Provided"
+	}
+	val := "None"
+	if value != "" {
+		if isSecretVar(key) && !private {
+			val = maskAPI(value)
+		} else {
+			val = value
+		}
+	}
+	text := fmt.Sprintf("<b>Variable:</b> <code>%s</code>\n\n<b>Description:</b> %s\n\n<b>Value:</b> <span class=\"tg-spoiler\">%s</span>",
+		key, desc, telegram.EscapeHTML(val))
+	if !live {
+		text += "\n\n<i>Applies after /restart</i>"
+	}
+	return text
+}
+
+func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing, private bool) (string, *telegram.ButtonMaker) {
 	cfgMap := config.GetConfigMap()
 	_, live := cfgMap[key]
-	liveNote := ""
-	if !live {
-		liveNote = "\n<i>Applies after /restart</i>"
-	}
-	v := configValue(cfgMap, key)
-	if v == "" {
-		v = "Not Set"
-	} else if isSecretVar(key) {
-		v = maskAPI(v)
-	}
-
+	text := varPageText(key, configValue(cfgMap, key), private, live)
 	btn := telegram.NewButtonMaker()
 
 	if isBoolVar(key) {
-		text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-			"╰ <b>Current Value:</b> <code>%s</code></blockquote>%s\n\n"+
-			"<i>Choose a valid value for the above Var:</i>",
-			"Boolean Configuration", key, v, liveNote)
-
-		btn.IButtonStyled("✓ "+"True", fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
+		text += "\n\n<i>Choose a valid value for the above Var:</i>"
+		btn.IButtonStyled("True", fmt.Sprintf("botset boolvar %s true %d", key, page), "success")
 		btn.IButtonStyled("False", fmt.Sprintf("botset boolvar %s false %d", key, page), "danger")
 		btn.Row()
 		btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
@@ -456,24 +469,14 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 	}
 
 	if editing {
-		text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-			"╰ <b>Current Value:</b> <code>%s</code></blockquote>%s\n\n"+
-			"<i>Send a valid value for the above Var in chat.</i> <b>Timeout:</b> 60 sec\n"+
-			"<i>Send /cancel to abort.</i>",
-			"Edit Variable", key, v, liveNote)
-
-		btn.IButtonStyled("Cancel Edit", fmt.Sprintf("botset editvar %s %d", key, page), "danger")
+		text += "\n\n<i>Send a valid value for the above Var.</i> <b>Timeout:</b> 60 sec"
+		btn.IButtonStyled("Stop Edit", fmt.Sprintf("botset editvar %s %d", key, page), "danger")
+		btn.Row()
 		btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
+		btn.IButtonStyled("❌", "botset close", "danger")
 		btn.Row()
 		return text, btn
 	}
-
-	text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-		"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
-		"╰ <b>Current Value:</b> <code>%s</code></blockquote>%s\n\n"+
-		"<i>Click <b>Edit Value</b> to update this setting directly:</i>",
-		"Variable Details", key, v, liveNote)
 
 	btn.IButtonStyled("Edit Value", fmt.Sprintf("botset editvar_prompt %s %d", key, page), "success")
 	btn.IButtonStyled("Reset", fmt.Sprintf("botset resetvar %s %d", key, page), "danger")
@@ -481,7 +484,6 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 	btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
 	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
-
 	return text, btn
 }
 
@@ -500,7 +502,7 @@ func (m *BotSettingsModule) HandleSessionValue(ctx context.Context, peer tg.Inpu
 						_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
 					}
 				} else {
-					text, btn := m.buildVarDetailMenu(key, page, false)
+					text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
 					text += errMsg
 					if m.sender != nil {
 						_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
@@ -519,7 +521,7 @@ func (m *BotSettingsModule) HandleSessionValue(ctx context.Context, peer tg.Inpu
 					_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
 				}
 			} else {
-				text, btn := m.buildVarDetailMenu(key, page, false)
+				text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
 				text += successMsg
 				if m.sender != nil {
 					_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
@@ -569,7 +571,7 @@ func (m *BotSettingsModule) HandleSessionValue(ctx context.Context, peer tg.Inpu
 		return
 	}
 
-	text, btn := m.buildVarDetailMenu(key, page, false)
+	text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
 	text += "\n\n✓ <i>Value updated successfully!</i>"
 	if m.sender != nil {
 		_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
@@ -593,7 +595,7 @@ func (m *BotSettingsModule) HandleSessionCancelled(ctx context.Context, peer tg.
 		}
 		return
 	}
-	text, btn := m.buildVarDetailMenu(key, page, false)
+	text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
 	text += "\n\n× <i>Edit cancelled.</i>"
 	if m.sender != nil {
 		_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
@@ -678,7 +680,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			if len(parts) >= 4 {
 				page, _ = strconv.Atoi(parts[3])
 			}
-			text, btn := m.buildVarDetailMenu(key, page, false)
+			text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
 			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		}
@@ -691,7 +693,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 				page, _ = strconv.Atoi(parts[3])
 			}
 			ext.SetPendingBotSettingSession(fromUID, key, 0, msgID, page, 60*time.Second)
-			text, btn := m.buildVarDetailMenu(key, page, true)
+			text, btn := m.buildVarDetailMenu(key, page, true, isPrivatePeer(peer))
 			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 			_ = m.sender.AnswerCallback(ctx, queryID, "Send new value within 60s...", false)
 		}
@@ -705,7 +707,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 				page, _ = strconv.Atoi(parts[4])
 			}
 			_ = config.UpdateConfigVar(key, val)
-			text, btn := m.buildVarDetailMenu(key, page, false)
+			text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
 			text += fmt.Sprintf("\n\n✓ <i>%s set to %s!</i>", key, val)
 			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 			_ = m.sender.AnswerCallback(ctx, queryID, fmt.Sprintf("%s set to %s", key, val), false)
@@ -724,7 +726,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			} else {
 				_ = config.UpdateConfigVar(key, defVal)
 			}
-			text, btn := m.buildVarDetailMenu(key, page, false)
+			text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
 			text += fmt.Sprintf("\n\n• <i>%s reset to default: %s</i>", key, defVal)
 			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 			_ = m.sender.AnswerCallback(ctx, queryID, fmt.Sprintf("%s reset to default", key), false)

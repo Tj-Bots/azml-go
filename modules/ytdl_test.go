@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"azml-go/helper/downloader"
 )
@@ -43,31 +44,73 @@ func TestYtQuality(t *testing.T) {
 }
 
 func TestYtdlMenu(t *testing.T) {
-	info := &downloader.YtFormatInfo{Title: "A <b> & c", Heights: []int{2160, 1080, 720, 360, 144}, Sizes: map[int]int64{1080: 50 << 20}, AudioSize: 3 << 20, Duration: 125}
-	text, btn := buildYtdlMenu(info, 42, "abcd")
+	info := &downloader.YtFormatInfo{Title: "A <b> & c", Duration: 125, Formats: []downloader.YtFormat{
+		{ID: "140", Ext: "m4a", VideoExt: "none", AudioExt: "m4a", Acodec: "mp4a", Tbr: 129, Size: 3 << 20},
+		{ID: "137", Ext: "mp4", VideoExt: "mp4", Vcodec: "avc1", Acodec: "none", Height: 1080, Fps: 30, Tbr: 4000, Size: 50 << 20},
+		{ID: "248", Ext: "webm", VideoExt: "webm", Vcodec: "vp9", Acodec: "none", Height: 1080, Fps: 30, Tbr: 2500},
+		{ID: "399", Ext: "mp4", VideoExt: "mp4", Vcodec: "av01", Acodec: "none", Height: 1080, Fps: 30, Tbr: 2000},
+		{ID: "sb0", Ext: "mhtml", VideoExt: "none", Acodec: "none"},
+	}}
+	p := &ytdlPending{info: info, groups: ytdlGroups(info.Formats), uid: 42, key: "abcd", created: time.Now()}
+	text, btn := p.mainMenu()
 	if !strings.Contains(text, "A &lt;b&gt; &amp; c") || !strings.Contains(text, "Duration") {
 		t.Fatalf("bad text: %s", text)
 	}
-	var datas []string
-	for _, row := range btn.Rows(2) {
+	rows := btn.Rows(2)
+	var all []string
+	for _, row := range rows {
+		if len(row) > 2 {
+			t.Fatalf("row with %d buttons: %+v", len(row), row)
+		}
 		for _, b := range row {
-			datas = append(datas, b.Data)
+			all = append(all, b.Data)
+			if len(b.Data) > 64 {
+				t.Errorf("callback too long: %s", b.Data)
+			}
 		}
 	}
-	all := strings.Join(datas, "|")
-	for _, want := range []string{"ytq 42 abcd 2160", "ytq 42 abcd 1080", "ytq 42 abcd best", "ytq 42 abcd audio", "ytq 42 abcd mp3", "ytq 42 abcd cancel"} {
-		if !strings.Contains(all, want) {
-			t.Errorf("missing %s in %s", want, all)
+	joined := strings.Join(all, "|")
+	for _, want := range []string{"ytq 42 abcd dict", "ytq 42 abcd sel", "ytq 42 abcd mp3", "ytq 42 abcd audio", "ytq 42 abcd fmt bv", "ytq 42 abcd fmt ba", "ytq 42 abcd cancel"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("missing %s in %s", want, joined)
 		}
 	}
-	for _, d := range datas {
-		if len(d) > 64 {
-			t.Errorf("callback data too long: %s", d)
+	// 1080p30-mp4 has two bit rates -> submenu
+	for i, g := range p.groups {
+		if g.name == "1080p30-mp4" {
+			if len(g.tbrs) != 2 {
+				t.Fatalf("1080p30-mp4 rates: %d", len(g.tbrs))
+			}
+			if !strings.HasPrefix(g.tbrs[0].format, "137+ba[ext=m4a]") {
+				t.Fatalf("format: %s", g.tbrs[0].format)
+			}
+			_, sb := p.bitrateMenu(i)
+			if len(sb.Rows(2)) < 2 {
+				t.Fatal("bitrate menu rows")
+			}
 		}
 	}
-	text, _ = buildYtdlMenu(&downloader.YtFormatInfo{Title: "PL", IsPlaylist: true, Count: 12, Sizes: map[int]int64{}}, 1, "k")
+	_, ab := p.audioQualityMenu("flac")
+	for _, row := range ab.Rows(5) {
+		if len(row) > 5 {
+			t.Fatal("audio quality row too long")
+		}
+	}
+	pl := &ytdlPending{info: &downloader.YtFormatInfo{Title: "PL", IsPlaylist: true, Count: 12}, uid: 1, key: "k", created: time.Now()}
+	text, pb := pl.mainMenu()
 	if !strings.Contains(text, "12 items") {
 		t.Fatal("playlist count missing")
+	}
+	for _, row := range pb.Rows(3) {
+		if len(row) > 3 {
+			t.Fatal("playlist row too long")
+		}
+	}
+	if f, a := downloader.YtQuality("ba/b-mp3-320"); f != "ba/b" || strings.Join(a, " ") != "-x --audio-format mp3 --audio-quality 320K" {
+		t.Fatalf("mp3: %s %v", f, a)
+	}
+	if _, a := downloader.YtQuality("ba/b-flac-0"); strings.Join(a, " ") != "-x --audio-format flac --audio-quality 0" {
+		t.Fatalf("flac: %v", a)
 	}
 }
 

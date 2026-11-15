@@ -83,9 +83,9 @@ func TestRenderAllMenus(t *testing.T) {
 	out.WriteString(render("bs main", tx, b, 1))
 	tx, b = bm.buildVarsMenu(0)
 	out.WriteString(render("bs vars", tx, b, 2))
-	tx, b = bm.buildVarDetailMenu("STATUS_LIMIT", 0, false)
+	tx, b = bm.buildVarDetailMenu("STATUS_LIMIT", 0, false, true)
 	out.WriteString(render("bs var", tx, b, 2))
-	tx, b = bm.buildVarDetailMenu("AS_DOCUMENT", 0, false)
+	tx, b = bm.buildVarDetailMenu("AS_DOCUMENT", 0, false, false)
 	out.WriteString(render("bs boolvar", tx, b, 2))
 	tx, b = bm.buildAriaMenu()
 	out.WriteString(render("bs aria", tx, b, 2))
@@ -110,5 +110,23 @@ func TestRenderAllMenus(t *testing.T) {
 	}
 	if p := os.Getenv("RENDER_OUT"); p != "" {
 		_ = os.WriteFile(p, []byte(out.String()), 0o644)
+	}
+}
+
+func TestAllVarPages(t *testing.T) {
+	for _, k := range configVarKeys {
+		if varDescriptions[k] == "" {
+			t.Errorf("%s has no description", k)
+		}
+		for _, private := range []bool{true, false} {
+			tx := varPageText(k, "a<b>&c", private, true)
+			plain, ents := telegram.ParseFormatting(tx)
+			if plain == tx || len(ents) < 3 {
+				t.Errorf("%s: broken HTML page: %s", k, tx)
+			}
+		}
+	}
+	if tx := varPageText("DATABASE_URL", "mongodb+srv://user:secretpass@x", false, true); strings.Contains(tx, "secretpass") {
+		t.Error("secret shown in a group")
 	}
 }

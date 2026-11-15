@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -242,15 +241,28 @@ func ytdlpError(stderr string, err error) string {
 	return "yt-dlp failed: " + err.Error()
 }
 
+// YtFormat is one format from yt-dlp -J.
+type YtFormat struct {
+	ID       string  `json:"format_id"`
+	Ext      string  `json:"ext"`
+	VideoExt string  `json:"video_ext"`
+	AudioExt string  `json:"audio_ext"`
+	Vcodec   string  `json:"vcodec"`
+	Acodec   string  `json:"acodec"`
+	Height   int     `json:"height"`
+	Fps      float64 `json:"fps"`
+	Tbr      float64 `json:"tbr"`
+	Size     int64   `json:"filesize"`
+	Approx   int64   `json:"filesize_approx"`
+}
+
 // YtFormatInfo is what the quality menu needs.
 type YtFormatInfo struct {
 	Title      string
 	IsPlaylist bool
 	Count      int
-	Heights    []int         // available video heights, highest first
-	Sizes      map[int]int64 // approximate size per height (0 = unknown)
-	AudioSize  int64
 	Duration   float64
+	Formats    []YtFormat
 }
 
 // GetFormats reads the formats of a link (yt-dlp -J).
@@ -268,53 +280,46 @@ func (y *YtDlpDownloader) GetFormats(ctx context.Context, link string, extraArgs
 	if err != nil {
 		return nil, fmt.Errorf("%s", ytdlpError(stderr.String(), err))
 	}
+	return parseYtJSON(out)
+}
+
+func parseYtJSON(out []byte) (*YtFormatInfo, error) {
 	var data struct {
 		Title    string        `json:"title"`
 		Type     string        `json:"_type"`
 		Entries  []interface{} `json:"entries"`
 		Duration float64       `json:"duration"`
-		Formats  []struct {
-			Height         int     `json:"height"`
-			Vcodec         string  `json:"vcodec"`
-			Acodec         string  `json:"acodec"`
-			Filesize       int64   `json:"filesize"`
-			FilesizeApprox int64   `json:"filesize_approx"`
-			Tbr            float64 `json:"tbr"`
-		} `json:"formats"`
+		Formats  []YtFormat    `json:"formats"`
 	}
 	if err := json.Unmarshal(out, &data); err != nil {
 		return nil, err
 	}
-	info := &YtFormatInfo{Title: data.Title, Sizes: map[int]int64{}, Duration: data.Duration}
+	info := &YtFormatInfo{Title: data.Title, Duration: data.Duration, Formats: data.Formats}
 	if data.Type == "playlist" || len(data.Entries) > 0 {
 		info.IsPlaylist = true
 		info.Count = len(data.Entries)
-		return info, nil
+		info.Formats = nil
 	}
-	seen := map[int]bool{}
-	for _, f := range data.Formats {
-		size := f.Filesize
-		if size == 0 {
-			size = f.FilesizeApprox
-		}
-		if f.Vcodec != "" && f.Vcodec != "none" && f.Height > 0 {
-			if !seen[f.Height] {
-				seen[f.Height] = true
-				info.Heights = append(info.Heights, f.Height)
-			}
-			if size > info.Sizes[f.Height] {
-				info.Sizes[f.Height] = size
-			}
-		} else if f.Acodec != "" && f.Acodec != "none" && size > info.AudioSize {
-			info.AudioSize = size
-		}
-	}
-	sort.Sort(sort.Reverse(sort.IntSlice(info.Heights)))
 	return info, nil
 }
 
 // YtQuality turns a menu choice ("best", "1080", "audio", "mp3") into yt-dlp options.
 func YtQuality(choice string) (format string, extra []string) {
+	if strings.HasPrefix(choice, "ba/b-") {
+		parts := strings.Split(choice, "-")
+		extra = []string{"-x"}
+		if len(parts) > 1 && parts[1] != "" {
+			extra = append(extra, "--audio-format", parts[1])
+		}
+		if len(parts) > 2 && parts[2] != "" {
+			q := parts[2]
+			if parts[1] == "mp3" && q != "0" && len(q) > 1 {
+				q += "K" // bitrate (64, 128, 320); 0-10 is VBR quality
+			}
+			extra = append(extra, "--audio-quality", q)
+		}
+		return "ba/b", extra
+	}
 	switch choice {
 	case "", "best":
 		return "bv*+ba/b", nil

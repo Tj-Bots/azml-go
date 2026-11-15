@@ -286,29 +286,37 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 		}
 	}
 
-	// Default: everything in one screen
-	text, btn := m.buildLeechMenu(u, msg.SenderName)
-	_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 2)
+	// Default: main menu (Mirror / Leech)
+	if msg.SenderName != "" && u.Name == "" {
+		u.Name = msg.SenderName
+	}
+	text, btn := m.buildMainMenu(u, msg.SenderName)
+	_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 1)
 }
 
 func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (string, *telegram.ButtonMaker) {
 	if name == "" {
-		name = fmt.Sprintf("User_%d", u.UserID)
+		name = u.Name
 	}
-	text := fmt.Sprintf("㊂ <b><u>%s</u> for <a href=\"tg://user?id=%d\">%s</a></b> (<code>%d</code>)\n\n"+
-		"<i>Select a category below to configure your preferences:</i>",
-		telegram.ToSmallCaps("User Settings"), u.UserID, name, u.UserID)
+	if name == "" {
+		name = fmt.Sprintf("%d", u.UserID)
+	}
+	text := fmt.Sprintf("㊂ <b><u>User Settings :</u></b>\n\n"+
+		"<blockquote>╭ <b>Name :</b> <a href=\"tg://user?id=%d\">%s</a>\n"+
+		"╰ <b>User ID :</b> <code>%d</code></blockquote>",
+		u.UserID, telegram.EscapeHTML(name), u.UserID)
 
 	btn := telegram.NewButtonMaker()
+	btn.IButton("Mirror Settings", fmt.Sprintf("userset %d mirror", u.UserID))
+	btn.Row()
 	btn.IButton("Leech Settings", fmt.Sprintf("userset %d leech", u.UserID))
 	btn.Row()
-	btn.IButton("Metadata Settings", fmt.Sprintf("userset %d metadata", u.UserID))
-	btn.Row()
-	btn.IButtonStyled("Reset Setting", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
-	btn.Row()
+	if m.settingsChanged(u) {
+		btn.IButtonStyled("Reset Setting", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
+		btn.Row()
+	}
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
-
 	return text, btn
 }
 
@@ -440,12 +448,11 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		"┠ <b>Leech Metadata :</b> <code>%s</code>\n"+
 		"┠ <b>Caption Font :</b> <i>%s</i>\n"+
 		"┠ <b>Excluded Ext :</b> <code>%s</code>\n"+
-		"┠ <b>Mirror Host :</b> <i>%s</i>\n"+
 		"╰ <b>Bot PM :</b> <i>%s</i></blockquote>",
 		"Leech Settings",
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
 		caption, prefix, suffix, dumps, remnameAuto, remnameRegex, renameMethod,
-		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts), mirrorHostText(u.MirrorHost), onOff(u.BotPM))
+		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts), onOff(u.BotPM))
 
 	btn := telegram.NewButtonMaker()
 	docLabel := "Send As Document"
@@ -480,18 +487,14 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	btn.IButton("Caption Font", fmt.Sprintf("userset %d capfont", u.UserID))
 	btn.IButton("Excluded Ext", fmt.Sprintf("userset %d lexcluded", u.UserID))
 	btn.Row()
-	btn.IButton("Mirror Host", fmt.Sprintf("userset %d mhost", u.UserID))
 	toggle("Bot PM", u.BotPM, fmt.Sprintf("userset %d botpm", u.UserID))
-	btn.Row()
 	if u.RenameMethod == "regex" {
 		btn.IButton("Rename Method: Regex", fmt.Sprintf("userset %d rename_method", u.UserID))
 	} else {
 		btn.IButton("Rename Method: Auto", fmt.Sprintf("userset %d rename_method", u.UserID))
 	}
 	btn.Row()
-	if m.settingsChanged(u) {
-		btn.IButtonStyled("Reset", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
-	}
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 
@@ -804,11 +807,34 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	switch action {
 	// 1. Navigation
-	case "main", "back", "leech":
+	case "main", "back":
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		text, btn := m.buildMainMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 1)
+	case "leech":
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildLeechMenu(u, "")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "mirror":
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		text, btn := m.buildMirrorHostMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 	case "reset_all":
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		btn := telegram.NewButtonMaker()
+		btn.IButtonStyled("✓", fmt.Sprintf("userset %d reset_now y", u.UserID), "success")
+		btn.IButtonStyled("✘", fmt.Sprintf("userset %d reset_now n", u.UserID), "danger")
+		btn.Row()
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, "Do you want to Reset Settings ?", btn, 2)
+	case "reset_now":
+		if len(parts) < 4 || parts[3] != "y" {
+			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+			text, btn := m.buildMainMenu(u, "")
+			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 1)
+			return
+		}
 		u.Prefix = ""
 		u.Suffix = ""
 		u.Caption = ""
@@ -830,8 +856,8 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		}
 		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
 		_ = m.sender.AnswerCallback(ctx, queryID, "All user settings reset to default!", true)
-		text, btn := m.buildLeechMenu(u, "")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		text, btn := m.buildMainMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 1)
 	case "close":
 		ext.ClearPendingSettingSession(targetUID)
 		ext.ClearPendingThumbSession(targetUID)
@@ -1389,10 +1415,19 @@ func (m *SettingsModule) buildCapFontMenu(u *types.UserSettings) (string, *teleg
 }
 
 func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
-	text := fmt.Sprintf("㊂ <b><u>Mirror Host Settings :</u></b>\n\n"+
-		"➲ <b>Mirror Host :</b> <i>%s</i>\n\n"+
-		"➲ <b>Description :</b> <i>Where /mirror uploads your files. Hosts that need a key show up after the owner sets it in /bs.</i>",
-		mirrorHostText(u.MirrorHost))
+	name := u.Name
+	if name == "" {
+		name = fmt.Sprintf("%d", u.UserID)
+	}
+	var hosts []string
+	for _, h := range ext.AvailableMirrorHosts() {
+		hosts = append(hosts, h.Name)
+	}
+	text := fmt.Sprintf("㊂ <b><u>Mirror Settings for <a href=\"tg://user?id=%d\">%s</a></u></b>\n\n"+
+		"<blockquote>╭ <b>Upload To :</b> <i>%s</i>\n"+
+		"╰ <b>DDL Server(s) :</b> <i>%s</i></blockquote>\n\n"+
+		"➲ <b>Description :</b> <i>Pick where /mirror uploads your files. Ask every time shows the choice on each task.</i>",
+		u.UserID, telegram.EscapeHTML(name), mirrorHostText(u.MirrorHost), strings.Join(hosts, ", "))
 	btn := telegram.NewButtonMaker()
 	if u.MirrorHost == "" {
 		btn.IButtonStyled("✓ Ask every time", fmt.Sprintf("userset %d sethost none", u.UserID), "success")
@@ -1411,7 +1446,7 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		}
 	}
 	btn.Row()
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn

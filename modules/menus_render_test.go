@@ -50,8 +50,10 @@ func TestRenderAllMenus(t *testing.T) {
 		{UserID: 1, AsDoc: true, Autorename: true, RenameMethod: "auto"},
 		{UserID: 1, Prefix: "[Tj] <x>", Caption: "cap", AutoThumb: true, SplitSize: 1 << 30},
 	} {
-		tx, b := sm.buildLeechMenu(u, "Boss")
-		out.WriteString(render("us main", tx, b, 2))
+		tx, b := sm.buildMainMenu(u, "Boss")
+		out.WriteString(render("us home", tx, b, 1))
+		tx, b = sm.buildLeechMenu(u, "Boss")
+		out.WriteString(render("us leech", tx, b, 2))
 		for name, fn := range map[string]func(*types.UserSettings) (string, *telegram.ButtonMaker){
 			"split": sm.buildSplitSizeMenu, "caption": sm.buildCaptionMenu, "prefix": sm.buildPrefixMenu,
 			"suffix": sm.buildSuffixMenu, "autorename": sm.buildAutoRenameMenu, "regex": sm.buildRegexMenu,

@@ -50,7 +50,7 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	msgCtx.Text = text
 	if host == "" && b.userMap != nil {
 		if u := b.userMap.Get(msgCtx.UserID); u != nil && u.MirrorHost != "" {
-			for _, h := range ext.AvailableMirrorHosts() {
+			for _, h := range ext.AvailableMirrorHostsFor(u.DDLKeys) {
 				if h.ID == u.MirrorHost {
 					host = h.ID
 				}
@@ -68,7 +68,13 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 		b.leechHandler(ctx, peer, msgCtx, false, false)
 		return
 	}
-	hosts := ext.AvailableMirrorHosts()
+	var userKeys map[string]string
+	if b.userMap != nil {
+		if u := b.userMap.Get(msgCtx.UserID); u != nil {
+			userKeys = u.DDLKeys
+		}
+	}
+	hosts := ext.AvailableMirrorHostsFor(userKeys)
 	btn := telegram.NewButtonMaker()
 	for i, h := range hosts {
 		btn.IButton(h.Name, fmt.Sprintf("mirror %d %s", msgCtx.UserID, h.ID))

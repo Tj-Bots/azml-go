@@ -40,6 +40,7 @@ type UserSettings struct {
 	MirrorHost     string            `json:"mirror_host" bson:"mirror_host"`
 	ExcludedExts   string            `json:"excluded_exts" bson:"excluded_exts"`
 	CapFont        string            `json:"cap_font" bson:"cap_font"`
+	DDLKeys        map[string]string `json:"ddl_keys" bson:"ddl_keys"` // per user API keys of the /mirror hosts
 	ThumbData      []byte            `json:"thumb_data,omitempty" bson:"thumb_data,omitempty"` // the thumbnail image, so it survives restarts
 }
 
@@ -160,7 +161,7 @@ func (m *SafeUserMap) GetOrCreate(userID int64) *UserSettings {
 	}
 	u := &UserSettings{
 		UserID:       userID,
-		Autorename:   true,
+		Autorename:   false,
 		RenameMethod: "auto",
 		AsDoc:        false, // upload as media by default
 		Metadata:     make(map[string]string),

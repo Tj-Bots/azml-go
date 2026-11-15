@@ -1647,6 +1647,16 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 		u.SplitSize = bytes
 		fieldName = "Leech Split Size"
 		val = ext.GetReadableFileSize(u.SplitSize)
+	default:
+		// ddlkey_<host>: the user's own API key of a /mirror host
+		if hostID := strings.TrimPrefix(key, "ddlkey_"); hostID != key {
+			if u.DDLKeys == nil {
+				u.DDLKeys = map[string]string{}
+			}
+			u.DDLKeys[hostID] = val
+			fieldName = "API Key"
+			val = "Saved"
+		}
 	}
 
 	_ = ext.DB.SaveUser(u)

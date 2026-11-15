@@ -27,16 +27,19 @@ type MirrorHost struct {
 	NeedsKey bool
 	// KeyVar is the config variable that holds the key.
 	KeyVar string
+	// Desc and Prompt are shown in the user's DDL Servers page.
+	Desc   string
+	Prompt string
 }
 
 // MirrorHosts are the /mirror upload hosts (the same ones as the DDL list of the Python bot).
 var MirrorHosts = []MirrorHost{
-	{ID: "gofile", Name: "GoFile", KeyVar: "GOFILE_TOKEN", Key: func(c *config.Config) string { return c.GoFileToken }},
-	{ID: "vikingfile", Name: "VikingFile", KeyVar: "VIKINGFILE_USER", Key: func(c *config.Config) string { return c.VikingFileUser }},
-	{ID: "pixeldrain", Name: "PixelDrain", KeyVar: "PIXELDRAIN_KEY", Key: func(c *config.Config) string { return c.PixelDrainKey }},
-	{ID: "buzzheavier", Name: "BuzzHeavier", KeyVar: "BUZZHEAVIER_TOKEN", NeedsKey: true, Key: func(c *config.Config) string { return c.BuzzHeavierToken }},
-	{ID: "devuploads", Name: "DevUploads", KeyVar: "DEVUPLOADS_KEY", NeedsKey: true, Key: func(c *config.Config) string { return c.DevUploadsKey }},
-	{ID: "streamtape", Name: "StreamTape", KeyVar: "STREAMTAPE_API", NeedsKey: true, Key: func(c *config.Config) string { return c.StreamTapeAPI }},
+	{ID: "gofile", Name: "GoFile", KeyVar: "GOFILE_TOKEN", Key: func(c *config.Config) string { return c.GoFileToken }, Desc: "Gofile is a free file sharing and storage platform. You can store and share your content without any limit. Works without API Key too (as Guest).", Prompt: "Send GoFile's API Key. Get it on https://gofile.io/myProfile"},
+	{ID: "vikingfile", Name: "VikingFile", KeyVar: "VIKINGFILE_USER", Key: func(c *config.Config) string { return c.VikingFileUser }, Desc: "VikingFile is a free file hosting with no size limit. Works without User Hash too (as Guest).", Prompt: "Send VikingFile's User Hash. Get it on https://vikingfile.com/account"},
+	{ID: "pixeldrain", Name: "PixelDrain", KeyVar: "PIXELDRAIN_KEY", Key: func(c *config.Config) string { return c.PixelDrainKey }, Desc: "PixelDrain is a fast free file hosting.", Prompt: "Send PixelDrain's API Key. Get it on https://pixeldrain.com/user/api_keys"},
+	{ID: "buzzheavier", Name: "BuzzHeavier", KeyVar: "BUZZHEAVIER_TOKEN", NeedsKey: true, Key: func(c *config.Config) string { return c.BuzzHeavierToken }, Desc: "BuzzHeavier is a free file hosting with no size limit.", Prompt: "Send BuzzHeavier's Account ID (API token)."},
+	{ID: "devuploads", Name: "DevUploads", KeyVar: "DEVUPLOADS_KEY", NeedsKey: true, Key: func(c *config.Config) string { return c.DevUploadsKey }, Desc: "DevUploads is a file hosting that pays per download.", Prompt: "Send DevUploads's API Key. Get it on https://devuploads.com/?op=my_account"},
+	{ID: "streamtape", Name: "StreamTape", KeyVar: "STREAMTAPE_API", NeedsKey: true, Key: func(c *config.Config) string { return c.StreamTapeAPI }, Desc: "Streamtape is free Video Streaming & sharing Hoster", Prompt: "Send StreamTape's Login and Key\n<b>Format:</b> <code>user_login:pass_key</code>"},
 }
 
 // Endpoints (overridable in tests).
@@ -65,10 +68,22 @@ func FindMirrorHost(s string) (MirrorHost, bool) {
 
 // AvailableMirrorHosts are the hosts that can be used now (keyless hosts, or the key is set).
 func AvailableMirrorHosts() []MirrorHost {
-	cfg := config.Get()
+	return AvailableMirrorHostsFor(nil)
+}
+
+// HostKey: the user's own key first, then the owner's key from /bs.
+func HostKey(h MirrorHost, userKeys map[string]string) string {
+	if k := userKeys[h.ID]; k != "" {
+		return k
+	}
+	return h.Key(config.Get())
+}
+
+// AvailableMirrorHostsFor: the hosts this user can use (with the user's own keys).
+func AvailableMirrorHostsFor(userKeys map[string]string) []MirrorHost {
 	var out []MirrorHost
 	for _, h := range MirrorHosts {
-		if !h.NeedsKey || h.Key(cfg) != "" {
+		if !h.NeedsKey || HostKey(h, userKeys) != "" {
 			out = append(out, h)
 		}
 	}
@@ -77,6 +92,8 @@ func AvailableMirrorHosts() []MirrorHost {
 
 // MirrorSession keeps state between the files of one task (GoFile puts them in one folder).
 type MirrorSession struct {
+	// Keys are the user's own host keys (they win over the ones in /bs).
+	Keys         map[string]string
 	goFileToken  string
 	goFileFolder string
 	goFileLink   string
@@ -91,9 +108,9 @@ func UploadToHost(ctx context.Context, hostID, path string, sess *MirrorSession,
 	if !ok {
 		return "", fmt.Errorf("unknown upload host %q", hostID)
 	}
-	key := h.Key(config.Get())
+	key := HostKey(h, sess.Keys)
 	if h.NeedsKey && key == "" {
-		return "", fmt.Errorf("%s needs %s, set it in /bs", h.Name, h.KeyVar)
+		return "", fmt.Errorf("%s needs an API key: set it in /us → Mirror Settings → DDL Servers (or %s in /bs)", h.Name, h.KeyVar)
 	}
 	switch h.ID {
 	case "gofile":

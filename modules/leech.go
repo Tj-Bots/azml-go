@@ -235,7 +235,11 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 
 	if link == "" && !msg.HasMedia && !msg.IsReply && opt.IsMirror {
 		var hosts []string
-		for _, h := range ext.AvailableMirrorHosts() {
+		var userKeys map[string]string
+		if u := m.userMap.Get(msg.UserID); u != nil {
+			userKeys = u.DDLKeys
+		}
+		for _, h := range ext.AvailableMirrorHostsFor(userKeys) {
 			hosts = append(hosts, h.Name)
 		}
 		helpMsg := fmt.Sprintf("㊂ <b><u>Mirror Command Usage :</u></b>\n\n"+
@@ -466,6 +470,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var mirrorLinks []string
 	var fileLinks []string // link to each uploaded file in the dump / log channel
 	mirrorSess := &ext.MirrorSession{}
+	if user != nil {
+		mirrorSess.Keys = user.DDLKeys
+	}
 	modeStr := "#Leech | #Aria2"
 	if ext.IsMagnet(link) || strings.HasSuffix(strings.ToLower(link), ".torrent") {
 		modeStr = "#Leech | #Torrent"

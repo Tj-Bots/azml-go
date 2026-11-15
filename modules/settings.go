@@ -326,7 +326,7 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 	return u.Prefix != "" || u.Suffix != "" || u.Caption != "" ||
 		u.RemnameAuto != "" || u.RemnameRegex != "" || u.SplitSize != 0 ||
-		!u.Autorename || (u.RenameMethod != "" && u.RenameMethod != "auto") ||
+		u.Autorename || (u.RenameMethod != "" && u.RenameMethod != "auto") ||
 		u.AutoThumb || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != ""
@@ -726,7 +726,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.RemnameAuto = ""
 		u.RemnameRegex = ""
 		u.SplitSize = 0
-		u.Autorename = true
+		u.Autorename = false
 		u.RenameMethod = "auto"
 		u.AutoThumb = false
 		u.EqualSplits = false
@@ -1099,6 +1099,48 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		text, btn := m.buildMirrorHostMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 
+	case "ddlservers":
+		text, btn := m.buildDDLServersMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "ddlhost":
+		if len(parts) > 3 {
+			text, btn := m.buildDDLHostMenu(u, parts[3])
+			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		}
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "edit_ddlkey":
+		if len(parts) < 4 {
+			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+			return
+		}
+		h, ok := ext.FindMirrorHost(parts[3])
+		if !ok {
+			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+			return
+		}
+		ext.SetPendingSettingSession(targetUID, "ddlkey_"+h.ID, 0, msgID, 60*time.Second)
+		text, _ := m.buildDDLHostMenu(u, h.ID)
+		btn := telegram.NewButtonMaker()
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d ddlhost %s", u.UserID, h.ID))
+		btn.Row()
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d ddlservers", u.UserID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n"+h.Prompt+"\n<b>Timeout:</b> 60 sec", btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Send the key...", false)
+
+	case "del_ddlkey":
+		if len(parts) > 3 && u.DDLKeys != nil {
+			delete(u.DDLKeys, parts[3])
+			_ = ext.DB.SaveUser(u)
+			text, btn := m.buildDDLHostMenu(u, parts[3])
+			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		}
+		_ = m.sender.AnswerCallback(ctx, queryID, "Key deleted", false)
+
 	case "lexcluded":
 		text, btn := m.buildExcludedMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
@@ -1152,6 +1194,11 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 	}
 	var text string
 	var btn *telegram.ButtonMaker
+	if hostID := strings.TrimPrefix(key, "ddlkey_"); hostID != key {
+		text, btn = m.buildDDLHostMenu(u, hostID)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
+		return
+	}
 	switch key {
 	case "lexcluded":
 		text, btn = m.buildExcludedMenu(u)
@@ -1310,7 +1357,7 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		name = fmt.Sprintf("%d", u.UserID)
 	}
 	var hosts []string
-	for _, h := range ext.AvailableMirrorHosts() {
+	for _, h := range ext.AvailableMirrorHostsFor(u.DDLKeys) {
 		hosts = append(hosts, h.Name)
 	}
 	text := fmt.Sprintf("㊂ <b><u>Mirror Settings for <a href=\"tg://user?id=%d\">%s</a></u></b>\n\n"+
@@ -1325,7 +1372,7 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		btn.IButton("Ask every time", fmt.Sprintf("userset %d sethost none", u.UserID))
 	}
 	btn.Row()
-	for i, h := range ext.AvailableMirrorHosts() {
+	for i, h := range ext.AvailableMirrorHostsFor(u.DDLKeys) {
 		if h.ID == u.MirrorHost {
 			btn.IButtonStyled("✓ "+h.Name, fmt.Sprintf("userset %d sethost %s", u.UserID, h.ID), "success")
 		} else {
@@ -1335,6 +1382,8 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 			btn.Row()
 		}
 	}
+	btn.Row()
+	btn.IButton("DDL Servers", fmt.Sprintf("userset %d ddlservers", u.UserID))
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
@@ -1367,4 +1416,68 @@ func stdMenuButtons(btn *telegram.ButtonMaker, uid int64, name, editAction, delA
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", uid), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", uid), "danger")
 	btn.Row()
+}
+
+// buildDDLServersMenu lists the /mirror hosts; a ✓ marks the ones with the user's own key.
+func (m *SettingsModule) buildDDLServersMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+	var ready []string
+	for _, h := range ext.AvailableMirrorHostsFor(u.DDLKeys) {
+		ready = append(ready, h.Name)
+	}
+	text := fmt.Sprintf("㊂ <b><u>DDL Servers Settings :</u></b>\n\n"+
+		"➲ <b>Ready to use :</b> <i>%s</i>\n\n"+
+		"➲ <b>Description :</b> <i>DDL Servers which uploads your File to their Specific Hosting. Add your own API key to upload to your account.</i>",
+		strings.Join(ready, ", "))
+	btn := telegram.NewButtonMaker()
+	for i, h := range ext.MirrorHosts {
+		label := h.Name
+		if u.DDLKeys[h.ID] != "" {
+			label = "✓ " + h.Name
+		}
+		btn.IButton(label, fmt.Sprintf("userset %d ddlhost %s", u.UserID, h.ID))
+		if i%2 == 1 {
+			btn.Row()
+		}
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+// buildDDLHostMenu is the page of one host: the user's key, Set / Change, ↻ Delete.
+func (m *SettingsModule) buildDDLHostMenu(u *types.UserSettings, hostID string) (string, *telegram.ButtonMaker) {
+	h, ok := ext.FindMirrorHost(hostID)
+	btn := telegram.NewButtonMaker()
+	if !ok {
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d ddlservers", u.UserID), "primary")
+		return "Unknown host", btn
+	}
+	has := u.DDLKeys[h.ID] != ""
+	keyText := "Not Exists"
+	if has {
+		keyText = "Exists"
+	} else if h.Key(config.Get()) != "" {
+		keyText = "Not Exists (the owner's key is used)"
+	} else if !h.NeedsKey {
+		keyText = "Not Exists (Guest upload)"
+	}
+	text := fmt.Sprintf("㊂ <b><u>%s Settings :</u></b>\n\n"+
+		"➲ <b>%s's API Key :</b> <i>%s</i>\n\n"+
+		"➲ <b>Description :</b> <i>%s</i>",
+		h.Name, h.Name, keyText, telegram.EscapeHTML(h.Desc))
+	label := "Set " + h.Name
+	if has {
+		label = "Change " + h.Name
+	}
+	btn.IButton(label, fmt.Sprintf("userset %d edit_ddlkey %s", u.UserID, h.ID))
+	if has {
+		btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ddlkey %s", u.UserID, h.ID))
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d ddlservers", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
 }

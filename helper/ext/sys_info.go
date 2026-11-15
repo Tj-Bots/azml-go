@@ -220,19 +220,19 @@ func RenderBotStats(startTime time.Time) string {
 	appRAM := GetAppMemoryUsageMB()
 
 	return fmt.Sprintf("⌬ <b><i>BOT STATISTICS :</i></b>\n"+
-		"┖ <b>Bot Uptime :</b> %s\n\n"+
-		"┎ <b><i>RAM ( MEMORY ) :</i></b>\n"+
+		"<blockquote>╭ <b>Bot Uptime :</b> %s</blockquote>\n\n"+
+		"<blockquote>╭ <b><i>RAM ( MEMORY ) :</i></b></blockquote>\n"+
 		"┃ %s %.1f%%\n"+
-		"┠ <b>App RAM (AZML-Go) :</b> <code>%.1f MB</code>\n"+
-		"┖ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s\n\n"+
-		"┎ <b><i>SWAP MEMORY :</i></b>\n"+
+		"<blockquote>╭ <b>App RAM (AZML-Go) :</b> <code>%.1f MB</code>\n"+
+		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
+		"<blockquote>╭ <b><i>SWAP MEMORY :</i></b></blockquote>\n"+
 		"┃ %s %.1f%%\n"+
-		"┖ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s\n\n"+
-		"┎ <b><i>DISK :</i></b>\n"+
+		"<blockquote>╭ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
+		"<blockquote>╭ <b><i>DISK :</i></b></blockquote>\n"+
 		"┃ %s %.1f%%\n"+
 		"┃ <b>Total Disk Read :</b> %s\n"+
 		"┃ <b>Total Disk Write :</b> %s\n"+
-		"┖ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s",
+		"<blockquote>╭ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>",
 		botUptime,
 		ramBar, ramPercent,
 		appRAM,
@@ -461,22 +461,22 @@ func RenderSysStats() string {
 	vCores := totalCores - pCores
 
 	return fmt.Sprintf("⌬ <b><i>OS SYSTEM :</i></b>\n"+
-		"┠ <b>OS Uptime :</b> %s\n"+
-		"┠ <b>OS Version :</b> %s\n"+
-		"┖ <b>OS Arch :</b> %s\n\n"+
+		"<blockquote>╭ <b>OS Uptime :</b> %s\n"+
+		"┊ <b>OS Version :</b> %s\n"+
+		"╰ <b>OS Arch :</b> %s</blockquote>\n\n"+
 		"⌬ <b><i>NETWORK STATS :</i></b>\n"+
-		"┠ <b>Upload Data:</b> %s\n"+
-		"┠ <b>Download Data:</b> %s\n"+
-		"┠ <b>Pkts Sent:</b> %sk\n"+
-		"┠ <b>Pkts Received:</b> %sk\n"+
-		"┖ <b>Total I/O Data:</b> %s\n\n"+
-		"┎ <b>CPU :</b>\n"+
+		"<blockquote>╭ <b>Upload Data:</b> %s\n"+
+		"┊ <b>Download Data:</b> %s\n"+
+		"┊ <b>Pkts Sent:</b> %sk\n"+
+		"┊ <b>Pkts Received:</b> %sk\n"+
+		"╰ <b>Total I/O Data:</b> %s</blockquote>\n\n"+
+		"<blockquote>╭ <b>CPU :</b></blockquote>\n"+
 		"┃ %s %.1f%%\n"+
-		"┠ <b>CPU Frequency :</b> %s\n"+
-		"┠ <b>System Avg Load :</b> %s\n"+
-		"┠ <b>P-Core(s) :</b> %d | <b>V-Core(s) :</b> %d\n"+
-		"┠ <b>Total Core(s) :</b> %d\n"+
-		"┖ <b>Usable CPU(s) :</b> %d",
+		"<blockquote>╭ <b>CPU Frequency :</b> %s\n"+
+		"┊ <b>System Avg Load :</b> %s\n"+
+		"┊ <b>P-Core(s) :</b> %d | <b>V-Core(s) :</b> %d\n"+
+		"┊ <b>Total Core(s) :</b> %d\n"+
+		"╰ <b>Usable CPU(s) :</b> %d</blockquote>",
 		osUptime, osVersion, osArch,
 		upData, dlData, pktSent, pktRecv, tlData,
 		cpuBar, cpuUsage,
@@ -509,10 +509,10 @@ func RenderRepoStats() string {
 	remarks := "Up to date!"
 
 	return fmt.Sprintf("⌬ <b><i>REPO STATISTICS :</i></b>\n"+
-		"┠ <b>Bot Updated :</b> %s\n"+
-		"┠ <b>Current Version :</b> %s\n"+
-		"┠ <b>Latest Version :</b> %s\n"+
-		"┖ <b>Last ChangeLog :</b> %s\n\n"+
+		"<blockquote>╭ <b>Bot Updated :</b> %s\n"+
+		"┊ <b>Current Version :</b> %s\n"+
+		"┊ <b>Latest Version :</b> %s\n"+
+		"╰ <b>Last ChangeLog :</b> %s</blockquote>\n\n"+
 		"⌬ <b>REMARKS :</b> <code>%s</code>",
 		lastCommit, botVersion, latVersion, changeLog, remarks)
 }
@@ -585,17 +585,17 @@ func RenderBotLimits() string {
 	}
 
 	return fmt.Sprintf("⌬ <b><i>BOT LIMITATIONS :</i></b>\n"+
-		"┠ <b>Direct Limit :</b> %s GB\n"+
-		"┠ <b>Torrent Limit :</b> %s GB\n"+
-		"┠ <b>YT-DLP Limit :</b> %s GB\n"+
-		"┠ <b>Mega Limit :</b> %s GB\n"+
-		"┠ <b>Archive Limit :</b> %s GB\n"+
-		"┠ <b>Extract Limit :</b> %s GB\n"+
-		"┠ <b>Daily Leech Limit :</b> %s\n"+
-		"┠ <b>Storage Threshold :</b> %s GB\n"+
-		"┖ <b>Leech Limit :</b> %s GB\n\n"+
-		"┎ <b>Token Validity :</b> %s\n"+
-		"┠ <b>User Parallel Tasks :</b> %s\n"+
-		"┖ <b>Bot Parallel Tasks :</b> %s",
+		"<blockquote>╭ <b>Direct Limit :</b> %s GB\n"+
+		"┊ <b>Torrent Limit :</b> %s GB\n"+
+		"┊ <b>YT-DLP Limit :</b> %s GB\n"+
+		"┊ <b>Mega Limit :</b> %s GB\n"+
+		"┊ <b>Archive Limit :</b> %s GB\n"+
+		"┊ <b>Extract Limit :</b> %s GB\n"+
+		"┊ <b>Daily Leech Limit :</b> %s\n"+
+		"┊ <b>Storage Threshold :</b> %s GB\n"+
+		"╰ <b>Leech Limit :</b> %s GB</blockquote>\n\n"+
+		"<blockquote>╭ <b>Token Validity :</b> %s\n"+
+		"┊ <b>User Parallel Tasks :</b> %s\n"+
+		"╰ <b>Bot Parallel Tasks :</b> %s</blockquote>",
 		dl, tl, yl, ml, al, el, daily, st, ll, tv, ut, bt)
 }

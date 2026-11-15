@@ -245,11 +245,11 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-		"┠ <b>Status:</b> %s\n"+
-		"┠ <b>Max Split Size:</b> <code>%s</code>\n"+
-		"┠ <b>Dump Channel:</b> %s\n"+
-		"┠ <b>Session String:</b> <code>%s</code>\n"+
-		"┖ <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code>\n\n"+
+		"<blockquote>╭ <b>Status:</b> %s\n"+
+		"┊ <b>Max Split Size:</b> <code>%s</code>\n"+
+		"┊ <b>Dump Channel:</b> %s\n"+
+		"┊ <b>Session String:</b> <code>%s</code>\n"+
+		"╰ <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code></blockquote>\n\n"+
 		"<i>Supported session string formats: Pyrogram (v1, v2), Pyrofork, Telethon, gotd</i>\n\n"+
 		"<i>Click <b>Set Session String</b> to save/update your user session for 4GB uploads:</i>",
 		telegram.ToSmallCaps("User Session Settings"),
@@ -342,8 +342,8 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 
 	if isBoolVar(key) {
 		text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"┠ <b>Variable:</b> <code>%s</code>\n"+
-			"┖ <b>Current Value:</b> <code>%s</code>\n\n"+
+			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
+			"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Choose a valid value for the above Var:</i>",
 			telegram.ToSmallCaps("Boolean Configuration"), key, v)
 
@@ -358,8 +358,8 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 
 	if editing {
 		text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"┠ <b>Variable:</b> <code>%s</code>\n"+
-			"┖ <b>Current Value:</b> <code>%s</code>\n\n"+
+			"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
+			"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Send a valid value for the above Var in chat.</i> <b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
 			telegram.ToSmallCaps("Edit Variable"), key, v)
@@ -371,8 +371,8 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing boo
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-		"┠ <b>Variable:</b> <code>%s</code>\n"+
-		"┖ <b>Current Value:</b> <code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Variable:</b> <code>%s</code>\n"+
+		"╰ <b>Current Value:</b> <code>%s</code></blockquote>\n\n"+
 		"<i>Click <b>Edit Value</b> to update this setting directly:</i>",
 		telegram.ToSmallCaps("Variable Details"), key, v)
 
@@ -521,11 +521,11 @@ func (m *BotSettingsModule) buildAriaMenu() (string, *telegram.ButtonMaker) {
 func (m *BotSettingsModule) buildPrivateMenu() (string, *telegram.ButtonMaker) {
 	text := fmt.Sprintf("⌬ <b><u>%s:</u></b>\n\n"+
 		"<i>Send any of these private files as a document directly to the bot:</i>\n\n"+
-		"┠ <code>token.pickle</code> — Google Drive OAuth token (automatically loaded)\n"+
-		"┠ <code>config.env</code> — Bot environment variables (auto reloaded)\n"+
-		"┠ <code>cookies.txt</code> — Netscape cookies for yt-dlp & aria2c\n"+
-		"┠ <code>shorteners.txt</code> — Multi-shortener routing file (auto reloaded)\n"+
-		"┖ <code>accounts.zip</code> — Service accounts archive\n\n"+
+		"<blockquote>╭ <code>token.pickle</code> — Google Drive OAuth token (automatically loaded)\n"+
+		"┊ <code>config.env</code> — Bot environment variables (auto reloaded)\n"+
+		"┊ <code>cookies.txt</code> — Netscape cookies for yt-dlp & aria2c\n"+
+		"┊ <code>shorteners.txt</code> — Multi-shortener routing file (auto reloaded)\n"+
+		"╰ <code>accounts.zip</code> — Service accounts archive</blockquote>\n\n"+
 		"<b>Automatic Processing:</b>\n"+
 		"When you share <code>token.pickle</code> or <code>shorteners.txt</code> to the bot, they are automatically saved and reloaded immediately.",
 		telegram.ToSmallCaps("Private Files"))
@@ -723,7 +723,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		}
 		ext.SetPendingBotSettingSession(fromUID, "SHORTENER", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"┠ <b>Current Domain:</b> <code>%s</code>\n\n"+
+			"<blockquote>╭ <b>Current Domain:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Send the shortener domain (e.g. <code>droplink.co</code> or <code>https://api.shareus.io/short?api=%%s&url=%%s</code>).</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
@@ -740,7 +740,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		cur := maskAPI(cfg.ShortenerAPI)
 		ext.SetPendingBotSettingSession(fromUID, "SHORTENER_API", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"┠ <b>Current API Key:</b> <code>%s</code>\n\n"+
+			"<blockquote>╭ <b>Current API Key:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Send your shortener API key in chat.</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
@@ -757,7 +757,7 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		cur := ext.GetReadableTime(cfg.TokenTimeout)
 		ext.SetPendingBotSettingSession(fromUID, "TOKEN_TIMEOUT", 0, msgID, -1, 60*time.Second)
 		promptText := fmt.Sprintf("⌬ <b><u>%s</u> :</b>\n\n"+
-			"┠ <b>Current Validity:</b> <code>%s</code>\n\n"+
+			"<blockquote>╭ <b>Current Validity:</b> <code>%s</code></blockquote>\n\n"+
 			"<i>Send custom validity duration in seconds (e.g. <code>86400</code>) or with suffix (e.g. <code>24h</code>, <code>12h</code>, <code>2d</code>).</i>\n"+
 			"<b>Timeout:</b> 60 sec\n"+
 			"<i>Send /cancel to abort.</i>",
@@ -795,10 +795,10 @@ func (m *BotSettingsModule) buildShortenerMenu() (string, *telegram.ButtonMaker)
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
-		"┎ <b>Shortener Access :</b> <code>%s</code>\n"+
-		"┠ <b>Token Validity :</b> <code>%s</code>\n"+
-		"┠ <b>Default Domain :</b> <code>%s</code>\n"+
-		"┖ <b>Default API Key :</b> <code>%s</code>\n\n",
+		"<blockquote>╭ <b>Shortener Access :</b> <code>%s</code>\n"+
+		"┊ <b>Token Validity :</b> <code>%s</code>\n"+
+		"┊ <b>Default Domain :</b> <code>%s</code>\n"+
+		"╰ <b>Default API Key :</b> <code>%s</code></blockquote>\n\n",
 		telegram.ToSmallCaps("Shortener Settings"), stEmoji, valStr, shDomain, shAPI))
 
 	if shrtsCount > 0 {

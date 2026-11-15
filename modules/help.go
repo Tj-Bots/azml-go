@@ -47,20 +47,20 @@ func (m *HelpModule) getHelpGuideText() string {
 	cfg := config.Get()
 	sfx := cfg.CmdSuffix
 	return fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
-		"┎ <b>Leech & Mirror:</b>\n"+
-		"┠ <code>/leech%s [link]</code> — Direct, Magnet, Torrent, Mega, TG media\n"+
-		"┠ <code>/zipleech%s [link]</code> — Zip contents before uploading\n"+
-		"┠ <code>/unzipleech%s [link]</code> — Extract zip/rar/7z archives\n"+
-		"┖ <code>/ytdl%s [link]</code> — Download video/audio via yt-dlp\n\n"+
-		"┎ <b>User Configuration:</b>\n"+
-		"┠ <code>/us%s</code> — User settings (Prefix, Suffix, Caption, AutoRename)\n"+
-		"┠ <code>/ar%s [template]</code> — Quick AutoRename template set/clear\n"+
-		"┠ <code>/setthumb%s</code> (reply) — Set custom leech thumbnail\n"+
-		"┖ <code>/status%s</code> — Live download & upload speed and progress\n\n"+
-		"┎ <b>Admin & Control:</b>\n"+
-		"┠ <code>/bs%s</code> — Bot Settings (Config vars, Aria2c, Private files)\n"+
-		"┠ <code>/cancel%s [GID]</code> — Cancel specific task\n"+
-		"┖ <code>/cancelall%s</code> — Cancel all your active tasks\n\n"+
+		"<blockquote>╭ <b>Leech & Mirror:</b>\n"+
+		"┊ <code>/leech%s [link]</code> — Direct, Magnet, Torrent, Mega, TG media\n"+
+		"┊ <code>/zipleech%s [link]</code> — Zip contents before uploading\n"+
+		"┊ <code>/unzipleech%s [link]</code> — Extract zip/rar/7z archives\n"+
+		"╰ <code>/ytdl%s [link]</code> — Download video/audio via yt-dlp</blockquote>\n\n"+
+		"<blockquote>╭ <b>User Configuration:</b>\n"+
+		"┊ <code>/us%s</code> — User settings (Prefix, Suffix, Caption, AutoRename)\n"+
+		"┊ <code>/ar%s [template]</code> — Quick AutoRename template set/clear\n"+
+		"┊ <code>/setthumb%s</code> (reply) — Set custom leech thumbnail\n"+
+		"╰ <code>/status%s</code> — Live download & upload speed and progress</blockquote>\n\n"+
+		"<blockquote>╭ <b>Admin & Control:</b>\n"+
+		"┊ <code>/bs%s</code> — Bot Settings (Config vars, Aria2c, Private files)\n"+
+		"┊ <code>/cancel%s [GID]</code> — Cancel specific task\n"+
+		"╰ <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>\n\n"+
 		"<i>Click Back below to return to start menu.</i>",
 		telegram.ToSmallCaps("AZML-Go Commands Guide"),
 		sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx)

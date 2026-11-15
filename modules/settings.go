@@ -407,22 +407,22 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 
 	// Exact AZML text format with small caps header
 	text := fmt.Sprintf("⌬ <b><u>%s :</u></b> %s\n\n"+
-		"┎ <b>Daily Leech :</b> <code>%s</code> per day\n"+
-		"┠ <b>Leech Type :</b> <i>%s</i>\n"+
-		"┠ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
-		"┠ <b>Leech Split Size :</b> <code>%s</code>\n"+
-		"┠ <b>Equal Splits :</b> <i>%s</i>\n"+
-		"┠ <b>Media Group :</b> <i>%s</i>\n"+
-		"┠ <b>Leech Caption :</b> <code>%s</code>\n"+
-		"┠ <b>Leech Prefix :</b> <code>%s</code>\n"+
-		"┠ <b>Leech Suffix :</b> <code>%s</code>\n"+
-		"┠ <b>Leech Dumps :</b> <code>%s</code>\n"+
-		"┠ <b>AutoRename Template :</b> <code>%s</code>\n"+
-		"┠ <b>Regex Remname :</b> <code>%s</code>\n"+
-		"┠ <b>Rename Method :</b> <i>%s</i>\n"+
-		"┠ <b>AutoRename :</b> <i>%s</i>\n"+
-		"┠ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
-		"┖ <b>Leech Metadata :</b> <code>%s</code>",
+		"<blockquote>╭ <b>Daily Leech :</b> <code>%s</code> per day\n"+
+		"┊ <b>Leech Type :</b> <i>%s</i>\n"+
+		"┊ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
+		"┊ <b>Leech Split Size :</b> <code>%s</code>\n"+
+		"┊ <b>Equal Splits :</b> <i>%s</i>\n"+
+		"┊ <b>Media Group :</b> <i>%s</i>\n"+
+		"┊ <b>Leech Caption :</b> <code>%s</code>\n"+
+		"┊ <b>Leech Prefix :</b> <code>%s</code>\n"+
+		"┊ <b>Leech Suffix :</b> <code>%s</code>\n"+
+		"┊ <b>Leech Dumps :</b> <code>%s</code>\n"+
+		"┊ <b>AutoRename Template :</b> <code>%s</code>\n"+
+		"┊ <b>Regex Remname :</b> <code>%s</code>\n"+
+		"┊ <b>Rename Method :</b> <i>%s</i>\n"+
+		"┊ <b>AutoRename :</b> <i>%s</i>\n"+
+		"┊ <b>Auto Thumbnail :</b> <i>%s</i>\n"+
+		"╰ <b>Leech Metadata :</b> <code>%s</code></blockquote>",
 		telegram.ToSmallCaps("Leech Settings"),
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
 		caption, prefix, suffix, dumps, remnameAuto, remnameRegex, renameMethod,
@@ -504,8 +504,8 @@ func (m *SettingsModule) buildThumbnailMenu(u *types.UserSettings, banner ...str
 	}
 
 	text := fmt.Sprintf("%s⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Status:</b> <code>%s</code>\n"+
-		"┖ <b>Stored File:</b> <code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Status:</b> <code>%s</code>\n"+
+		"╰ <b>Stored File:</b> <code>%s</code></blockquote>\n\n"+
 		"<i>Custom thumbnail will be embedded into your leeched media files.</i>\n\n"+
 		"• Click <b>Change Thumbnail</b> to activate photo listener.\n"+
 		"• Alternatively reply to a photo with <code>/us thumb</code>.",
@@ -546,9 +546,9 @@ func (m *SettingsModule) buildSplitSizeMenu(u *types.UserSettings) (string, *tel
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Current Split Size:</b> <code>%s</code>\n"+
-		"┠ <b>Equal Splits:</b> <i>%s</i>\n"+
-		"┖ <b>Media Group:</b> <i>%s</i>\n\n"+
+		"<blockquote>╭ <b>Current Split Size:</b> <code>%s</code>\n"+
+		"┊ <b>Equal Splits:</b> <i>%s</i>\n"+
+		"╰ <b>Media Group:</b> <i>%s</i></blockquote>\n\n"+
 		"<i>Files larger than this limit will be automatically split before uploading.</i>",
 		telegram.ToSmallCaps("Leech Split Settings"), splitSize, eqStatus, mgStatus)
 
@@ -590,7 +590,7 @@ func (m *SettingsModule) buildCaptionMenu(u *types.UserSettings) (string, *teleg
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Current Caption:</b>\n<code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Current Caption:</b>\n<code>%s</code></blockquote>\n\n"+
 		"➲ <b>Supported Format Tags:</b>\n"+
 		"• <code>{filename}</code> - Original or renamed filename\n"+
 		"• <code>{size}</code> - File size (e.g. 1.25 GB)\n"+
@@ -623,7 +623,7 @@ func (m *SettingsModule) buildPrefixMenu(u *types.UserSettings) (string, *telegr
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Current Prefix:</b> <code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Current Prefix:</b> <code>%s</code></blockquote>\n\n"+
 		"➲ <b>Description:</b> <i>Text prepended to the start of all your leeched filenames.</i>\n\n"+
 		"<b>Example:</b> <code>[AZML] </code>",
 		telegram.ToSmallCaps("Leech Prefix Settings"), prefix)
@@ -651,7 +651,7 @@ func (m *SettingsModule) buildSuffixMenu(u *types.UserSettings) (string, *telegr
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Current Suffix:</b> <code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Current Suffix:</b> <code>%s</code></blockquote>\n\n"+
 		"➲ <b>Description:</b> <i>Text appended before extension in all your leeched filenames.</i>\n\n"+
 		"<b>Example:</b> <code> @MyChannel</code>",
 		telegram.ToSmallCaps("Leech Suffix Settings"), suffix)
@@ -679,7 +679,7 @@ func (m *SettingsModule) buildAutoRenameMenu(u *types.UserSettings) (string, *te
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Current Template:</b>\n<code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Current Template:</b>\n<code>%s</code></blockquote>\n\n"+
 		"➲ <b>Supported Tags:</b>\n"+
 		"• <code>{title}</code> - Media or anime title\n"+
 		"• <code>{season}</code> - Season number (e.g. 01)\n"+
@@ -711,7 +711,7 @@ func (m *SettingsModule) buildRegexMenu(u *types.UserSettings) (string, *telegra
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Current Regex:</b>\n<code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Current Regex:</b>\n<code>%s</code></blockquote>\n\n"+
 		"➲ <b>Format:</b> <code>search_regex:replacement</code>\n"+
 		"<b>Example:</b> <code>\\[TG\\]:</code> (removes [TG] from filenames)",
 		telegram.ToSmallCaps("Regex Remname Settings"), regexVal)
@@ -739,7 +739,7 @@ func (m *SettingsModule) buildDumpMenu(u *types.UserSettings) (string, *telegram
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Dump Channel ID:</b> <code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Dump Channel ID:</b> <code>%s</code></blockquote>\n\n"+
 		"➲ <b>Description:</b> <i>Leeched files will be forwarded to your personal dump channel.</i>\n\n"+
 		"<b>Note:</b> Make sure the bot is an <b>Administrator</b> in your channel!",
 		telegram.ToSmallCaps("Leech Dump Channel Settings"), dumpStr)
@@ -767,7 +767,7 @@ func (m *SettingsModule) buildMetadataMenu(u *types.UserSettings) (string, *tele
 	}
 
 	text := fmt.Sprintf("⌬ <b><u>%s</u></b>\n\n"+
-		"┠ <b>Metadata Text:</b> <code>%s</code>\n\n"+
+		"<blockquote>╭ <b>Metadata Text:</b> <code>%s</code></blockquote>\n\n"+
 		"➲ <b>Description:</b> <i>Metadata title and author encoded directly into video streams via FFmpeg.</i>\n\n"+
 		"<b>Example:</b> <code>Encoded by TBX TEAM</code>",
 		telegram.ToSmallCaps("Leech Video Metadata Settings"), metaAll)

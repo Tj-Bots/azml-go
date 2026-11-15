@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"strconv"
 	"strings"
@@ -1187,7 +1188,9 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 
 	case "del_ddlkey":
 		if len(parts) > 3 && u.DDLKeys != nil {
-			delete(u.DDLKeys, parts[3])
+			keys := maps.Clone(u.DDLKeys)
+			delete(keys, parts[3])
+			u.DDLKeys = keys
 			_ = ext.DB.SaveUser(u)
 			text, btn := m.buildDDLHostMenu(u, parts[3])
 			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)

@@ -282,12 +282,14 @@ var (
 )
 
 // telegraphAPIs: graph.org first like the Python bot, telegra.ph (same API) when it is not reachable.
+var telegraphClient = &http.Client{Timeout: 20 * time.Second}
+
 var telegraphAPIs = []string{"https://api.graph.org", "https://api.telegra.ph"}
 
 func telegraphCall(method string, form url.Values) (json.RawMessage, string, error) {
 	var lastErr error
 	for _, api := range telegraphAPIs {
-		resp, err := http.PostForm(api+"/"+method, form)
+		resp, err := telegraphClient.PostForm(api+"/"+method, form)
 		if err != nil {
 			lastErr = err
 			continue

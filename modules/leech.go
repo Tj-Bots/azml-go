@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"maps"
 	"sync"
 	"context"
 	"errors"
@@ -65,6 +66,7 @@ func (m *LeechModule) SetDumpChatID(dumpChatID int64) {
 }
 
 func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, isZip, isUnzip bool) {
+	msg.IsZip, msg.IsUnzip = isZip, isUnzip // kept for the Retry button
 	cfg := config.Get()
 
 	// Access control & token check
@@ -472,7 +474,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var fileLinks []string // link to each uploaded file in the dump / log channel
 	mirrorSess := &ext.MirrorSession{}
 	if user != nil {
-		mirrorSess.Keys = user.DDLKeys
+		mirrorSess.Keys = maps.Clone(user.DDLKeys)
 	}
 	modeStr := "#Leech | #Aria2"
 	if ext.IsMagnet(link) || strings.HasSuffix(strings.ToLower(link), ".torrent") {
@@ -1389,7 +1391,12 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 
 			upOpt.Result = &partResults[idx]
-			upOpt.Buttons = fileButtons
+			if useGroup {
+				partCaption = upOpt.Caption + captionLinks(fileButtons)
+				upOpt.Caption = partCaption
+			} else {
+				upOpt.Buttons = fileButtons
+			}
 			lastUpOpt = upOpt
 			if useGroup {
 				upOpt.SkipDelivery = true
@@ -1923,10 +1930,7 @@ func (m *LeechModule) HandleRetryCallback(ctx context.Context, peer tg.InputPeer
 	}
 	_ = m.sender.AnswerCallback(ctx, queryID, "Retrying...", false)
 	_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
-	lower := strings.ToLower(entry.msg.Text)
-	isUnzip := strings.Contains(lower, "unzip")
-	isZip := strings.Contains(lower, "zip") && !isUnzip
-	go m.HandleLeech(context.Background(), peer, entry.msg, isZip, isUnzip)
+	go m.HandleLeech(context.Background(), peer, entry.msg, entry.msg.IsZip, entry.msg.IsUnzip)
 }
 
 func addHistory(u *types.UserSettings, e types.HistoryEntry) {
@@ -1954,4 +1958,23 @@ func (m *LeechModule) HandleHistory(ctx context.Context, peer tg.InputPeerClass,
 		sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>%d.</b> %s\n╰ %s | %s | %s</blockquote>\n", i+1, name, ext.GetReadableFileSize(h.Size), telegram.EscapeHTML(h.Mode), when))
 	}
 	_, _ = m.sender.SendMessage(ctx, peer, sb.String(), msg.MessageID, telegram.CloseMarkup(msg.UserID))
+}
+
+// captionLinks: the button links as caption text (for albums, which can't have buttons).
+func captionLinks(btn *telegram.ButtonMaker) string {
+	if btn == nil {
+		return ""
+	}
+	var out []string
+	for _, row := range btn.Rows(1) {
+		for _, b := range row {
+			if b.URL != "" {
+				out = append(out, fmt.Sprintf("<a href=\"%s\">%s</a>", b.URL, b.Text))
+			}
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	return "\n\n◈ " + strings.Join(out, " | ")
 }

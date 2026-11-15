@@ -101,12 +101,7 @@ func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, 
 		logChat = cfg.LeechLogID
 	}
 
-	for start := 0; start < len(parts); start += 10 {
-		end := start + 10
-		if end > len(parts) {
-			end = len(parts)
-		}
-		chunk := parts[start:end]
+	for start, chunk := range albumChunks(parts) {
 		destChat := chunk[0].ChatID
 		ids := make([]int, 0, len(chunk))
 		for _, p := range chunk {
@@ -193,4 +188,18 @@ func (u *TelegramUploader) makeAlbum(ctx context.Context, destChat int64, chunk 
 		return nil
 	}
 	return sentMessageIDs(res)
+}
+
+// albumChunks: albums only from consecutive parts in the same chat, up to 10 each.
+func albumChunks(parts []UploadResult) [][]UploadResult {
+	var chunks [][]UploadResult
+	for _, p := range parts {
+		last := len(chunks) - 1
+		if last >= 0 && len(chunks[last]) < 10 && chunks[last][0].ChatID == p.ChatID {
+			chunks[last] = append(chunks[last], p)
+			continue
+		}
+		chunks = append(chunks, []UploadResult{p})
+	}
+	return chunks
 }

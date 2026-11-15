@@ -99,9 +99,6 @@ func main() {
 	ext.CleanDownloadsDir()
 	ext.StartPeriodicStorageCleaner()
 
-	// Initialize commands with CMD_SUFFIX
-	telegram.InitCommands()
-
 	// Initialize Database (MongoDB or local JSON fallback)
 	ext.InitDB()
 	if db := ext.GetDB(); db != nil {
@@ -125,6 +122,9 @@ func main() {
 			_ = db.SaveBotSetting("UPSTREAM_BRANCH", "main")
 		}
 	}
+	// Initialize commands with CMD_SUFFIX (after the settings from the database)
+	telegram.InitCommands()
+
 	config.SetOnConfigVarUpdated(func(key, val string) {
 		if db := ext.GetDB(); db != nil {
 			if err := db.SaveBotSetting(key, val); err != nil {

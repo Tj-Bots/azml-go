@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1672,10 +1673,12 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 	default:
 		// ddlkey_<host>: the user's own API key of a /mirror host
 		if hostID := strings.TrimPrefix(key, "ddlkey_"); hostID != key {
-			if u.DDLKeys == nil {
-				u.DDLKeys = map[string]string{}
+			keys := maps.Clone(u.DDLKeys) // a new map: running tasks may be reading the old one
+			if keys == nil {
+				keys = map[string]string{}
 			}
-			u.DDLKeys[hostID] = val
+			keys[hostID] = val
+			u.DDLKeys = keys
 			fieldName = "API Key"
 			val = "Saved"
 		}

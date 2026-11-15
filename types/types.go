@@ -125,6 +125,8 @@ type LeechOptions struct {
 }
 
 type MessageContext struct {
+	IsZip       bool
+	IsUnzip     bool
 	IsMirror    bool
 	MirrorHost  string
 	ChatID      int64

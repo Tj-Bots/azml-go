@@ -281,6 +281,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 		}
 		b.userClient = nil
 		b.userRawAPI = nil
+		telegram.SetActiveTD(b.client, nil)
 		if b.uploader != nil {
 			b.uploader.SetUserClient(nil)
 		}
@@ -351,6 +352,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 		b.userCancel = uCancel
 		b.userClient = newUserClient
 		b.userRawAPI = newUserClient.API()
+		telegram.SetActiveTD(b.client, newUserClient)
 
 		uname := res.user.Username
 		if uname == "" {
@@ -978,6 +980,7 @@ func (b *BotApp) Start(ctx context.Context) error {
 			}
 		}
 
+		telegram.SetActiveTD(b.client, telegram.ActiveUserTD())
 		botSelf, _ := b.client.Self(ctx)
 		if botSelf != nil {
 			b.botUsername = botSelf.Username

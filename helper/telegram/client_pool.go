@@ -151,3 +151,32 @@ func ActiveUserPool() []*tg.Client {
 	defer activePoolMu.RUnlock()
 	return append([]*tg.Client(nil), activePoolClients...)
 }
+
+var (
+	activeTDMu   sync.RWMutex
+	activeUserTD *telegram.Client
+	activeBotTD  *telegram.Client
+)
+
+// SetActiveTD keeps the running clients so downloads can open connections on the file's DC.
+func SetActiveTD(bot, user *telegram.Client) {
+	activeTDMu.Lock()
+	if bot != nil {
+		activeBotTD = bot
+	}
+	activeUserTD = user
+	activeTDMu.Unlock()
+}
+
+// ActiveUserTD / ActiveBotTD return the running clients (nil when not running).
+func ActiveUserTD() *telegram.Client {
+	activeTDMu.RLock()
+	defer activeTDMu.RUnlock()
+	return activeUserTD
+}
+
+func ActiveBotTD() *telegram.Client {
+	activeTDMu.RLock()
+	defer activeTDMu.RUnlock()
+	return activeBotTD
+}

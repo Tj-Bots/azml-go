@@ -1,16 +1,17 @@
 package modules
 
 import (
-	"maps"
-	"sync"
 	"context"
 	"errors"
 	"fmt"
+	td "github.com/gotd/td/telegram"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"azml-go/config"
@@ -639,6 +640,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 						// the bot's own file location: only the bot account can use it
 						downloadClient := m.rawAPI
 						chunkDL := downloader.NewTelegramChunkDownloader(downloadClient)
+						if dcClients, closeFn := dcDownloadClients(ctx, telegram.ActiveBotTD(), doc.DCID); len(dcClients) > 0 {
+							defer closeFn()
+							log.Printf("[LEECH] Bot download on DC%d with %d connections", doc.DCID, dcPoolSize)
+							chunkDL = downloader.NewTelegramChunkDownloaderPool(dcClients)
+						}
 						loc := doc.AsInputDocumentFileLocation("")
 						if loc != nil {
 							refreshRef := func() ([]byte, error) {
@@ -1376,19 +1382,19 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			botPM := cfg.BotPM || (user != nil && user.BotPM) || (msg.ChatID != msg.UserID)
 
 			upOpt := uploader.UploadOptions{
-				FilePath:   part,
-				FileName:   filepath.Base(part),
-				Caption:    partCaption,
-				ThumbPath:  thumbPath,
-				CoverPath:  coverPath,
-				AsDoc:      asDoc,
+				FilePath:       part,
+				FileName:       filepath.Base(part),
+				Caption:        partCaption,
+				ThumbPath:      thumbPath,
+				CoverPath:      coverPath,
+				AsDoc:          asDoc,
 				DumpChatID:     dumpID,
 				LogChatID:      cfg.LeechLogID,
 				UserID:         msg.UserID,
 				UserAccessHash: telegram.GetUserAccessHash(msg.UserID),
 				BotPM:          botPM,
-				IsPremium:  isPremium,
-				GID:        taskUID,
+				IsPremium:      isPremium,
+				GID:            taskUID,
 				OnProgress: func(curr, total int64, speed float64, eta string) {
 					if speed > maxULSpeed {
 						maxULSpeed = speed
@@ -1871,6 +1877,23 @@ func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeer
 	if err != nil {
 		return err
 	}
+	// fastest: a multi-connection pool opened right on the DC that holds the file
+	if dcClients, closeFn := dcDownloadClients(ctx, telegram.ActiveUserTD(), doc.DCID); len(dcClients) > 0 {
+		defer closeFn()
+		log.Printf("[LEECH] User session download on DC%d with %d connections", doc.DCID, dcPoolSize)
+		dl := downloader.NewTelegramChunkDownloaderPool(dcClients)
+		err := dl.DownloadToFile(ctx, doc.AsInputDocumentFileLocation(""), size, destPath, onProgress, func() ([]byte, error) {
+			d, err := fetchDoc()
+			if err != nil {
+				return nil, err
+			}
+			return d.FileReference, nil
+		})
+		if err == nil {
+			return nil
+		}
+		log.Printf("[LEECH] DC pool download failed (%v), trying the user session pool", err)
+	}
 	clients := []*tg.Client{m.userRawAPI}
 	for _, c := range telegram.ActiveUserPool() {
 		if c != m.userRawAPI {
@@ -1992,4 +2015,26 @@ func captionLinks(btn *telegram.ButtonMaker) string {
 func setStep(t *ext.UnifiedTask, step string) {
 	t.SetStatus(types.StatusProcessing, step)
 	t.SetProgress(t.DownloadedBytes(), t.Size(), 0, "-")
+}
+
+// dcPoolSize is how many connections are opened on the file's DC.
+const dcPoolSize = 8
+
+// dcDownloadClients opens a pool of connections on the DC of a file (nil when it can't).
+// Every worker of the downloader uses it, the pool spreads the requests over the connections.
+func dcDownloadClients(ctx context.Context, client *td.Client, dc int) ([]*tg.Client, func()) {
+	if client == nil || dc <= 0 {
+		return nil, func() {}
+	}
+	inv, err := client.DC(ctx, dc, dcPoolSize)
+	if err != nil {
+		log.Printf("[LEECH] Could not open connections on DC%d: %v", dc, err)
+		return nil, func() {}
+	}
+	api := tg.NewClient(inv)
+	clients := make([]*tg.Client, dcPoolSize)
+	for i := range clients {
+		clients[i] = api
+	}
+	return clients, func() { _ = inv.Close() }
 }

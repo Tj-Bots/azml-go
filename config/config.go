@@ -230,7 +230,7 @@ func LoadConfig(path string) (*Config, error) {
 		BotTheme:                  getEnv("BOT_THEME", "minimal"),
 		ShowExtraCmds:             getEnvBool("SHOW_EXTRA_CMDS", true),
 		Timezone:                  getEnv("TIMEZONE", "Asia/Jerusalem"),
-		EnableFFmpegCmds:          getEnvBool("ENABLE_FFMPEG_CMDS", true),
+		EnableFFmpegCmds:          !getEnvBool("DISABLE_FF_MODE", !getEnvBool("ENABLE_FFMPEG_CMDS", true)),
 		FFmpegEncoding:            getEnvBool("FFMPEG_ENCODING", false),
 		TMDBAccessToken:           getEnv("TMDB_ACCESS_TOKEN", ""),
 		AutoThumbnail:             getEnvBool("AUTO_THUMBNAIL", false),
@@ -498,6 +498,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.ScreenshotsMode = val == "true" || val == "1"
 	case "DISABLE_TORRENTS":
 		GlobalConfig.DisableTorrents = val == "true" || val == "1"
+	case "DISABLE_FF_MODE": // name of our Python bot: True = -ff blocked
+		GlobalConfig.EnableFFmpegCmds = !(val == "true" || val == "1")
 	case "ENABLE_FFMPEG_CMDS":
 		GlobalConfig.EnableFFmpegCmds = val == "true" || val == "1"
 	case "FFMPEG_ENCODING":
@@ -631,7 +633,7 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
-		"ENABLE_FFMPEG_CMDS":           strconv.FormatBool(GlobalConfig.EnableFFmpegCmds),
+		"DISABLE_FF_MODE":              strconv.FormatBool(!GlobalConfig.EnableFFmpegCmds),
 		"CAP_FONT":                     GlobalConfig.CapFont,
 		"REAL_DEBRID_API":              GlobalConfig.RealDebridAPI,
 		"DEBRID_LINK_API":              GlobalConfig.DebridLinkAPI,

@@ -2,6 +2,7 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"DISABLE_FF_MODE":              "Disable FFmpeg Cmds (-ff) for all users. When True the option is hidden from User Settings. Default is False. Bool",
 	"REAL_DEBRID_API":              "real-debrid.com API token: the same for the hosters Real-Debrid supports (used when DEBRID_LINK_API is not set or fails). Str",
 	"DEBRID_LINK_API":              "debrid-link.com API key: links of 360+ hosters (Mega, 1fichier, Rapidgator, Uptobox ...) are downloaded through debrid-link, fast and without the host's limits. Str",
 	"SAFE_MODE":                    "Hide the file names and the source link in the leech log and the finish message (only the file links stay). Default is False. Bool",
@@ -78,7 +79,6 @@ var varDescriptions = map[string]string{
 	"AUTHOR_URL":                   "Author URL for Telegraph page, Put Channel URL to Show Join Channel. Str",
 	"SHOW_EXTRA_CMDS":              "Add Extra Commands beside Arg Format for -z or -e. <b>COMMANDS: </b> /unzipxxx or /zipxxx or /uzx or /zx",
 	"TIMEZONE":                     "Set your Preferred Time Zone for Restart Message. Get yours at <a href=\"http://www.timezoneconverter.com/cgi-bin/findzone.tzc\">Here</a> Str",
-	"ENABLE_FFMPEG_CMDS":           "Allow FFmpeg Cmds: the -ff flag and FFmpeg Cmds in /us → Universal. False = blocked for everyone and hidden from /us. Default is True. Bool",
 	"FFMPEG_ENCODING":              "Allow re-encoding with FFmpeg (heavy on CPU/RAM). Default is False. Bool",
 	"TMDB_ACCESS_TOKEN":            "TMDB API Key or Read Access Token, used for Auto Thumbnail (movie/series poster) in User Settings. Get it from https://www.themoviedb.org/settings/api",
 	"DDL_API":                      "API URL of a Telegram direct-download service, used to get a direct link for t.me files before downloading them. Str",

@@ -22,6 +22,7 @@ type DatabaseManager struct {
 	usersCol          *mongo.Collection
 	settingsCol       *mongo.Collection
 	peersCol          *mongo.Collection
+	tasksCol          *mongo.Collection
 	isMongo           bool
 	localFile         string
 	localSettingsFile string
@@ -57,6 +58,7 @@ func InitDB() *DatabaseManager {
 				mgr.usersCol = client.Database(name).Collection("users")
 				mgr.settingsCol = client.Database(name).Collection("settings")
 				mgr.peersCol = client.Database(name).Collection("peers")
+				mgr.tasksCol = client.Database(name).Collection("tasks")
 				mgr.isMongo = true
 				log.Printf("[DB] Connected to MongoDB successfully (database %s)", name)
 			} else {
@@ -358,4 +360,56 @@ func databaseName(ctx context.Context, client *mongo.Client, botToken string) st
 	_, _ = col.UpdateOne(ctx, bson.M{"_id": "_OWNER_BOT_ID"},
 		bson.M{"$set": bson.M{"value": botID}}, options.Update().SetUpsert(true))
 	return "azml"
+}
+
+// ---- running tasks (INCOMPLETE_TASK_NOTIFIER): saved at start, removed at the end ----
+
+type RunningTask struct {
+	ID        string `bson:"_id"`
+	ChatID    int64  `bson:"chat_id"`
+	MessageID int    `bson:"message_id"`
+	UserID    int64  `bson:"user_id"`
+	User      string `bson:"user"`
+	Name      string `bson:"name"`
+}
+
+func (d *DatabaseManager) SaveRunningTask(t RunningTask) {
+	if d == nil || !d.isMongo || d.tasksCol == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, _ = d.tasksCol.UpdateOne(ctx, bson.M{"_id": t.ID}, bson.M{"$set": t}, options.Update().SetUpsert(true))
+}
+
+func (d *DatabaseManager) RemoveRunningTask(id string) {
+	if d == nil || !d.isMongo || d.tasksCol == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, _ = d.tasksCol.DeleteOne(ctx, bson.M{"_id": id})
+}
+
+// TakeRunningTasks returns the tasks left from before the restart and clears them.
+func (d *DatabaseManager) TakeRunningTasks() []RunningTask {
+	if d == nil || !d.isMongo || d.tasksCol == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cur, err := d.tasksCol.Find(ctx, bson.M{})
+	if err != nil {
+		return nil
+	}
+	defer cur.Close(ctx)
+	var out []RunningTask
+	for cur.Next(ctx) {
+		var t RunningTask
+		if cur.Decode(&t) == nil {
+			out = append(out, t)
+		}
+	}
+	_, _ = d.tasksCol.DeleteMany(ctx, bson.M{})
+	return out
 }

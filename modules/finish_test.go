@@ -32,3 +32,23 @@ func TestFinishFileList(t *testing.T) {
 		t.Fatalf("too long: %d", utf8.RuneCountInString(plain))
 	}
 }
+
+func TestStoreLink(t *testing.T) {
+	telegram.CurrentBotUsername = "TestBot"
+	l := storeLink(-1002472959232, 345)
+	arg := strings.TrimPrefix(l, "https://t.me/TestBot?start=")
+	if len(arg) > 64 {
+		t.Fatal("start payload too long")
+	}
+	c, m, ok := parseStoreArg(arg)
+	if !ok || c != -1002472959232 || m != 345 {
+		t.Fatalf("%d %d %v", c, m, ok)
+	}
+	if c2, m2, ok := parseChannelLink("https://t.me/c/2472959232/345"); !ok || c2 != -1002472959232 || m2 != 345 {
+		t.Fatalf("channel link %d %d", c2, m2)
+	}
+	out := finishFileList(withStoreLinks([]string{"a.mkv"}, []string{"https://t.me/c/2472959232/345"}), []string{"https://t.me/c/2472959232/345"})
+	if !strings.Contains(out, ">Store</a>") || strings.Contains(out, "\x00") {
+		t.Fatalf("%s", out)
+	}
+}

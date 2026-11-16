@@ -86,6 +86,9 @@ func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, ms
 	tokens := strings.Fields(msg.Text)
 	if len(tokens) > 1 {
 		tokenArg := tokens[1]
+		if HandleStoreStart(ctx, m.sender, peer, msg, tokenArg) {
+			return
+		}
 		if ok, reply := ext.VerifyToken(tokenArg, msg.UserID, m.userMap); ok {
 			_, _ = m.sender.SendMessage(ctx, peer, reply, msg.MessageID, nil)
 			return

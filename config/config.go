@@ -56,6 +56,8 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	MediaStore                bool
+	IncompleteTaskNotifier    bool
 	DisableVT                 bool
 	VtCustomCmds              string
 	BotMaxTasks               int
@@ -206,6 +208,8 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		MediaStore:                getEnvBool("MEDIA_STORE", false),
+		IncompleteTaskNotifier:    getEnvBool("INCOMPLETE_TASK_NOTIFIER", false),
 		DisableVT:                 getEnvBool("DISABLE_VT", false),
 		VtCustomCmds:              getEnv("VT_CUSTOM_CMDS", ""),
 		BotMaxTasks:               getEnvInt("BOT_MAX_TASKS", 0),
@@ -502,6 +506,10 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.VtCustomCmds = val
 	case "DISABLE_VT":
 		GlobalConfig.DisableVT = val == "true" || val == "1"
+	case "INCOMPLETE_TASK_NOTIFIER":
+		GlobalConfig.IncompleteTaskNotifier = val == "true" || val == "1"
+	case "MEDIA_STORE":
+		GlobalConfig.MediaStore = val == "true" || val == "1"
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -645,6 +653,8 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"MEDIA_STORE":                  strconv.FormatBool(GlobalConfig.MediaStore),
+		"INCOMPLETE_TASK_NOTIFIER":     strconv.FormatBool(GlobalConfig.IncompleteTaskNotifier),
 		"DISABLE_VT":                   strconv.FormatBool(GlobalConfig.DisableVT),
 		"VT_CUSTOM_CMDS":               GlobalConfig.VtCustomCmds,
 		"DISABLE_FF_MODE":              strconv.FormatBool(!GlobalConfig.EnableFFmpegCmds),

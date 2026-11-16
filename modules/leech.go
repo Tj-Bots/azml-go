@@ -438,6 +438,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	uTask := ext.NewUnifiedTask(taskUID, displayName, msg.FileSize, msg.ChatID, msg.UserID, notifyID, cancel)
 	uTask.SetStatusDisplay(msg.Username, msg.SenderName, "#leech")
 	m.taskMgr.AddTask(uTask)
+	// INCOMPLETE_TASK_NOTIFIER: remembered until the task ends (a restart leaves it in the DB)
+	ext.DB.SaveRunningTask(ext.RunningTask{ID: taskUID, ChatID: msg.ChatID, MessageID: msg.MessageID, UserID: msg.UserID, User: msg.SenderName, Name: displayName})
+	defer ext.DB.RemoveRunningTask(taskUID)
 
 	// Instantly render the status progress bar so the user gets an immediate (<1s) response
 	if notifyID > 0 && m.statusMod != nil {
@@ -1825,6 +1828,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				names[i] = fmt.Sprintf("File %d", i+1)
 			}
 		}
+		if cfg.MediaStore {
+			names = withStoreLinks(names, fileLinks)
+		}
 		sb.WriteString(finishFileList(names, fileLinks))
 	}
 
@@ -2441,6 +2447,10 @@ func finishFileList(names, links []string) string {
 	sb.WriteString("<blockquote expandable>")
 	budget := 2800 // visible chars; the whole message must stay under 4096
 	for idx, name := range names {
+		store := ""
+		if n, sl, ok := strings.Cut(name, "\x00"); ok { // Media Store link
+			name, store = n, fmt.Sprintf(" | <a href=\"%s\">Store</a>", sl)
+		}
 		if r := []rune(name); len(r) > 120 {
 			name = string(r[:117]) + "..."
 		}
@@ -2450,7 +2460,7 @@ func finishFileList(names, links []string) string {
 			break
 		}
 		if idx < len(links) && links[idx] != "" {
-			sb.WriteString(fmt.Sprintf("%d. <a href=\"%s\">%s</a>\n", idx+1, links[idx], telegram.EscapeHTML(name)))
+			sb.WriteString(fmt.Sprintf("%d. <a href=\"%s\">%s</a>%s\n", idx+1, links[idx], telegram.EscapeHTML(name), store))
 		} else {
 			sb.WriteString(fmt.Sprintf("%d. <code>%s</code>\n", idx+1, telegram.EscapeHTML(name)))
 		}
@@ -2749,4 +2759,38 @@ func noRetry(reason string) bool {
 		}
 	}
 	return false
+}
+
+// withStoreLinks marks names whose file has a Store link (finishFileList adds it).
+func withStoreLinks(names, links []string) []string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = n
+		if i < len(links) {
+			if chat, msgID, ok := parseChannelLink(links[i]); ok {
+				if sl := storeLink(chat, msgID); sl != "" {
+					out[i] = n + "\x00" + sl
+				}
+			}
+		}
+	}
+	return out
+}
+
+// parseChannelLink reads https://t.me/c/<id>/<msg>.
+func parseChannelLink(link string) (int64, int, bool) {
+	rest := strings.TrimPrefix(link, "https://t.me/c/")
+	if rest == link {
+		return 0, 0, false
+	}
+	parts := strings.Split(rest, "/")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	id, err1 := strconv.ParseInt(parts[0], 10, 64)
+	msgID, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return 0, 0, false
+	}
+	return -1000000000000 - id, msgID, true
 }

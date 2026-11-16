@@ -1145,6 +1145,7 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 		}
 	}
 
+	b.notifyIncompleteTasks(ctx)
 	log.Printf("[AZML-Go Bot Client] Triggering startup notification...")
 	sentToAny := false
 	for _, chatID := range cfg.AuthorizedChats {
@@ -1824,4 +1825,36 @@ func torrentSenderName(um *types.SafeUserMap, id int64) string {
 		return u.Name
 	}
 	return "User"
+}
+
+// notifyIncompleteTasks: INCOMPLETE_TASK_NOTIFIER, the tasks the restart stopped, per chat.
+func (b *BotApp) notifyIncompleteTasks(ctx context.Context) {
+	tasks := ext.DB.TakeRunningTasks()
+	if len(tasks) == 0 || !config.Get().IncompleteTaskNotifier || b.sender == nil {
+		return
+	}
+	byChat := map[int64][]ext.RunningTask{}
+	for _, t := range tasks {
+		byChat[t.ChatID] = append(byChat[t.ChatID], t)
+	}
+	for chatID, list := range byChat {
+		peer := b.getPeerForChatID(chatID)
+		if peer == nil {
+			continue
+		}
+		var sb strings.Builder
+		sb.WriteString("㊂ <b><u>Restarted :</u></b>\n\n<blockquote>These tasks were stopped by the restart, send them again:\n")
+		for i, t := range list {
+			name := telegram.EscapeHTML(t.Name)
+			if link := ""; chatID < 0 {
+				if id := strings.TrimPrefix(fmt.Sprint(chatID), "-100"); id != fmt.Sprint(chatID) && t.MessageID > 0 {
+					link = fmt.Sprintf("https://t.me/c/%s/%d", id, t.MessageID)
+					name = fmt.Sprintf("<a href=\"%s\">%s</a>", link, name)
+				}
+			}
+			sb.WriteString(fmt.Sprintf("%d. %s — <a href=\"tg://user?id=%d\">%s</a>\n", i+1, name, t.UserID, telegram.EscapeHTML(t.User)))
+		}
+		sb.WriteString("</blockquote>")
+		_, _ = b.sender.SendMessage(ctx, peer, sb.String(), 0, nil)
+	}
 }

@@ -49,8 +49,14 @@ func BuildGDriveSelectionButtons(uid string) tg.ReplyMarkupClass {
 	}
 
 	b := telegram.NewButtonMaker()
-	b.UButtonStyled("◈ "+telegram.ToSmallCaps("Select Files"), fmt.Sprintf("%s/app/files/%s", baseURL, uid), "primary")
-	b.IButtonStyled("◈ "+telegram.ToSmallCaps("Pincode"), fmt.Sprintf("gdsel pin %s %s", uid, pinCode), "primary")
+	selURL := fmt.Sprintf("%s/app/files/%s", baseURL, uid)
+	if !cfg.WebPincode { // WEB_PINCODE off: the link opens the list directly
+		selURL += "?pin_code=" + pinCode
+	}
+	b.UButtonStyled("◈ "+telegram.ToSmallCaps("Select Files"), selURL, "primary")
+	if cfg.WebPincode {
+		b.IButtonStyled("◈ "+telegram.ToSmallCaps("Pincode"), fmt.Sprintf("gdsel pin %s %s", uid, pinCode), "primary")
+	}
 	b.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), fmt.Sprintf("gdsel cancel %s", uid), "danger")
 	b.IButtonStyled("✓ "+telegram.ToSmallCaps("Done Selecting"), fmt.Sprintf("gdsel done %s", uid), "success")
 	return b.BuildMenu(2)

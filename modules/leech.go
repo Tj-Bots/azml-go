@@ -241,8 +241,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		return
 	}
 	if link == "" && !msg.HasMedia && !msg.IsReply {
-		helpMsg := leechHelpText()
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
+		m.replyTemp(ctx, peer, msg, leechHelpText())
 		return
 	}
 
@@ -252,6 +251,9 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	}
 
 	if !msg.Internal && !m.timeIntervalOK(ctx, peer, msg) {
+		return
+	}
+	if !msg.Internal && !m.userTasksOK(ctx, peer, msg) {
 		return
 	}
 
@@ -1278,7 +1280,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	for _, curFile := range filesToUpload {
-		if user != nil && isExcludedFile(curFile, user.ExcludedExts) {
+		userExcl := ""
+		if user != nil {
+			userExcl = user.ExcludedExts
+		}
+		if isExcludedFile(curFile, userExcl+" "+cfg.ExtensionFilter) {
 			log.Printf("[AZML-Go Leech] Skipping excluded file: %s", filepath.Base(curFile))
 			continue
 		}
@@ -1513,6 +1519,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				AsDoc:          asDoc,
 				DumpChatID:     dumpID,
 				LogChatID:      cfg.LeechLogID,
+				NoLog:          isExcepChat(msg.ChatID),
 				UserID:         msg.UserID,
 				UserAccessHash: telegram.GetUserAccessHash(msg.UserID),
 				BotPM:          botPM,
@@ -1643,6 +1650,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if len(uploadedNames) > 0 {
 		mainName = uploadedNames[0]
 	}
+	if cfg.SafeMode {
+		mainName = "Task Completed"
+	}
 	sb.WriteString(fmt.Sprintf("<b>%s</b>\n", mainName))
 	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Size:</b> %s\n", ext.GetReadableFileSize(totalSize)))
 	sb.WriteString(fmt.Sprintf("┠ <b>Elapsed:</b> %s\n", ext.GetReadableTime(int64(overallElapsed.Seconds()))))
@@ -1669,7 +1679,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		} else {
 			sb.WriteString("➲ <b><i>File(s) have been Sent. Access via Links...</i></b>\n")
 		}
-		sb.WriteString(finishFileList(uploadedNames, fileLinks))
+		names := uploadedNames
+		if cfg.SafeMode { // SAFE_MODE: no names, only the links
+			names = make([]string, len(uploadedNames))
+			for i := range names {
+				names[i] = fmt.Sprintf("File %d", i+1)
+			}
+		}
+		sb.WriteString(finishFileList(names, fileLinks))
 	}
 
 	botUser := telegram.CurrentBotUsername
@@ -1704,7 +1721,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 
-	if cfg.SourceLink && (ext.IsURL(sourceURL) || strings.HasPrefix(sourceURL, "https://t.me/")) && !ext.IsMagnet(sourceURL) {
+	if cfg.SourceLink && !cfg.SafeMode && (ext.IsURL(sourceURL) || strings.HasPrefix(sourceURL, "https://t.me/")) && !ext.IsMagnet(sourceURL) {
 		finishBtn.UButtonStyled("Source Link", sourceURL, "primary")
 		finishBtn.Row()
 	}
@@ -2375,7 +2392,7 @@ func isLocalTorrent(p string) bool {
 // sendLogStart posts "Leech Started" in LEECH_LOG_ID (user + source link).
 func (m *LeechModule) sendLogStart(ctx context.Context, msg *types.MessageContext, source string, mirror bool) (int, tg.InputPeerClass) {
 	logID := config.Get().LeechLogID
-	if logID == 0 || mirror {
+	if logID == 0 || mirror || isExcepChat(msg.ChatID) {
 		return 0, nil
 	}
 	hash := telegram.ResolveChannelAccessHash(ctx, m.rawAPI, logID)
@@ -2388,7 +2405,9 @@ func (m *LeechModule) sendLogStart(ctx context.Context, msg *types.MessageContex
 		mention = "@" + msg.Username
 	}
 	src := "Telegram"
-	if ext.IsURL(source) || strings.HasPrefix(source, "https://t.me/") {
+	if config.Get().SafeMode {
+		src = "Hidden"
+	} else if ext.IsURL(source) || strings.HasPrefix(source, "https://t.me/") {
 		src = fmt.Sprintf("<a href=\"%s\">Click Here</a>", telegram.EscapeHTML(source))
 	}
 	text := fmt.Sprintf("➲ <b><u>Leech Started :</u></b>\n\n<blockquote>╭ <b>User :</b> %s ( #ID%d )\n╰ <b>Source :</b> %s</blockquote>", mention, msg.UserID, src)
@@ -2398,4 +2417,52 @@ func (m *LeechModule) sendLogStart(ctx context.Context, msg *types.MessageContex
 		return 0, nil
 	}
 	return id, logPeer
+}
+
+// isExcepChat: EXCEP_CHATS, chats without leech log.
+func isExcepChat(chatID int64) bool {
+	for _, f := range strings.Fields(config.Get().ExcepChats) {
+		if id, err := strconv.ParseInt(f, 10, 64); err == nil && id == chatID {
+			return true
+		}
+	}
+	return false
+}
+
+// userTasksOK: USER_TASKS_LIMIT, tasks one user may run at once.
+func (m *LeechModule) userTasksOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
+	limit := config.Get().UserTasksLimit
+	if limit <= 0 || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
+		return true
+	}
+	n := 0
+	for _, t := range m.taskMgr.GetAllTasks() {
+		if t.UserID() == msg.UserID {
+			n++
+		}
+	}
+	if n < limit {
+		return true
+	}
+	m.replyTemp(ctx, peer, msg, fmt.Sprintf("㊂ <b><u>Tasks Limit :</u></b>\n\n<blockquote>Your tasks limit exceeded for %d tasks. Wait until one of them is done.</blockquote>", limit))
+	return false
+}
+
+// replyTemp answers the command; with AUTO_DELETE_MESSAGE_DURATION both are deleted after it.
+func (m *LeechModule) replyTemp(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, text string) {
+	id, _ := m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
+	autoDeletePair(m.sender, peer, id, msg.MessageID)
+}
+
+func autoDeletePair(sender *telegram.MessageSender, peer tg.InputPeerClass, botMsg, cmdMsg int) {
+	sec := config.Get().AutoDeleteMessageDuration
+	if sec <= 0 || botMsg <= 0 {
+		return
+	}
+	go func() {
+		time.Sleep(time.Duration(sec) * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = sender.DeleteMessage(ctx, peer, []int{botMsg, cmdMsg})
+	}()
 }

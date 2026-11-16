@@ -2,6 +2,17 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"SAFE_MODE":                    "Hide the file names and the source link in the leech log and the finish message (only the file links stay). Default is False. Bool",
+	"AUTO_DELETE_MESSAGE_DURATION": "Seconds after which the bot deletes its short messages (usage, errors like limits or access) together with the command. 0 = keep them. Int",
+	"PM_ACCESS":                    "Let everyone use the bot in private chat, like in authorized groups. Blacklisted users stay blocked. Default is False. Bool",
+	"SET_COMMANDS":                 "Register the bot commands in Telegram's command menu at start. Default is True. Bool",
+	"WEB_PINCODE":                  "Ask for the pincode on the file selection web page. False = the Select Files link opens the list directly. Default is True. Bool",
+	"YT_DLP_OPTIONS":               "Default yt-dlp options for everyone (command line style, e.g. --embed-subs --sub-langs en). Users can add their own in /us → Universal → YT-DLP Options. Str",
+	"USER_TASKS_LIMIT":             "Maximum tasks one user can run at the same time (0 = no limit). Owner and sudo are not limited. Int",
+	"PLAYLIST_LIMIT":               "Maximum number of videos taken from a yt-dlp playlist (0 = no limit). Int",
+	"LEECH_FILENAME_REMNAME":       "Remove words from every leeched file name. Separate them by | (e.g. www.site.com|[Group]). Str",
+	"EXTENSION_FILTER":             "File extensions that won't be uploaded, for all users (e.g. .txt .nfo .url). Separate them by space. Users can add their own in /us. Str",
+	"EXCEP_CHATS":                  "Chats (IDs separated by space) that don't use logging: no Leech Started and no copy in LEECH_LOG_ID for tasks started there. Str",
 	"DELETE_LINKS":                 "Delete the command and the replied TgLink/Magnet/File when the task starts uploading, to keep the group clean. Default is False. Bool",
 	"RICH_MESSAGES":                "Send the status as a Telegram Rich Message: a Cancel button inside every task and lines between tasks, instead of /cancel commands. Default is False. Bool",
 	"CLEAN_LOG_MSG":                "Delete the \"Leech Started\" message in LEECH_LOG_ID after the upload is done. Default is False. Bool",

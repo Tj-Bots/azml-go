@@ -56,6 +56,15 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	SafeMode                  bool
+	PmAccess                  bool
+	SetCommands               bool
+	WebPincode                bool
+	YtDlpOptions              string
+	UserTasksLimit            int
+	PlaylistLimit             int
+	ExtensionFilter           string
+	ExcepChats                string
 	DeleteLinks               bool
 	RichMessages              bool
 	CleanLogMsg               bool
@@ -191,6 +200,15 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		SafeMode:                  getEnvBool("SAFE_MODE", false),
+		PmAccess:                  getEnvBool("PM_ACCESS", false),
+		SetCommands:               getEnvBool("SET_COMMANDS", true),
+		WebPincode:                getEnvBool("WEB_PINCODE", true),
+		YtDlpOptions:              getEnv("YT_DLP_OPTIONS", ""),
+		UserTasksLimit:            getEnvInt("USER_TASKS_LIMIT", 0),
+		PlaylistLimit:             getEnvInt("PLAYLIST_LIMIT", 0),
+		ExtensionFilter:           getEnv("EXTENSION_FILTER", ""),
+		ExcepChats:                getEnv("EXCEP_CHATS", ""),
 		DeleteLinks:               getEnvBool("DELETE_LINKS", false),
 		RichMessages:              getEnvBool("RICH_MESSAGES", false),
 		CleanLogMsg:               getEnvBool("CLEAN_LOG_MSG", false),
@@ -444,6 +462,26 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.RichMessages = val == "true" || val == "1"
 	case "DELETE_LINKS":
 		GlobalConfig.DeleteLinks = val == "true" || val == "1"
+	case "EXCEP_CHATS":
+		GlobalConfig.ExcepChats = val
+	case "EXTENSION_FILTER":
+		GlobalConfig.ExtensionFilter = val
+	case "LEECH_FILENAME_REMNAME":
+		GlobalConfig.LeechFilenameRemname = val
+	case "PLAYLIST_LIMIT":
+		GlobalConfig.PlaylistLimit, _ = strconv.Atoi(val)
+	case "USER_TASKS_LIMIT":
+		GlobalConfig.UserTasksLimit, _ = strconv.Atoi(val)
+	case "YT_DLP_OPTIONS":
+		GlobalConfig.YtDlpOptions = val
+	case "WEB_PINCODE":
+		GlobalConfig.WebPincode = val == "true" || val == "1"
+	case "SET_COMMANDS":
+		GlobalConfig.SetCommands = val == "true" || val == "1"
+	case "PM_ACCESS":
+		GlobalConfig.PmAccess = val == "true" || val == "1"
+	case "SAFE_MODE":
+		GlobalConfig.SafeMode = val == "true" || val == "1"
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -581,6 +619,16 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"SAFE_MODE":                    strconv.FormatBool(GlobalConfig.SafeMode),
+		"PM_ACCESS":                    strconv.FormatBool(GlobalConfig.PmAccess),
+		"SET_COMMANDS":                 strconv.FormatBool(GlobalConfig.SetCommands),
+		"WEB_PINCODE":                  strconv.FormatBool(GlobalConfig.WebPincode),
+		"YT_DLP_OPTIONS":               GlobalConfig.YtDlpOptions,
+		"USER_TASKS_LIMIT":             strconv.Itoa(GlobalConfig.UserTasksLimit),
+		"PLAYLIST_LIMIT":               strconv.Itoa(GlobalConfig.PlaylistLimit),
+		"LEECH_FILENAME_REMNAME":       GlobalConfig.LeechFilenameRemname,
+		"EXTENSION_FILTER":             GlobalConfig.ExtensionFilter,
+		"EXCEP_CHATS":                  GlobalConfig.ExcepChats,
 		"DELETE_LINKS":                 strconv.FormatBool(GlobalConfig.DeleteLinks),
 		"RICH_MESSAGES":                strconv.FormatBool(GlobalConfig.RichMessages),
 		"CLEAN_LOG_MSG":                strconv.FormatBool(GlobalConfig.CleanLogMsg),

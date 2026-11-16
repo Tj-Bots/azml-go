@@ -1151,6 +1151,9 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 
 func (b *BotApp) registerBotCommands(ctx context.Context) {
 	cfg := config.Get()
+	if !cfg.SetCommands {
+		return
+	}
 	cmds := make([]tg.BotCommand, 0)
 
 	addCmd := func(cmd, desc string) {

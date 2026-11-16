@@ -130,7 +130,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 
 	m.applyMirrorFlag(msg)
 
-	if !m.leech.timeIntervalOK(ctx, peer, msg) {
+	if !m.leech.timeIntervalOK(ctx, peer, msg) || !m.leech.userTasksOK(ctx, peer, msg) {
 		return
 	}
 
@@ -479,6 +479,12 @@ func (m *LeechModule) StartYtdl(peer tg.InputPeerClass, msg *types.MessageContex
 	opt.Ytdl = true
 	opt.YtdlFormat, opt.YtdlArgs = downloader.YtQuality(quality)
 	msg.YtdlQuality = quality
+	if g, _ := safeYtOpts(cfg.YtDlpOptions); len(g) > 0 { // YT_DLP_OPTIONS for everyone
+		opt.YtdlArgs = append(append([]string{}, opt.YtdlArgs...), g...)
+	}
+	if cfg.PlaylistLimit > 0 {
+		opt.YtdlArgs = append(opt.YtdlArgs, "--playlist-end", strconv.Itoa(cfg.PlaylistLimit))
+	}
 	cookieFile := ""
 	if u := m.userMap.Get(msg.UserID); u != nil {
 		extra, _ := safeYtOpts(u.YtOpt)

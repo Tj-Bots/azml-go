@@ -48,8 +48,14 @@ func selectionButtons(webID, key string) *telegram.ButtonMaker {
 		base = fmt.Sprintf("http://localhost:%d", cfg.BaseURLPort)
 	}
 	b := telegram.NewButtonMaker()
-	b.UButtonStyled("Select Files", fmt.Sprintf("%s/app/files/%s", base, webID), "primary")
-	b.IButton("Pincode", "sel pin "+key)
+	selURL := fmt.Sprintf("%s/app/files/%s", base, webID)
+	if !cfg.WebPincode { // WEB_PINCODE off: the link opens the list directly
+		selURL += "?pin_code=" + selPin(webID)
+	}
+	b.UButtonStyled("Select Files", selURL, "primary")
+	if cfg.WebPincode {
+		b.IButton("Pincode", "sel pin "+key)
+	}
 	b.Row()
 	b.IButtonStyled("Cancel", "sel rm "+key, "danger")
 	b.IButtonStyled("Done Selecting", "sel done "+key, "success")

@@ -75,6 +75,9 @@ func IsAuthorized(chatID, userID int64, userCache *types.SafeUserMap) bool {
 		return true
 	}
 	cfg := config.Get()
+	if cfg.PmAccess && chatID == userID { // PM_ACCESS: everyone may use the bot in private
+		return true
+	}
 	for _, id := range cfg.AuthorizedChats {
 		if matchID(id, chatID) || matchID(id, userID) {
 			return true

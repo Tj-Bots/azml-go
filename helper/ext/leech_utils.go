@@ -251,6 +251,20 @@ func FormatFilename(filename string, user *types.UserSettings, filePath string) 
 		}
 	}
 
+	// LEECH_FILENAME_REMNAME: words removed from every name ("a|b|c")
+	if rm := strings.TrimSpace(cfg.LeechFilenameRemname); rm != "" {
+		ext := filepath.Ext(formatted)
+		base := strings.TrimSuffix(formatted, ext)
+		for _, w := range strings.Split(rm, "|") {
+			if w = strings.TrimSpace(w); w != "" {
+				base = strings.ReplaceAll(base, w, "")
+			}
+		}
+		base = strings.Trim(strings.Join(strings.Fields(base), " "), " ._-")
+		if base != "" {
+			formatted = base + ext
+		}
+	}
 	if prefix != "" {
 		formatted = prefix + formatted
 	}

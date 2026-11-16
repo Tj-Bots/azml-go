@@ -56,6 +56,7 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	UserTimeInterval          int
 	DisableTorrents           bool
 	ShowMediaInfo             bool
 	SaveMsg                   bool
@@ -187,6 +188,7 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		UserTimeInterval:          getEnvInt("USER_TIME_INTERVAL", 0),
 		DisableTorrents:           getEnvBool("DISABLE_TORRENTS", true),
 		ShowMediaInfo:             getEnvBool("SHOW_MEDIAINFO", false),
 		SaveMsg:                   getEnvBool("SAVE_MSG", false),
@@ -428,6 +430,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.SourceLink = val == "true" || val == "1"
 	case "SHOW_MEDIAINFO":
 		GlobalConfig.ShowMediaInfo = val == "true" || val == "1"
+	case "USER_TIME_INTERVAL":
+		GlobalConfig.UserTimeInterval, _ = strconv.Atoi(val)
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -565,6 +569,7 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"USER_TIME_INTERVAL":           strconv.Itoa(GlobalConfig.UserTimeInterval),
 		"SAVE_MSG":                     strconv.FormatBool(GlobalConfig.SaveMsg),
 		"SOURCE_LINK":                  strconv.FormatBool(GlobalConfig.SourceLink),
 		"SHOW_MEDIAINFO":               strconv.FormatBool(GlobalConfig.ShowMediaInfo),

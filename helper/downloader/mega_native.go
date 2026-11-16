@@ -79,14 +79,41 @@ func megaAPI(ctx context.Context, folderID string, req interface{}, out interfac
 	if folderID != "" {
 		url += "&n=" + folderID
 	}
+	baseURL := url
+	useSID := false
+	if r, ok := req.(map[string]interface{}); ok && r["a"] != "us0" && r["a"] != "us" {
+		useSID = true
+	}
 	var lastErr error
+	hashcash := ""
 	for attempt := 0; attempt < 5; attempt++ {
+		url = baseURL
+		if useSID {
+			if sid := megaSession(ctx); sid != "" {
+				url += "&sid=" + sid
+			}
+		}
 		hreq, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 		hreq.Header.Set("Content-Type", "application/json")
+		if hashcash != "" {
+			hreq.Header.Set("X-Hashcash", hashcash)
+		}
 		resp, err := megaHTTP.Do(hreq)
 		if err != nil {
 			lastErr = err
 			time.Sleep(time.Duration(attempt+1) * time.Second)
+			continue
+		}
+		if resp.StatusCode == 402 && resp.Header.Get("X-Hashcash") != "" {
+			// proof of work asked (login): solve it and send again
+			ch := resp.Header.Get("X-Hashcash")
+			_ = resp.Body.Close()
+			hc, hErr := solveHashcash(ctx, ch)
+			if hErr != nil {
+				return hErr
+			}
+			hashcash = hc
+			lastErr = fmt.Errorf("MEGA: hashcash")
 			continue
 		}
 		data, _ := io.ReadAll(resp.Body)
@@ -105,6 +132,11 @@ func megaAPI(ctx context.Context, folderID string, req interface{}, out interfac
 			return fmt.Errorf("MEGA: bad answer: %s", strings.TrimSpace(string(data)))
 		}
 		if json.Unmarshal(arr[0], &code) == nil && code < 0 {
+			if code == -15 && attempt == 0 && strings.Contains(url, "&sid=") {
+				megaResetSession()
+				lastErr = megaAPIError(code)
+				continue
+			}
 			if code == -3 {
 				time.Sleep(time.Duration(attempt+1) * time.Second)
 				lastErr = megaAPIError(code)

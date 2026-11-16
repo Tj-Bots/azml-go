@@ -203,6 +203,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					ReplyText:  targetMsg.Message,
 					LangCode:   msg.LangCode,
 					Username:   msg.Username,
+					Internal:   true, // part of the same -i run
 					HasMedia:   targetMsg.Media != nil,
 					RawMedia:   targetMsg.Media,
 					ReplyToID:  targetID,
@@ -247,6 +248,10 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 
 	if link != "" && !ext.IsURL(link) && !ext.IsMagnet(link) && !ext.IsMegaLink(link) && !strings.HasPrefix(link, "tg://") && !isLocalTorrent(link) {
 		m.sendDownloadError(ctx, peer, msg, 0, "Invalid link or resource not found! Please check the URL.", "#Leech", time.Now())
+		return
+	}
+
+	if !msg.Internal && !m.timeIntervalOK(ctx, peer, msg) {
 		return
 	}
 

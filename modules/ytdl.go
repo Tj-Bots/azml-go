@@ -130,6 +130,10 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 
 	m.applyMirrorFlag(msg)
 
+	if !m.leech.timeIntervalOK(ctx, peer, msg) {
+		return
+	}
+
 	if quality != "" {
 		m.start(peer, msg, link, quality)
 		return

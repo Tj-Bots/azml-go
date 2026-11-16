@@ -46,6 +46,7 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"USER_TIME_INTERVAL",
 	"SAVE_MSG",
 	"SOURCE_LINK",
 	"FSUB_IDS",

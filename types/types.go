@@ -137,6 +137,7 @@ type LeechOptions struct {
 }
 
 type MessageContext struct {
+	Internal    bool   // started by the bot itself (-i run): no time interval check
 	YtdlQuality string // set for /ytdl tasks (used by Retry)
 	IsZip       bool
 	IsUnzip     bool

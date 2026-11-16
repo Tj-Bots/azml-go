@@ -125,3 +125,34 @@ func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, ms
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 1)
 	return false
 }
+
+// ---- USER_TIME_INTERVAL: a user waits between tasks (Python bot: timeval_check) ----
+
+var (
+	userTaskMu   sync.Mutex
+	userLastTask = map[int64]time.Time{}
+)
+
+// timeIntervalOK refuses a new task too soon after the user's last one.
+func (m *LeechModule) timeIntervalOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
+	iv := config.Get().UserTimeInterval
+	if iv <= 0 || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
+		return true
+	}
+	limit := time.Duration(iv) * time.Second
+	userTaskMu.Lock()
+	last, ok := userLastTask[msg.UserID]
+	if ok && time.Since(last) < limit {
+		userTaskMu.Unlock()
+		left := (limit - time.Since(last)).Round(time.Second)
+		text := fmt.Sprintf("㊂ <b><u>Please Wait :</u></b>\n\n<blockquote>Please wait %s, users have a time interval of %s between tasks.</blockquote>", left, limit)
+		id, _ := m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
+		if id > 0 {
+			m.sender.AutoDeleteMessage(peer, id, 10)
+		}
+		return false
+	}
+	userLastTask[msg.UserID] = time.Now()
+	userTaskMu.Unlock()
+	return true
+}

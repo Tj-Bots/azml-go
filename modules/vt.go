@@ -32,6 +32,8 @@ var (
 	vtRemove  = [][2]string{{"subs", "Subtitles"}, {"audio", "Extra Audio"}, {"attach", "Attachments"}}
 	vtConvert = [][2]string{{"mkv", "MKV"}, {"mp4", "MP4"}, {"mp3", "MP3 (Audio)"}, {"m4a", "M4A (Audio)"}}
 	vtShots   = []int{3, 5, 10}
+	vtChapter = [][2]string{{"remove", "Remove All"}, {"5", "Every 5 Min"}, {"10", "Every 10 Min"}, {"15", "Every 15 Min"}}
+	vtASplit  = [][2]string{{"10", "10 Min Parts"}, {"30", "30 Min Parts"}, {"60", "60 Min Parts"}}
 	vtLabels  = map[string]string{"rename": "Rename", "merge_video": "Video + Video", "merge_audio": "Video + Audio",
 		"merge_subs": "Video + Subtitle", "extract": "Extract", "remove": "Remove Stream", "trim": "Trim",
 		"ss": "Screenshots", "convert": "Convert To"}
@@ -50,6 +52,14 @@ type VTSelection struct {
 	Shots      int
 	Convert    string
 	Custom     string // name of an owner tool
+	MergeAll   bool   // video + audio + subtitle files
+	StripMeta  bool
+	AudioDelay string // seconds, can be negative
+	SubDelay   string // seconds, can be negative
+	Chapters   string // remove | minutes
+	DefAudio   string // track number or language
+	AudioSplit string // minutes
+	Translate  string // language code
 }
 
 func (s *VTSelection) empty() bool {
@@ -69,8 +79,8 @@ type vtState struct {
 	msgID  int
 	peer   tg.InputPeerClass
 	sel    VTSelection
-	page   string // main | extract | remove | convert | ss
-	wait   string // rename | trim
+	page   string // main | extract | remove | convert | ss | chapters | asplit
+	wait   string // rename | trim | async | ssync | daudio | translate
 	start  time.Time
 	result chan *VTSelection // nil = cancelled
 	once   sync.Once
@@ -137,6 +147,30 @@ func vtSelectedText(s VTSelection) []string {
 	if s.Custom != "" {
 		out = append(out, telegram.EscapeHTML(s.Custom))
 	}
+	if s.MergeAll {
+		out = append(out, "Video + Audio + Sub")
+	}
+	if s.StripMeta {
+		out = append(out, "Strip Metadata")
+	}
+	if s.AudioDelay != "" {
+		out = append(out, "Audio Sync → "+telegram.EscapeHTML(s.AudioDelay)+"s")
+	}
+	if s.SubDelay != "" {
+		out = append(out, "Subtitle Sync → "+telegram.EscapeHTML(s.SubDelay)+"s")
+	}
+	if s.Chapters != "" {
+		out = append(out, "Chapters → "+name(vtChapter, s.Chapters))
+	}
+	if s.DefAudio != "" {
+		out = append(out, "Default Audio → "+telegram.EscapeHTML(s.DefAudio))
+	}
+	if s.AudioSplit != "" {
+		out = append(out, "Audio Split → "+name(vtASplit, s.AudioSplit))
+	}
+	if s.Translate != "" {
+		out = append(out, "Translate Subtitles → "+telegram.EscapeHTML(s.Translate))
+	}
 	return out
 }
 
@@ -170,6 +204,13 @@ func (st *vtState) menu() (string, *telegram.ButtonMaker) {
 		back()
 		return "㊂ <b><u>Video Tools : Trim</u></b>\n\n<blockquote>Send start and end:\n<code>00:01:30-00:05:00</code> or <code>90-300</code> (seconds)\nOnly start: <code>00:10:00</code></blockquote>\n<i>Cut without re-encoding, starts at the nearest keyframe.</i>", b
 	}
+	if p, ok := vtPrompts[st.wait]; ok {
+		if p.isSet(&st.sel) {
+			b.IButton("Remove", fmt.Sprintf("vtool %d unset %s", st.user, st.wait))
+		}
+		back()
+		return p.text, b
+	}
 	grid2 := func(items [][2]string, action, cur string) {
 		for i, it := range items {
 			st.btn(b, action, it[1], cur == it[0], it[0])
@@ -189,6 +230,12 @@ func (st *vtState) menu() (string, *telegram.ButtonMaker) {
 	case "convert":
 		grid2(vtConvert, "convert", st.sel.Convert)
 		return "㊂ <b><u>Video Tools : Convert To</u></b>\n\n<i>Choose one, it takes you back to the menu.</i>", b
+	case "chapters":
+		grid2(vtChapter, "chapters", st.sel.Chapters)
+		return "㊂ <b><u>Video Tools : Chapters</u></b>\n\n<i>Remove the chapters, or add one every few minutes. Choose one, it takes you back to the menu.</i>", b
+	case "asplit":
+		grid2(vtASplit, "asplit", st.sel.AudioSplit)
+		return "㊂ <b><u>Video Tools : Audio Split</u></b>\n\n<i>Cuts audio files into parts. Choose one, it takes you back to the menu.</i>", b
 	case "ss":
 		var items [][2]string
 		for _, n := range vtShots {
@@ -210,6 +257,18 @@ func (st *vtState) menu() (string, *telegram.ButtonMaker) {
 	b.Row()
 	st.btn(b, "page", "Screenshots", st.sel.Shots > 0, "ss")
 	st.btn(b, "page", "Convert To", st.sel.Convert != "", "convert")
+	b.Row()
+	st.btn(b, "merge_all", "Video + Audio + Sub", st.sel.MergeAll, "")
+	st.btn(b, "strip", "Strip Metadata", st.sel.StripMeta, "")
+	b.Row()
+	st.btn(b, "async", "Audio Sync", st.sel.AudioDelay != "", "")
+	st.btn(b, "ssync", "Subtitle Sync", st.sel.SubDelay != "", "")
+	b.Row()
+	st.btn(b, "page", "Chapters", st.sel.Chapters != "", "chapters")
+	st.btn(b, "daudio", "Default Audio", st.sel.DefAudio != "", "")
+	b.Row()
+	st.btn(b, "page", "Audio Split", st.sel.AudioSplit != "", "asplit")
+	st.btn(b, "translate", "Translate Subtitles", st.sel.Translate != "", "")
 	b.Row()
 	names, _ := vtCustomTools()
 	for i, n := range names {
@@ -325,11 +384,40 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 	case "rename", "trim":
 		st.wait = action
 		ext.SetPendingSettingSession(st.user, "vt_"+action, st.chat, st.msgID, vtTimeout)
+	case "async", "ssync", "daudio", "translate":
+		st.wait = action
+		ext.SetPendingSettingSession(st.user, "vt_"+action, st.chat, st.msgID, vtTimeout)
+	case "merge_all", "strip":
+		was := map[string]bool{"merge_all": st.sel.MergeAll, "strip": st.sel.StripMeta}[action]
+		st.sel.clearTool()
+		if !was {
+			if action == "merge_all" {
+				st.sel.MergeAll = true
+			} else {
+				st.sel.StripMeta = true
+			}
+		}
+	case "chapters", "asplit":
+		cur := map[string]string{"chapters": st.sel.Chapters, "asplit": st.sel.AudioSplit}[action]
+		st.sel.clearTool()
+		if cur != arg {
+			if action == "chapters" {
+				st.sel.Chapters = arg
+			} else {
+				st.sel.AudioSplit = arg
+			}
+		}
+		st.page = "main"
 	case "unset":
-		if arg == "rename" {
+		switch arg {
+		case "rename":
 			st.sel.Rename = ""
-		} else {
+		case "trim":
 			st.sel.TrimStart, st.sel.TrimEnd = "", ""
+		default:
+			if p, ok := vtPrompts[arg]; ok {
+				p.set(&st.sel, "")
+			}
 		}
 		st.wait = ""
 	case "merge_video", "merge_audio", "merge_subs":
@@ -390,6 +478,17 @@ func (m *LeechModule) HandleVTInput(uid int64, key, val string) bool {
 		start, end, _ := strings.Cut(strings.TrimSpace(val), "-")
 		st.sel.clearTool()
 		st.sel.TrimStart, st.sel.TrimEnd = strings.TrimSpace(start), strings.TrimSpace(end)
+	default:
+		if p, ok := vtPrompts[strings.TrimPrefix(key, "vt_")]; ok {
+			v, good := p.parse(strings.TrimSpace(val))
+			if !good {
+				st.mu.Unlock()
+				ext.SetPendingSettingSession(uid, key, st.chat, st.msgID, vtTimeout) // wrong value: wait again
+				return true
+			}
+			st.sel.clearTool()
+			p.set(&st.sel, v)
+		}
 	}
 	st.wait = ""
 	st.mu.Unlock()
@@ -652,6 +751,31 @@ func runVideoTools(path string, s *VTSelection) (string, int) {
 		path = extractAudio(path, s.Convert)
 	case "mkv", "mp4":
 		path = convertMedia(path, s.Convert, "")
+	}
+	if s.MergeAll {
+		vtMuxExtra(path, "audio")
+		vtMuxExtra(path, "subs")
+	}
+	if s.StripMeta {
+		vtStripMeta(path)
+	}
+	if s.AudioDelay != "" {
+		vtShift(path, "a", s.AudioDelay)
+	}
+	if s.SubDelay != "" {
+		vtShift(path, "s", s.SubDelay)
+	}
+	if s.Chapters != "" {
+		vtChapters(path, s.Chapters)
+	}
+	if s.DefAudio != "" {
+		vtDefaultAudio(path, s.DefAudio)
+	}
+	if s.AudioSplit != "" {
+		vtAudioSplit(path, s.AudioSplit)
+	}
+	if s.Translate != "" {
+		vtTranslateSubs(path, s.Translate)
 	}
 	if s.Custom != "" {
 		if _, cmds := vtCustomTools(); cmds[s.Custom] != "" {

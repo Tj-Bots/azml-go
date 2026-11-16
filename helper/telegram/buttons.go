@@ -91,7 +91,8 @@ func (b *ButtonMaker) HasStyle() bool {
 }
 
 func (b *ButtonMaker) getFinalRows(cols int) [][]InlineButton {
-	if len(b.rows) > 0 || len(b.currentRow) > 0 {
+	// rows marked with Row() are kept; buttons added without any Row() go cols per row
+	if len(b.rows) > 0 {
 		var res [][]InlineButton
 		for _, r := range b.rows {
 			if len(r) > 0 {

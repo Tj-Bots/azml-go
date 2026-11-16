@@ -22,7 +22,7 @@ var (
 	tgPrivateLink = regexp.MustCompile(`(?i)https?://t\.me/c/(\d+)/(\d+)`)
 	tgPublicLink  = regexp.MustCompile(`(?i)https?://t\.me/([a-zA-Z0-9_]+)/(\d+)`)
 	mediafireReg  = regexp.MustCompile(`(?i)https?://(?:www\.)?mediafire\.com/(?:file|download)/[a-zA-Z0-9]+(?:/[^/\s]+)?`)
-	pixelDrainReg = regexp.MustCompile(`(?i)https?://pixeldrain\.com/u/([a-zA-Z0-9_-]+)`)
+	pixelDrainReg = regexp.MustCompile(`(?i)https?://(?:www\.)?(pixeldrain\.(?:com|dev|net))/(?:u|api/file)/([a-zA-Z0-9_-]+)`)
 )
 
 type ddlReq struct {
@@ -113,9 +113,9 @@ func GenerateDirectLink(rawURL string) (string, error) {
 	host := strings.ToLower(u.Host)
 
 	// Pixeldrain
-	if strings.Contains(host, "pixeldrain.com") {
-		if m := pixelDrainReg.FindStringSubmatch(rawURL); len(m) == 2 {
-			return fmt.Sprintf("https://pixeldrain.com/api/file/%s", m[1]), nil
+	if strings.Contains(host, "pixeldrain.") {
+		if m := pixelDrainReg.FindStringSubmatch(rawURL); len(m) == 3 {
+			return fmt.Sprintf("https://%s/api/file/%s?download", m[1], m[2]), nil
 		}
 	}
 

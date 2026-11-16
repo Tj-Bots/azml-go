@@ -334,7 +334,7 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.AutoThumb || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" ||
-		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet
+		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet || u.MediaStoreSet
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -489,6 +489,8 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	}
 	toggle("AutoRename", u.Autorename, fmt.Sprintf("userset %d autorename", u.UserID))
 	toggle("Auto Thumbnail", u.AutoThumb, fmt.Sprintf("userset %d auto_thumb", u.UserID))
+	btn.Row()
+	toggle("Media Store", u.MediaStoreOn(config.Get().MediaStore), fmt.Sprintf("userset %d media_store", u.UserID))
 	btn.Row()
 	btn.IButton("Caption Font", fmt.Sprintf("userset %d capfont", u.UserID))
 	btn.IButton("Excluded Ext", fmt.Sprintf("userset %d lexcluded", u.UserID))
@@ -750,6 +752,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.SampleSec = 0
 		u.MediaInfo = false
 		u.MediaInfoSet = false
+		u.MediaStore, u.MediaStoreSet = false, false
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1193,6 +1196,14 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		text, btn := m.buildYtdlSettingMenu(u, key, "")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Deleted", false)
+
+	case "media_store":
+		u.MediaStore = !u.MediaStoreOn(config.Get().MediaStore)
+		u.MediaStoreSet = true
+		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Media Store is now "+onOff(u.MediaStore), false)
+		text, btn := m.buildLeechMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 
 	case "mediainfo":
 		u.MediaInfo = !u.MediaInfoOn(config.Get().ShowMediaInfo)

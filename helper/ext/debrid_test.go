@@ -10,3 +10,14 @@ func TestDebridHosts(t *testing.T) {
 		t.Fatal("unknown host matched")
 	}
 }
+
+func TestPixeldrainLink(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://pixeldrain.dev/u/tE1FVfwf": "https://pixeldrain.dev/api/file/tE1FVfwf?download",
+		"https://pixeldrain.com/u/abc":      "https://pixeldrain.com/api/file/abc?download",
+	} {
+		if got, err := GenerateDirectLink(in); err != nil || got != want {
+			t.Errorf("%s -> %s %v", in, got, err)
+		}
+	}
+}

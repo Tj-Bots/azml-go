@@ -9,6 +9,8 @@ import (
 )
 
 type UserSettings struct {
+	MediaStore     bool              `json:"media_store,omitempty" bson:"media_store,omitempty"`
+	MediaStoreSet  bool              `json:"media_store_set,omitempty" bson:"media_store_set,omitempty"` // chose in /us (else MEDIA_STORE)
 	MegaEmail      string            `json:"mega_email,omitempty" bson:"mega_email,omitempty"`
 	MegaPass       string            `json:"mega_pass,omitempty" bson:"mega_pass,omitempty"`
 	MediaInfoSet   bool              `json:"mediainfo_set,omitempty" bson:"mediainfo_set,omitempty"` // the user chose in /us (else SHOW_MEDIAINFO)
@@ -229,4 +231,12 @@ func (u *UserSettings) MediaInfoOn(botDefault bool) bool {
 		return u.MediaInfo
 	}
 	return botDefault
+}
+
+// MediaStoreOn: the user's choice in /us, or MEDIA_STORE from /bs.
+func (u *UserSettings) MediaStoreOn(botDefault bool) bool {
+	if u == nil || !u.MediaStoreSet {
+		return botDefault
+	}
+	return u.MediaStore
 }

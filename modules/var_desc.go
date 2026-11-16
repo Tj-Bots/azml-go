@@ -2,7 +2,7 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
-	"MEDIA_STORE":                  "Media Store: every leeched file gets a Store Link in the finish message; anyone who opens it gets the file from the bot (good for sharing). Needs DUMP_CHAT_ID or LEECH_LOG_ID. Default is False. Bool",
+	"MEDIA_STORE":                  "Default for Media Store: every leeched file gets a Store Link, anyone who opens it gets the file from the bot in PM. Users can change it for themselves in User Settings → Leech. Bool",
 	"INCOMPLETE_TASK_NOTIFIER":     "Get incomplete task messages after restart: the tasks that were running are listed (with links to their commands in groups) in the chats they were started in. Needs DATABASE_URL. Default is False. Bool",
 	"DISABLE_VT":                   "Disable Video Tools (-vt) for all users. Default is False. Bool",
 	"VT_CUSTOM_CMDS":               "Extra tools for the Video Tools menu (-vt), one per line as <code>name: ffmpeg args</code> (the args come after <code>-i video</code>), e.g. <code>No Audio: -map 0 -map -0:a -c copy</code>. Str",

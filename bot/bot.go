@@ -545,6 +545,25 @@ func (b *BotApp) registerDispatcher() {
 		go b.routeCallback(ctx, update, e)
 		return nil
 	})
+
+	// buttons of ephemeral messages (seen only by one user) come as their own update
+	b.dispatcher.OnEphemeralBotCallbackQuery(func(ctx context.Context, e tg.Entities, update *tg.UpdateEphemeralBotCallbackQuery) error {
+		for uID, u := range e.Users {
+			if u.AccessHash != 0 {
+				b.cacheAccessHash(uID, u.AccessHash)
+			}
+		}
+		cb := &tg.UpdateBotCallbackQuery{QueryID: update.QueryID, UserID: update.UserID, Peer: update.Peer, MsgID: update.MsgID, Data: update.Data, ChatInstance: update.ChatInstance}
+		go func() {
+			b.routeCallback(ctx, cb, e)
+			// the answer is done: remove the ephemeral question
+			if peer := b.getPeerWithEntities(update.Peer, e); peer != nil {
+				user := &tg.InputUser{UserID: update.UserID, AccessHash: telegram.GetUserAccessHash(update.UserID)}
+				_, _ = b.rawAPI.EphemeralDeleteMessage(context.Background(), &tg.EphemeralDeleteMessageRequest{Peer: peer, ReceiverID: user, ID: update.MsgID})
+			}
+		}()
+		return nil
+	})
 }
 
 func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.Entities) {

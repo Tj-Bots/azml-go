@@ -221,7 +221,7 @@ func (st *vtState) menu() (string, *telegram.ButtonMaker) {
 	b.Row()
 	chosen := vtSelectedText(st.sel)
 	if len(chosen) > 0 {
-		b.IButton("Reset", fmt.Sprintf("vtool %d reset", st.user))
+		b.IButtonStyled("Reset", fmt.Sprintf("vtool %d reset", st.user), "danger")
 		b.Row()
 		b.IButtonStyled("❌", fmt.Sprintf("vtool %d close", st.user), "danger")
 		b.IButtonStyled("Continue ▶", fmt.Sprintf("vtool %d done", st.user), "success")

@@ -1828,7 +1828,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				names[i] = fmt.Sprintf("File %d", i+1)
 			}
 		}
-		if cfg.MediaStore {
+		if user.MediaStoreOn(cfg.MediaStore) {
 			names = withStoreLinks(names, fileLinks)
 		}
 		sb.WriteString(finishFileList(names, fileLinks))

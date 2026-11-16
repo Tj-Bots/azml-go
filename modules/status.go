@@ -591,7 +591,7 @@ func (m *StatusModule) UpdateAllMessages(ctx context.Context, force bool) {
 // sendStatus sends a status message (rich when RICH_MESSAGES is on, plain if that fails).
 func (m *StatusModule) sendStatus(ctx context.Context, peer tg.InputPeerClass, text string, replyTo int, btn *telegram.ButtonMaker) (int, error) {
 	if config.Get().RichMessages {
-		if id, err := m.sender.SendRich(ctx, peer, richStatus(text)+telegram.RichKeyboardHTML(btn), replyTo, nil); err == nil {
+		if id, err := m.sender.SendRich(ctx, peer, richStatus(text), replyTo, btn); err == nil {
 			return id, nil
 		} else {
 			log.Printf("[Status] rich message failed (%v), sending plain text", err)
@@ -605,7 +605,7 @@ func (m *StatusModule) editStatus(ctx context.Context, r *StatusReplyInfo, text 
 	if !config.Get().RichMessages {
 		return m.sender.EditMessageWithButtons(ctx, r.Peer, r.MessageID, text, btn, 3)
 	}
-	err := m.sender.EditRich(ctx, r.Peer, r.MessageID, richStatus(text)+telegram.RichKeyboardHTML(btn), nil)
+	err := m.sender.EditRich(ctx, r.Peer, r.MessageID, richStatus(text), btn)
 	if err == nil {
 		m.mu.Lock()
 		r.LastEdit = time.Now()
@@ -615,7 +615,7 @@ func (m *StatusModule) editStatus(ctx context.Context, r *StatusReplyInfo, text 
 	if strings.Contains(strings.ToLower(err.Error()), "too many requests") {
 		return err
 	}
-	newID, sErr := m.sender.SendRich(ctx, r.Peer, richStatus(text)+telegram.RichKeyboardHTML(btn), 0, nil)
+	newID, sErr := m.sender.SendRich(ctx, r.Peer, richStatus(text), 0, btn)
 	if sErr != nil {
 		log.Printf("[Status] rich status failed (%v), using plain text", sErr)
 		return m.sender.EditMessageWithButtons(ctx, r.Peer, r.MessageID, text, btn, 3)
@@ -643,7 +643,7 @@ func richStatus(text string) string {
 // editStatusID edits a status message by id (rich when RICH_MESSAGES is on).
 func (m *StatusModule) editStatusID(ctx context.Context, peer tg.InputPeerClass, msgID int, text string, btn *telegram.ButtonMaker) error {
 	if config.Get().RichMessages {
-		if err := m.sender.EditRich(ctx, peer, msgID, richStatus(text)+telegram.RichKeyboardHTML(btn), nil); err == nil {
+		if err := m.sender.EditRich(ctx, peer, msgID, richStatus(text), btn); err == nil {
 			return nil
 		}
 	}

@@ -198,6 +198,8 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					SenderName: msg.SenderName,
 					Text:       multiFollowText(msg.Text),
 					ReplyText:  targetMsg.Message,
+					LangCode:   msg.LangCode,
+					Username:   msg.Username,
 					HasMedia:   targetMsg.Media != nil,
 					RawMedia:   targetMsg.Media,
 					ReplyToID:  targetID,

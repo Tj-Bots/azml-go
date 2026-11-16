@@ -163,18 +163,9 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					_ = os.MkdirAll(subTaskDir, 0777)
 				}
 
-				isFirstBulk := false
-				if m.statusMod != nil {
-					isFirstBulk = m.statusMod.ReserveStatusSlot(msg.ChatID)
-				}
-
 				nID, _ := m.sender.SendMessage(context.Background(), peer, fmt.Sprintf("<i>Initiating Leech:</i> <code>%s</code>", truncateString(bLink, 40)), msg.MessageID, nil)
 				if nID > 0 && m.statusMod != nil {
-					if isFirstBulk {
-						m.statusMod.SetStatusMessage(msg.ChatID, nID, peer)
-					} else {
-						m.sender.AutoDeleteMessage(peer, nID, 4)
-					}
+					m.statusMod.TakeOverStatus(msg.ChatID, nID, peer)
 				}
 				m.processLeechPipeline(peer, msg, opt, bLink, subTaskDir, nID)
 				time.Sleep(2 * time.Second)
@@ -262,18 +253,9 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		_ = os.MkdirAll(taskDir, 0777)
 	}
 
-	isFirstStatus := false
-	if m.statusMod != nil {
-		isFirstStatus = m.statusMod.ReserveStatusSlot(msg.ChatID)
-	}
-
 	notifyID, _ := m.sender.SendMessage(ctx, peer, fmt.Sprintf("<i>%s...</i>", telegram.ToSmallCaps("Initiating Leech Task")), msg.MessageID, nil)
 	if notifyID > 0 && m.statusMod != nil {
-		if isFirstStatus {
-			m.statusMod.SetStatusMessage(msg.ChatID, notifyID, peer)
-		} else {
-			m.sender.AutoDeleteMessage(peer, notifyID, 4)
-		}
+		m.statusMod.TakeOverStatus(msg.ChatID, notifyID, peer)
 	}
 
 	go m.processLeechPipeline(peer, msg, opt, link, taskDir, notifyID)
@@ -735,7 +717,12 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				uidStr := fmt.Sprintf("%d", notifyID)
 				doneChan := RegisterGDriveSelectCache(uidStr, files, msg.UserID)
 				buttons := BuildGDriveSelectionButtons(uidStr)
-				_ = m.sender.EditMessage(ctx, peer, notifyID, "Your Google Drive download paused. Choose files from selection web link then press Done Selecting button.", buttons)
+				selMsg, _ := m.sender.SendMessage(ctx, peer, "㊂ <b><u>Select Files :</u></b>\n\n<blockquote>Your Google Drive download is paused. Choose the files on the web page, then press <b>Done Selecting</b>.</blockquote>", msg.MessageID, buttons)
+				defer func() {
+					if selMsg > 0 {
+						_ = m.sender.DeleteMessage(context.Background(), peer, []int{selMsg})
+					}
+				}()
 
 				select {
 				case ok := <-doneChan:
@@ -813,7 +800,12 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					files = append(files, downloader.MegaFileInfo{ID: n.Handle, Name: n.Name, Size: n.Size, Path: n.Path})
 				}
 				doneChan := RegisterMegaSelectCache(uidStr, files, msg.UserID)
-				_ = m.sender.EditMessage(ctx, peer, notifyID, fmt.Sprintf("㊂ <b><u>MEGA Folder :</u></b>\n\n<blockquote>%d files. Choose them on the web page, then press Done Selecting.</blockquote>", len(files)), BuildMegaSelectionButtons(uidStr))
+				selMsg, _ := m.sender.SendMessage(ctx, peer, fmt.Sprintf("㊂ <b><u>MEGA Folder :</u></b>\n\n<blockquote>%d files. Choose them on the web page, then press Done Selecting.</blockquote>", len(files)), msg.MessageID, BuildMegaSelectionButtons(uidStr))
+				defer func() {
+					if selMsg > 0 {
+						_ = m.sender.DeleteMessage(context.Background(), peer, []int{selMsg})
+					}
+				}()
 				select {
 				case ok := <-doneChan:
 					if !ok {
@@ -865,6 +857,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				if task.Name() != "" {
 					uTask.SetName(task.Name())
 				}
+				if se, le, isT := task.Peers(); isT {
+					uTask.SetPeers(se, le)
+				}
 			})
 		} else if isRemoteTorrent {
 			log.Printf("[LEECH] Downloading remote .torrent metadata: %s", link)
@@ -878,6 +873,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 						uTask.SetProgress(cur, total, task.Speed(), task.ETA())
 						if task.Name() != "" {
 							uTask.SetName(task.Name())
+						}
+						if se, le, isT := task.Peers(); isT {
+							uTask.SetPeers(se, le)
 						}
 					})
 				} else {
@@ -893,6 +891,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 						if task.Name() != "" {
 							uTask.SetName(task.Name())
 						}
+						if se, le, isT := task.Peers(); isT {
+							uTask.SetPeers(se, le)
+						}
 					})
 				}
 			} else {
@@ -907,6 +908,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					uTask.SetProgress(cur, total, task.Speed(), task.ETA())
 					if task.Name() != "" {
 						uTask.SetName(task.Name())
+					}
+					if se, le, isT := task.Peers(); isT {
+						uTask.SetPeers(se, le)
 					}
 				})
 			}
@@ -928,7 +932,6 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 			gid, err := aria.AddURIWith(ariaLink, taskDir, opt.CustomName, taskHeaders(opt.Headers, opt.Username, opt.Password), selExtra)
 			if err == nil && selExtra != nil {
-				_ = m.sender.EditMessage(ctx, peer, notifyID, "<i>Getting the torrent file list...</i>", nil)
 				fileGID, wErr := aria.WaitTorrentFiles(ctx, gid)
 				if wErr != nil {
 					_ = aria.Cancel(gid)
@@ -936,7 +939,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					return
 				}
 				_ = aria.Pause(fileGID) // a plain .torrent has no metadata step
-				if !m.waitSelection(ctx, peer, notifyID, msg.UserID, fileGID, "torrent") {
+				if !m.waitSelection(ctx, peer, msg.MessageID, msg.UserID, fileGID, "torrent") {
 					_ = aria.Cancel(fileGID)
 					m.sendDownloadError(ctx, peer, msg, notifyID, "File selection cancelled by user", modeStr, taskStartTime)
 					return
@@ -971,6 +974,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					uTask.SetProgress(cur, total, task.Speed(), task.ETA())
 					if task.Name() != "" {
 						uTask.SetName(task.Name())
+					}
+					if se, le, isT := task.Peers(); isT {
+						uTask.SetPeers(se, le)
 					}
 				})
 			}
@@ -1025,6 +1031,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				uTask.SetProgress(cur, total, task.Speed(), task.ETA())
 				if task.Name() != "" {
 					uTask.SetName(task.Name())
+				}
+				if se, le, isT := task.Peers(); isT {
+					uTask.SetPeers(se, le)
 				}
 			})
 			if dlErr != nil {

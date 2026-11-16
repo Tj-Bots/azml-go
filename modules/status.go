@@ -196,6 +196,35 @@ func (m *StatusModule) SetStatusMessage(chatID int64, msgID int, peer tg.InputPe
 	}
 }
 
+// TakeOverStatus makes msgID (the answer to the newest command) the status message of the chat
+// and deletes the old one, so the status is always at the bottom – like the Python bot.
+func (m *StatusModule) TakeOverStatus(chatID int64, msgID int, peer tg.InputPeerClass) {
+	if msgID <= 0 {
+		return
+	}
+	m.mu.Lock()
+	old := m.statusReplies[chatID]
+	m.chatPeers[chatID] = peer
+	m.statusReplies[chatID] = &StatusReplyInfo{
+		ChatID:      chatID,
+		MessageID:   msgID,
+		Peer:        peer,
+		CurrentPage: 1,
+		CreatedAt:   time.Now(),
+	}
+	m.mu.Unlock()
+	if old != nil && old.MessageID > 0 && old.MessageID != msgID {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = m.sender.DeleteMessage(ctx, old.Peer, []int{old.MessageID})
+		}()
+	}
+	if m.taskMgr.Count() > 0 {
+		go m.UpdateAllMessages(context.Background(), true)
+	}
+}
+
 func (m *StatusModule) RemoveStatusMessage(chatID int64) {
 	m.mu.Lock()
 	delete(m.statusReplies, chatID)

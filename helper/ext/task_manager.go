@@ -261,6 +261,11 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 		sb.WriteString(fmt.Sprintf("┠ <b>Processed:</b> %s of %s\n", GetReadableFileSize(t.DownloadedBytes()), GetReadableFileSize(t.Size())))
 		sb.WriteString(fmt.Sprintf("┠ <b>Speed:</b> %s/s\n", GetReadableFileSize(int64(t.Speed()))))
 		sb.WriteString(fmt.Sprintf("┠ <b>ETA:</b> %s | <b>Elapsed:</b> %s\n", telegram.EscapeHTML(t.ETA()), telegram.EscapeHTML(elapsed)))
+		if ut, ok := t.(interface{ Peers() (int, int, bool) }); ok {
+			if se, le, isT := ut.Peers(); isT && t.Status() == types.StatusDownloading {
+				sb.WriteString(fmt.Sprintf("┠ <b>Seeders:</b> %d | <b>Leechers:</b> %d\n", se, le))
+			}
+		}
 		sb.WriteString(fmt.Sprintf("┠ <b>Engine:</b> %s\n", telegram.EscapeHTML(engine)))
 		sb.WriteString(fmt.Sprintf("┠ <b>Mode:</b> %s | <b>Out:</b> telegram\n", telegram.EscapeHTML(inMode)))
 		sb.WriteString(fmt.Sprintf("┠ <b>User:</b> <code>%s</code>\n", telegram.EscapeHTML(user)))
@@ -400,7 +405,24 @@ type UnifiedTask struct {
 	chatID     int64
 	userID     int64
 	cancelFn   context.CancelFunc
+	seeders    int
+	leechers   int
+	isTorrent  bool
 	mu         sync.RWMutex
+}
+
+// SetPeers shows seeders / leechers of a torrent in the status.
+func (t *UnifiedTask) SetPeers(seeders, leechers int) {
+	t.mu.Lock()
+	t.seeders, t.leechers, t.isTorrent = seeders, leechers, true
+	t.mu.Unlock()
+}
+
+// Peers returns the torrent peers (ok=false when not a torrent).
+func (t *UnifiedTask) Peers() (int, int, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.seeders, t.leechers, t.isTorrent
 }
 
 func NewUnifiedTask(gid, name string, size int64, chatID, userID int64, msgID int, cancelFn context.CancelFunc) *UnifiedTask {

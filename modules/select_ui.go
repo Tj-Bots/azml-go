@@ -58,7 +58,7 @@ func selectionButtons(webID, key string) *telegram.ButtonMaker {
 }
 
 // waitSelection shows the selection message on msgID and blocks until Done (true) or Cancel.
-func (m *LeechModule) waitSelection(ctx context.Context, peer tg.InputPeerClass, msgID int, userID int64, webID, what string) bool {
+func (m *LeechModule) waitSelection(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, webID, what string) bool {
 	key := webID
 	if len(key) > 24 {
 		key = key[:24]
@@ -70,7 +70,13 @@ func (m *LeechModule) waitSelection(ctx context.Context, peer tg.InputPeerClass,
 	if config.Get().BaseURL == "" {
 		text += "\n\n⚠️ <i>BASE_URL is not set in /bs, the web page will not open.</i>"
 	}
-	_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, selectionButtons(webID, key), 2)
+	// its own message (the status message keeps refreshing), deleted when done
+	msgID, _ := m.sender.SendMessageWithButtons(ctx, peer, text, replyTo, selectionButtons(webID, key), 2)
+	defer func() {
+		if msgID > 0 {
+			_ = m.sender.DeleteMessage(context.Background(), peer, []int{msgID})
+		}
+	}()
 	select {
 	case ok := <-s.done:
 		return ok
@@ -107,7 +113,6 @@ func (m *LeechModule) HandleSelectCallback(ctx context.Context, peer tg.InputPee
 		}
 	case "done":
 		_ = m.sender.AnswerCallback(ctx, queryID, "Starting the download...", false)
-		_ = m.sender.EditMessage(ctx, peer, msgID, "<i>Starting the download...</i>", nil)
 		select {
 		case s.done <- true:
 		default:

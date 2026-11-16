@@ -60,6 +60,8 @@ type Aria2StatusResponse struct {
 	FollowedBy      []string     `json:"followedBy"`
 	Following       string       `json:"following"`
 	Bittorrent      *Aria2BTInfo `json:"bittorrent"`
+	NumSeeders      string       `json:"numSeeders"`
+	Connections     string       `json:"connections"`
 }
 
 type JSONRPCRequest struct {
@@ -495,6 +497,9 @@ type Aria2DownloadTask struct {
 	client       *Aria2RPCClient
 	downloadDir  string
 	downloadPath string
+	seeders      int
+	leechers     int
+	isTorrent    bool
 	mu           sync.RWMutex
 }
 
@@ -608,6 +613,15 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 			t.size = tot
 			t.downloaded = cur
 			t.speed = spd
+			if res.Bittorrent != nil {
+				t.seeders, _ = strconv.Atoi(res.NumSeeders)
+				conns, _ := strconv.Atoi(res.Connections)
+				t.leechers = conns - t.seeders
+				if t.leechers < 0 {
+					t.leechers = 0
+				}
+				t.isTorrent = true
+			}
 
 			if len(res.Files) > 0 {
 				clean := filepath.Base(res.Files[0].Path)
@@ -715,4 +729,11 @@ func (a *Aria2RPCClient) WaitTorrentFiles(ctx context.Context, gid string) (stri
 		}
 	}
 	return "", fmt.Errorf("no torrent metadata after 10 minutes")
+}
+
+// Peers: seeders and leechers of a torrent (ok=false for other downloads).
+func (t *Aria2DownloadTask) Peers() (seeders, leechers int, ok bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.seeders, t.leechers, t.isTorrent
 }

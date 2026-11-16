@@ -489,17 +489,9 @@ func (m *LeechModule) StartYtdl(peer tg.InputPeerClass, msg *types.MessageContex
 		_ = os.MkdirAll(taskDir, 0777)
 	}
 
-	isFirstStatus := false
-	if m.statusMod != nil {
-		isFirstStatus = m.statusMod.ReserveStatusSlot(msg.ChatID)
-	}
 	notifyID, _ := m.sender.SendMessage(ctx, peer, fmt.Sprintf("<i>%s...</i>", telegram.ToSmallCaps("Initiating YT-DLP Task")), msg.MessageID, nil)
 	if notifyID > 0 && m.statusMod != nil {
-		if isFirstStatus {
-			m.statusMod.SetStatusMessage(msg.ChatID, notifyID, peer)
-		} else {
-			m.sender.AutoDeleteMessage(peer, notifyID, 4)
-		}
+		m.statusMod.TakeOverStatus(msg.ChatID, notifyID, peer)
 	}
 	go func() {
 		m.processLeechPipeline(peer, msg, opt, link, taskDir, notifyID)

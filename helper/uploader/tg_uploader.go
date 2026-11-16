@@ -528,7 +528,7 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		}
 
 		// The user session uploads over its own pool (14+ connections) – much faster than the bot.
-		if os.Getenv("USER_UPLOAD") != "false" && u.userClient != nil && u.userUp != nil &&
+		if os.Getenv("USER_UPLOAD") == "true" && u.userClient != nil && u.userUp != nil &&
 			transitBinChatID < 0 && telegram.ResolveUserChannelHash(ctx, u.userClient, transitBinChatID) != 0 {
 			clientToUse = u.userClient
 			targetUploadChatID = transitBinChatID

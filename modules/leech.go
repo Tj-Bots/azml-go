@@ -1627,14 +1627,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			setStep(uTask, "MediaInfo")
 			if miLink := mediaInfoLink(curFile, finalName); miLink != "" {
 				fileButtons = telegram.NewButtonMaker()
-				fileButtons.UButtonStyled("MediaInfo", miLink, "primary")
+				fileButtons.UButtonStyled("📃 MediaInfo", miLink, "primary")
 			}
 		}
 		if len(ssLinks) > 0 {
 			if fileButtons == nil {
 				fileButtons = telegram.NewButtonMaker()
 			}
-			fileButtons.UButtonStyled("ScreenShots", ssLinks[0], "primary")
+			fileButtons.UButtonStyled("🖼 ScreenShots", ssLinks[0], "primary")
 		}
 		if fileButtons != nil {
 			fileButtons.Row()
@@ -1858,7 +1858,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			if idx >= 3 {
 				break
 			}
-			label := "◈ " + mirrorHostName(opt.MirrorHost)
+			label := "📎 " + mirrorHostName(opt.MirrorHost) + " Link"
 			if len(uniq) > 1 {
 				label = fmt.Sprintf("%s %d", label, idx+1)
 			}
@@ -1867,13 +1867,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	} else {
 		if botUser != "" {
-			finishBtn.UButtonStyled("View in Bot PM", fmt.Sprintf("https://t.me/%s", botUser), "primary")
+			finishBtn.UButtonStyled("📥 View in Bot PM", fmt.Sprintf("https://t.me/%s", botUser), "primary")
 			finishBtn.Row() // one button per row
 		}
 	}
 
 	if cfg.SourceLink && !cfg.SafeMode && (ext.IsURL(sourceURL) || strings.HasPrefix(sourceURL, "https://t.me/")) && !ext.IsMagnet(sourceURL) {
-		finishBtn.UButtonStyled("Source Link", sourceURL, "primary")
+		finishBtn.UButtonStyled("🔐 Source Link", sourceURL, "primary")
 		finishBtn.Row()
 	}
 	if cfg.SaveMsg && msg.ChatID != msg.UserID { // in PM there is nothing to save
@@ -2300,7 +2300,7 @@ func retryMarkup(msg *types.MessageContext) tg.ReplyMarkupClass {
 	retryStore[key] = retryEntry{msg: &cp, at: time.Now()}
 	retryMu.Unlock()
 	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("↻ Retry", fmt.Sprintf("retry %d %s", msg.UserID, key), "primary")
+	btn.IButtonStyled("🔄 Retry", fmt.Sprintf("retry %d %s", msg.UserID, key), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", msg.UserID), "danger")
 	btn.Row()
 	return btn.BuildMenu(2)

@@ -204,7 +204,7 @@ func (m *MediaInfoModule) sendMediaInfo(ctx context.Context, peer tg.InputPeerCl
 
 	respText := fmt.Sprintf("㊂ <b><u>MediaInfo :</u></b>\n\n<blockquote>◈ <b>Name :</b> <code>%s</code></blockquote>", telegram.EscapeHTML(fileName))
 	btn := telegram.NewButtonMaker()
-	btn.UButtonStyled("MediaInfo", pageURL, "primary")
+	btn.UButtonStyled("📃 MediaInfo", pageURL, "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", userID), "danger")
 	btn.Row()
 	_ = m.sender.EditMessage(ctx, peer, waitID, respText, btn.BuildMenu(2))

@@ -41,6 +41,7 @@ type UserSettings struct {
 	Metadata       map[string]string `json:"metadata" bson:"metadata"`
 	FFmpegCommands map[string]string `json:"ffmpeg_cmds" bson:"ffmpeg_cmds"`
 	AutoThumb      bool              `json:"auto_thumb" bson:"auto_thumb"`
+	AutoThumbSet   bool              `json:"auto_thumb_set,omitempty" bson:"auto_thumb_set,omitempty"` // chose in /us (else AUTO_THUMBNAIL)
 	BotPM          bool              `json:"bot_pm" bson:"bot_pm"`
 	StartedInPM    bool              `json:"started_in_pm" bson:"started_in_pm"`
 	TopicIDs       []int             `json:"topic_ids" bson:"topic_ids"`
@@ -231,6 +232,17 @@ func (u *UserSettings) MediaInfoOn(botDefault bool) bool {
 		return u.MediaInfo
 	}
 	return botDefault
+}
+
+// AutoThumbOn: the user's choice in /us, or AUTO_THUMBNAIL from /bs.
+func (u *UserSettings) AutoThumbOn(botDefault bool) bool {
+	if u == nil {
+		return botDefault
+	}
+	if !u.AutoThumbSet {
+		return botDefault || u.AutoThumb // older saves turned it on without the "set" mark
+	}
+	return u.AutoThumb
 }
 
 // MediaStoreOn: the user's choice in /us, or MEDIA_STORE from /bs.

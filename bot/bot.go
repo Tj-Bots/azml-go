@@ -53,6 +53,7 @@ type BotApp struct {
 
 	// Modules
 	leechHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, isZip, isUnzip bool)
+	gateHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool
 	ytdlHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	ytdlCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	selectCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
@@ -176,7 +177,10 @@ func (h *botUpdateHandler) Handle(ctx context.Context, u tg.UpdatesClass) error 
 				}
 			}
 		}
-		return h.gaps.Handle(ctx, u)
+		// straight to the handlers, like the Python bot: the gaps manager held group commands
+		// back (a bot in privacy mode sees a "gap" before almost every group command, waits,
+		// then Telegram makes it wait more for getChannelDifference), so replies came late
+		return h.dispatcher.Handle(ctx, u)
 	}
 }
 
@@ -233,6 +237,12 @@ func NewBotApp() *BotApp {
 func (b *BotApp) SetLeechHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, isZip, isUnzip bool)) {
 	b.leechHandler = h
 }
+
+// SetGateHandler: the PM / FSUB check of task commands (false = blocked, the user was told).
+func (b *BotApp) SetGateHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool) {
+	b.gateHandler = h
+}
+
 func (b *BotApp) SetYtdlHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext), cb func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
 	b.ytdlHandler = h
 	b.ytdlCbHandler = cb
@@ -801,7 +811,11 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		isGroupChat = true
 	}
 
-	if !isOwnerOrSudo && isGroupChat {
+	// task commands run their own check (PM + FSUB in one message, like the Python bot)
+	isTaskCmd := telegram.MatchCommand(text, telegram.BotCommands.Leech, b.botUsername) ||
+		telegram.MatchCommand(text, telegram.BotCommands.Mirror, b.botUsername) ||
+		telegram.MatchCommand(text, telegram.BotCommands.Ytdl, b.botUsername)
+	if !isOwnerOrSudo && isGroupChat && !isTaskCmd {
 		u := b.userMap.Get(senderID)
 		if u == nil || !u.StartedInPM {
 			botUser := b.botUsername
@@ -1058,14 +1072,9 @@ func (b *BotApp) Start(ctx context.Context) error {
 		// Register all bot commands in Telegram's autocomplete list
 		b.registerBotCommands(ctx)
 
-		// Start updates manager in background
-		if botSelf != nil {
-			go func() {
-				log.Printf("[AZML-Go Bot Client] Starting updates manager for bot user ID %d...", botSelf.ID)
-				if err := b.gaps.Run(ctx, b.rawAPI, botSelf.ID, updates.AuthOptions{IsBot: true}); err != nil && err != context.Canceled {
-					log.Printf("[AZML-Go Bot Client] Updates manager stopped: %v", err)
-				}
-			}()
+		// Telegram pushes updates to a connection that asked for its state once
+		if _, err := b.rawAPI.UpdatesGetState(ctx); err != nil {
+			log.Printf("[AZML-Go Bot Client] updates.getState: %v", err)
 		}
 
 		// Ensure Aria2c is up with 16 connections

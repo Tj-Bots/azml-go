@@ -521,6 +521,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		m.sendDownloadError(ctx, peer, msg, notifyID, "Download task cancelled while in queue", modeStr, taskStartTime)
 		return
 	}
+	// every early return must free the download slot, or the next task stays in QueueDL forever
+	defer ext.ReleaseDownload(taskUID)
 	if queuedDL {
 		_ = m.sender.EditMessage(ctx, peer, notifyID, "<i>Starting download from queue...</i>", nil)
 	}
@@ -1507,10 +1509,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if taskThumb != "" {
 			customThumb = taskThumb
 		}
-		autoThumbEnabled := cfg.AutoThumbnail
-		if user != nil && user.AutoThumb {
-			autoThumbEnabled = true
-		}
+		autoThumbEnabled := user.AutoThumbOn(cfg.AutoThumbnail)
 
 		// Effective upload as document resolution:
 		// 1. Bot-wide default (cfg.AsDocument, default true)

@@ -205,6 +205,7 @@ func main() {
 	app.SetSaveHandler(leechMod.HandleSaveCallback)
 	app.SetVTHandlers(leechMod.HandleVTCallback, leechMod.HandleVTInput)
 	app.SetYtdlHandler(ytdlMod.HandleYtdl, ytdlMod.HandleYtdlCallback)
+	app.SetGateHandler(leechMod.TaskGate)
 	app.SetStatusHandlers(statusMod.HandleStatus, statusMod.HandleCallback)
 	app.SetCancelHandlers(cancelMod.HandleCancel, cancelMod.HandleCancelAll, cancelMod.HandleCallback)
 	app.SetSettingsHandlers(settingsMod.HandleSettings, settingsMod.HandleCallback, settingsMod.HandleSettingUpdated)

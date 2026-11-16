@@ -68,6 +68,9 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 		b.leechHandler(ctx, peer, msgCtx, false, false)
 		return
 	}
+	if b.gateHandler != nil && !b.gateHandler(ctx, peer, msgCtx) {
+		return // before the host question
+	}
 	var userKeys map[string]string
 	if b.userMap != nil {
 		if u := b.userMap.Get(msgCtx.UserID); u != nil {

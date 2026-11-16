@@ -234,8 +234,37 @@ func IsGDriveLink(link string) bool {
 func (g *GDriveClient) GetFileInfo(id string) (*GDriveFile, error) {
 	token, err := g.GetAccessToken()
 	if err != nil {
-		return nil, err
+		return workerInfo(id) // no token.pickle: public links through GDRIVE_WORKER
 	}
+	f, err := g.apiFileInfo(id, token)
+	if err != nil {
+		if wf, wErr := workerInfo(id); wErr == nil {
+			g.markPublic(id)
+			return wf, nil
+		}
+	}
+	return f, err
+}
+
+// public: ids the token can't open but the worker can (their downloads go through the worker too)
+var (
+	publicMu  sync.Mutex
+	publicIDs = map[string]bool{}
+)
+
+func (g *GDriveClient) markPublic(id string) {
+	publicMu.Lock()
+	publicIDs[id] = true
+	publicMu.Unlock()
+}
+
+func isPublicID(id string) bool {
+	publicMu.Lock()
+	defer publicMu.Unlock()
+	return publicIDs[id]
+}
+
+func (g *GDriveClient) apiFileInfo(id, token string) (*GDriveFile, error) {
 
 	apiURL := fmt.Sprintf("https://www.googleapis.com/drive/v3/files/%s?supportsAllDrives=true&fields=id,name,mimeType,size", id)
 	req, _ := http.NewRequest("GET", apiURL, nil)
@@ -264,8 +293,12 @@ func (g *GDriveClient) GetFileInfo(id string) (*GDriveFile, error) {
 // GetFolderFiles lists all files inside a Google Drive folder recursively
 func (g *GDriveClient) GetFolderFiles(folderID string, currentPath string) ([]GDriveFile, error) {
 	token, err := g.GetAccessToken()
-	if err != nil {
-		return nil, err
+	if err != nil || isPublicID(folderID) {
+		files, wErr := workerFolder(folderID, currentPath, 0)
+		for _, f := range files {
+			g.markPublic(f.ID)
+		}
+		return files, wErr
 	}
 
 	var allFiles []GDriveFile
@@ -320,17 +353,25 @@ func (g *GDriveClient) GetFolderFiles(folderID string, currentPath string) ([]GD
 // DownloadFile downloads a Google Drive file using Aria2c (16 connections) or HTTP streaming fallback
 func (g *GDriveClient) DownloadFile(ctx context.Context, fileID, destDir, fileName string, progress func(curr, total int64, speed float64)) error {
 	token, err := g.GetAccessToken()
-	if err != nil {
-		return err
-	}
-
 	downloadURL := fmt.Sprintf("https://www.googleapis.com/drive/v3/files/%s?alt=media&supportsAllDrives=true", fileID)
 	header := fmt.Sprintf("Authorization: Bearer %s", token)
+	var headers []string
+	if err != nil || isPublicID(fileID) {
+		if gdriveWorker() == "" {
+			if err == nil {
+				err = fmt.Errorf("GDRIVE_WORKER is off")
+			}
+			return err
+		}
+		downloadURL, header, token = workerFileURL(fileID, fileName), "", ""
+	} else {
+		headers = []string{header}
+	}
 
 	// Try fast 16-connection download via Aria2c
 	aria := GetAria2Client()
 	if aria != nil {
-		gid, err := aria.AddURI(downloadURL, destDir, fileName, []string{header})
+		gid, err := aria.AddURI(downloadURL, destDir, fileName, headers)
 		if err == nil {
 			ticker := time.NewTicker(1 * time.Second)
 			defer ticker.Stop()
@@ -365,7 +406,9 @@ func (g *GDriveClient) DownloadFile(ctx context.Context, fileID, destDir, fileNa
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

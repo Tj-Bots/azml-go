@@ -82,16 +82,33 @@ func (m *LeechModule) fsubInfo(ctx context.Context, chatID int64) (*tg.InputChan
 	return ch, c, true
 }
 
-// forceSubOK sends the "join first" message and returns false when the user is missing a channel.
-func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
-	ids := strings.Fields(config.Get().FsubIDs)
-	if len(ids) == 0 || msg.ChatID == msg.UserID || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
-		return true
+// Task gate like the Python bot (task_utils): in groups, a user who didn't start the bot in PM
+// and/or didn't join the FSUB_IDS channels gets ONE numbered message with all the buttons.
+// The message then follows the user: every item he completes disappears from it, and when
+// nothing is left it says so (then deletes itself). Owner and sudo are never checked.
+
+type gateState struct {
+	pm    bool       // didn't start the bot in PM
+	chans []fsubChat // channels not joined yet
+}
+
+func (g gateState) empty() bool { return !g.pm && len(g.chans) == 0 }
+
+func (g gateState) key() string {
+	k := fmt.Sprint(g.pm)
+	for _, c := range g.chans {
+		k += "|" + c.title
 	}
-	user := &tg.InputUser{UserID: msg.UserID, AccessHash: telegram.GetUserAccessHash(msg.UserID)}
-	btn := telegram.NewButtonMaker()
-	missing := 0
-	for _, s := range ids {
+	return k
+}
+
+// gateCheck returns what the user still has to do.
+func (m *LeechModule) gateCheck(ctx context.Context, userID int64) gateState {
+	var g gateState
+	if u := m.userMap.Get(userID); u == nil || !u.StartedInPM {
+		g.pm = true
+	}
+	for _, s := range strings.Fields(config.Get().FsubIDs) {
 		id, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			continue
@@ -100,7 +117,8 @@ func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, ms
 		if !ok {
 			continue
 		}
-		_, err = m.rawAPI.ChannelsGetParticipant(ctx, &tg.ChannelsGetParticipantRequest{Channel: ch, Participant: &tg.InputPeerUser{UserID: user.UserID, AccessHash: user.AccessHash}})
+		_, err = m.rawAPI.ChannelsGetParticipant(ctx, &tg.ChannelsGetParticipantRequest{Channel: ch,
+			Participant: &tg.InputPeerUser{UserID: userID, AccessHash: telegram.GetUserAccessHash(userID)}})
 		if err == nil {
 			continue
 		}
@@ -108,22 +126,77 @@ func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, ms
 			log.Printf("[FSUB] check in %d failed: %v", id, err)
 			continue // can't check: don't block the user
 		}
-		missing++
-		if info.link != "" {
-			btn.UButtonStyled("Join "+info.title, info.link, "primary")
-			btn.Row()
+		g.chans = append(g.chans, info)
+	}
+	return g
+}
+
+func gateRender(tag string, g gateState) (string, *telegram.ButtonMaker) {
+	text := fmt.Sprintf("<b><i>User:</i> %s</b>,\n", tag)
+	btn := telegram.NewButtonMaker()
+	n := 0
+	if g.pm {
+		n++
+		text += fmt.Sprintf("\n<b>%d</b>: <i>You didn't START the bot in PM (Private)</i>\n", n)
+		bu := telegram.CurrentBotUsername
+		btn.UButtonStyled("Start Bot Now", fmt.Sprintf("https://t.me/%s?start=start", bu), "primary")
+	}
+	if len(g.chans) > 0 {
+		n++
+		text += fmt.Sprintf("\n<b>%d</b>: You haven't joined our channel yet!\n", n)
+		for _, c := range g.chans {
+			if c.link != "" {
+				btn.UButtonStyled("Join "+c.title, c.link, "primary")
+			}
 		}
 	}
-	if missing == 0 {
+	text += "\n<i>This message updates by itself when you're done.</i>"
+	return text, btn
+}
+
+// forceSubOK runs the gate; false = the user got the message and the task does not start.
+func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
+	if msg.ChatID == msg.UserID || msg.Internal || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
+		return true
+	}
+	g := m.gateCheck(ctx, msg.UserID)
+	if g.empty() {
 		return true
 	}
 	tag := fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, telegram.EscapeHTML(msg.SenderName))
 	if msg.Username != "" {
 		tag = "@" + msg.Username
 	}
-	text := fmt.Sprintf("㊂ <b><u>Join First :</u></b>\n\n<blockquote>Hey %s, you haven't joined our channel yet!\nJoin and send the command again.</blockquote>", tag)
-	_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 1)
+	text, btn := gateRender(tag, g)
+	id, err := m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 2)
+	if err != nil || id == 0 {
+		return false
+	}
+	go m.gateFollow(peer, msg.UserID, id, tag, g)
 	return false
+}
+
+// gateFollow re-checks the user every few seconds (10 minutes at most) and edits the message.
+func (m *LeechModule) gateFollow(peer tg.InputPeerClass, userID int64, msgID int, tag string, g gateState) {
+	ctx := context.Background()
+	last := g.key()
+	deadline := time.Now().Add(10 * time.Minute)
+	for time.Now().Before(deadline) {
+		time.Sleep(4 * time.Second)
+		cur := m.gateCheck(ctx, userID)
+		if cur.empty() {
+			done := fmt.Sprintf("<b><i>User:</i> %s</b>,\n\n✓ <b>All set!</b> Send the command again.", tag)
+			_ = m.sender.EditMessage(ctx, peer, msgID, done, nil)
+			m.sender.AutoDeleteMessage(peer, msgID, 60)
+			return
+		}
+		if k := cur.key(); k != last {
+			last = k
+			text, btn := gateRender(tag, cur)
+			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		}
+	}
+	_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 }
 
 // ---- USER_TIME_INTERVAL: a user waits between tasks (Python bot: timeval_check) ----
@@ -155,4 +228,9 @@ func (m *LeechModule) timeIntervalOK(ctx context.Context, peer tg.InputPeerClass
 	userLastTask[msg.UserID] = time.Now()
 	userTaskMu.Unlock()
 	return true
+}
+
+// TaskGate is the PM / FSUB check for commands that start in bot/ (like /mirror before its host question).
+func (m *LeechModule) TaskGate(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
+	return m.forceSubOK(ctx, peer, msg)
 }

@@ -15,7 +15,7 @@ import (
 const saveMsgData = "save"
 
 func saveMsgButton(btn *telegram.ButtonMaker) {
-	btn.IButton("📨 Save Message", saveMsgData)
+	btn.IButtonStyled("📨 Save Message", saveMsgData, "success")
 	btn.Row()
 }
 

@@ -56,6 +56,7 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	GDriveWorker              string
 	MediaStore                bool
 	IncompleteTaskNotifier    bool
 	DisableVT                 bool
@@ -208,6 +209,7 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		GDriveWorker:              getEnv("GDRIVE_WORKER", "https://gdrive.tjbot.workers.dev"),
 		MediaStore:                getEnvBool("MEDIA_STORE", false),
 		IncompleteTaskNotifier:    getEnvBool("INCOMPLETE_TASK_NOTIFIER", false),
 		DisableVT:                 getEnvBool("DISABLE_VT", false),
@@ -510,6 +512,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.IncompleteTaskNotifier = val == "true" || val == "1"
 	case "MEDIA_STORE":
 		GlobalConfig.MediaStore = val == "true" || val == "1"
+	case "GDRIVE_WORKER":
+		GlobalConfig.GDriveWorker = val
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -653,6 +657,7 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"GDRIVE_WORKER":                GlobalConfig.GDriveWorker,
 		"MEDIA_STORE":                  strconv.FormatBool(GlobalConfig.MediaStore),
 		"INCOMPLETE_TASK_NOTIFIER":     strconv.FormatBool(GlobalConfig.IncompleteTaskNotifier),
 		"DISABLE_VT":                   strconv.FormatBool(GlobalConfig.DisableVT),

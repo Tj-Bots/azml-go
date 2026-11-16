@@ -2,6 +2,7 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"GDRIVE_WORKER":                "Worker that downloads PUBLIC Google Drive files and folders when there is no token.pickle (or the token can't open the link). Empty = off.",
 	"MEDIA_STORE":                  "Default for Media Store: every leeched file gets a Store Link, anyone who opens it gets the file from the bot in PM. Users can change it for themselves in User Settings → Leech. Bool",
 	"INCOMPLETE_TASK_NOTIFIER":     "Get incomplete task messages after restart: the tasks that were running are listed (with links to their commands in groups) in the chats they were started in. Needs DATABASE_URL. Default is False. Bool",
 	"DISABLE_VT":                   "Disable Video Tools (-vt) for all users. Default is False. Bool",

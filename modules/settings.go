@@ -163,7 +163,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 			_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("◈ <b>AutoRename</b> is now: <b>%s</b>", st), msg.MessageID, nil)
 			return
 		case "autothumb", "auto_thumb":
-			u.AutoThumb = !u.AutoThumb
+			u.AutoThumb, u.AutoThumbSet = !u.AutoThumbOn(config.Get().AutoThumbnail), true
 			_ = ext.DB.SaveUser(u)
 			st := "Disabled"
 			if u.AutoThumb {
@@ -331,7 +331,7 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 	return u.Prefix != "" || u.Suffix != "" || u.Caption != "" ||
 		u.RemnameAuto != "" || u.RemnameRegex != "" || u.SplitSize != 0 ||
 		u.Autorename || (u.RenameMethod != "" && u.RenameMethod != "auto") ||
-		u.AutoThumb || u.EqualSplits || u.MediaGroup ||
+		u.AutoThumbSet || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" ||
 		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet || u.MediaStoreSet
@@ -424,7 +424,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 	}
 
 	autoThumb := "Disabled"
-	if u.AutoThumb {
+	if u.AutoThumbOn(config.Get().AutoThumbnail) {
 		autoThumb = "Enabled"
 	}
 
@@ -488,7 +488,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		}
 	}
 	toggle("AutoRename", u.Autorename, fmt.Sprintf("userset %d autorename", u.UserID))
-	toggle("Auto Thumbnail", u.AutoThumb, fmt.Sprintf("userset %d auto_thumb", u.UserID))
+	toggle("Auto Thumbnail", u.AutoThumbOn(config.Get().AutoThumbnail), fmt.Sprintf("userset %d auto_thumb", u.UserID))
 	btn.Row()
 	btn.IButton("Caption Font", fmt.Sprintf("userset %d capfont", u.UserID))
 	btn.IButton("Excluded Ext", fmt.Sprintf("userset %d lexcluded", u.UserID))
@@ -739,7 +739,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.SplitSize = 0
 		u.Autorename = false
 		u.RenameMethod = "auto"
-		u.AutoThumb = false
+		u.AutoThumb, u.AutoThumbSet = false, false
 		u.EqualSplits = false
 		u.MediaGroup = false
 		u.AsDoc = config.Get().AsDocument
@@ -791,7 +791,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 
 	case "auto_thumb":
-		u.AutoThumb = !u.AutoThumb
+		u.AutoThumb, u.AutoThumbSet = !u.AutoThumbOn(config.Get().AutoThumbnail), true
 		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
 		st := "Disabled"
 		if u.AutoThumb {

@@ -46,6 +46,7 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"GDRIVE_WORKER",
 	"MEDIA_STORE",
 	"INCOMPLETE_TASK_NOTIFIER",
 	"DISABLE_VT",

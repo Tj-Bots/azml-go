@@ -547,9 +547,18 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if srcMsgID == 0 {
 			srcMsgID = msg.MessageID
 		}
-		if mediaSource != nil && cfg.DeleteLinks && !msg.Internal {
-			// DELETE_LINKS: copy the file to the dump channel, delete the originals right away,
-			// download from the copy (also the Source Link points to it)
+		// helper bots (BOT_TOKENS) download from a forward of the message, so only then the file is
+		// first copied to the dump channel; the bot alone reads it directly (like the Python bot)
+		needsCopy := m.sessPool != nil && m.sessPool.ActiveSessionCount() > 0
+		if mediaSource != nil && cfg.DeleteLinks && !msg.Internal && !needsCopy {
+			deleteLinks() // the file location is known: delete now, the bot downloads it directly
+			if strings.HasPrefix(sourceURL, "https://t.me/c/") {
+				sourceURL = "" // the original is gone
+			}
+		}
+		if mediaSource != nil && cfg.DeleteLinks && !msg.Internal && needsCopy {
+			// DELETE_LINKS with helper bots: copy the file to the dump channel, delete the originals
+			// right away, the helper bots download from the copy (the Source Link points to it)
 			dump := m.dumpChatID
 			if dump == 0 {
 				dump = cfg.DumpChatID

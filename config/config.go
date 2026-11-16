@@ -56,6 +56,7 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	DeleteLinks               bool
 	RichMessages              bool
 	CleanLogMsg               bool
 	UserTimeInterval          int
@@ -190,6 +191,7 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		DeleteLinks:               getEnvBool("DELETE_LINKS", false),
 		RichMessages:              getEnvBool("RICH_MESSAGES", false),
 		CleanLogMsg:               getEnvBool("CLEAN_LOG_MSG", false),
 		UserTimeInterval:          getEnvInt("USER_TIME_INTERVAL", 0),
@@ -440,6 +442,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.CleanLogMsg = val == "true" || val == "1"
 	case "RICH_MESSAGES":
 		GlobalConfig.RichMessages = val == "true" || val == "1"
+	case "DELETE_LINKS":
+		GlobalConfig.DeleteLinks = val == "true" || val == "1"
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -577,6 +581,7 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"DELETE_LINKS":                 strconv.FormatBool(GlobalConfig.DeleteLinks),
 		"RICH_MESSAGES":                strconv.FormatBool(GlobalConfig.RichMessages),
 		"CLEAN_LOG_MSG":                strconv.FormatBool(GlobalConfig.CleanLogMsg),
 		"USER_TIME_INTERVAL":           strconv.Itoa(GlobalConfig.UserTimeInterval),

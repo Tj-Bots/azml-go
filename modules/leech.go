@@ -1231,6 +1231,20 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	ulStartTime = time.Now()
 
+	// DELETE_LINKS: the command and the replied link/file are removed to keep the group clean
+	// (after the download, the bot still needed the replied file until now)
+	if cfg.DeleteLinks && !msg.Internal {
+		ids := []int{msg.MessageID}
+		if msg.IsReply && msg.ReplyToID > 0 {
+			ids = append(ids, msg.ReplyToID)
+		}
+		go func() {
+			dctx, dcancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer dcancel()
+			_ = m.sender.DeleteMessage(dctx, peer, ids)
+		}()
+	}
+
 	setStep(uTask, "Preparing Upload")
 	taskThumb := ""
 	if opt.ThumbURL != "" {

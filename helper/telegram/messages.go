@@ -542,7 +542,7 @@ func (m *MessageSender) sendBotAPIMessage(ctx context.Context, botToken string, 
 		"link_preview_options": map[string]bool{"is_disabled": true},
 	}
 	if replyToID != 0 {
-		payload["reply_to_message_id"] = replyToID
+		payload["reply_parameters"] = map[string]interface{}{"message_id": replyToID, "allow_sending_without_reply": true} // the command may be deleted (DELETE_LINKS)
 	}
 	if markup != nil {
 		keyboard, err := buildBotAPIKeyboard(markup)
@@ -765,7 +765,7 @@ func (m *MessageSender) SendPhotoFromURLWithButtons(ctx context.Context, peer tg
 			payload["reply_markup"] = json.RawMessage(btn.BuildBotAPIKeyboard(cols))
 		}
 		if replyToID != 0 {
-			payload["reply_to_message_id"] = replyToID
+			payload["reply_parameters"] = map[string]interface{}{"message_id": replyToID, "allow_sending_without_reply": true} // the command may be deleted (DELETE_LINKS)
 		}
 		body, _ := json.Marshal(payload)
 		req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto", botToken), bytes.NewReader(body))

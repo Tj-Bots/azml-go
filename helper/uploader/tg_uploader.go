@@ -1006,6 +1006,39 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			continue
 		}
 
+		// CHANNEL_INVALID: the saved access hash of the channel is wrong/old for this client.
+		// Forget it, ask Telegram again, and try once more with the fresh one.
+		if (strings.Contains(errStr, "CHANNEL_INVALID") || strings.Contains(errStr, "PEER_ID_INVALID")) && attempt < 3 {
+			if chPeer, ok := req.Peer.(*tg.InputPeerChannel); ok {
+				var fresh int64
+				switch {
+				case clientToUse == u.userClient:
+					telegram.CacheUserSessionChannel(chPeer.ChannelID, 0)
+					fresh = telegram.ResolveUserChannelHash(ctx, clientToUse, actualDestChatID)
+				case uploadBotSession != nil:
+					if inChan, rErr := uploadBotSession.ResolveChannel(ctx, actualDestChatID); rErr == nil && inChan != nil {
+						fresh = inChan.AccessHash
+					}
+				default:
+					telegram.ForgetChannelAccessHash(chPeer.ChannelID)
+					fresh = telegram.ResolveChannelAccessHash(ctx, clientToUse, actualDestChatID)
+				}
+				if fresh != 0 && fresh != chPeer.AccessHash {
+					log.Printf("[AZML-Go Uploader] %v: channel %d has a new access hash, retrying", sendErr, actualDestChatID)
+					req.Peer = &tg.InputPeerChannel{ChannelID: chPeer.ChannelID, AccessHash: fresh}
+					uploadPeer = req.Peer
+					continue
+				}
+				log.Printf("[AZML-Go Uploader] %v: the client can't reach channel %d (is it a member/admin there? is the id right?)", sendErr, actualDestChatID)
+			}
+			// the bot itself: send to the chat of the command instead of failing the task
+			if uploadBotSession == nil && clientToUse == u.botClient && uploadPeer != peer {
+				uploadPeer, actualDestChatID, req.Peer = peer, fromChatID, peer
+				req.ReplyTo = nil
+				continue
+			}
+		}
+
 		// Fallback to command peer ONLY for Main Bot with explicit permission rejection, NEVER for user client or transient errors
 		if uploadBotSession == nil && clientToUse == u.botClient && uploadPeer != peer && attempt < 2 {
 			if strings.Contains(errStr, "CHAT_ADMIN_REQUIRED") || strings.Contains(errStr, "CHAT_WRITE_FORBIDDEN") ||

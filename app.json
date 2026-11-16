@@ -1,7 +1,7 @@
 {
-  "description": "High-Performance Telegram Leech & Mirror Bot written in Go",
-  "keywords": ["telegram", "leech", "mirror", "aria2", "go", "azml"],
-  "repository": "https://github.com/isseisenpai0/azml-go",
+  "description": "Telegram leech bot written in Go",
+  "keywords": ["telegram", "leech", "go"],
+  "repository": "https://github.com/Tj-Bots/azml-go",
   "stack": "container",
   "env": {
     "BOT_TOKEN": {

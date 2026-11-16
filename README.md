@@ -1,98 +1,96 @@
+# Leech Bot (Go)
 
-<p align="center">
-    <i>A high-performance, ultra-lightweight Telegram Leech Bot engineered in pure Go. Built on top of the Gotd MTProto framework, featuring multi-bot pool rotation, AIMD upload pacing, and in-place HatchZip extraction.</i>
-</p>
-
-</div>
-
----
-
-> [!IMPORTANT]
-> **Pure Leech Bot Notice**: `AZMLX-zone` is exclusively designed for **Leeching** (downloading files from direct links, torrents, yt-dlp, and Telegram to upload straight back to Telegram). **Cloud Drive Mirroring (Google Drive, RClone, Mega) is not included for now** to maintain absolute focus on raw leeching speed, stability, and minimal resource usage.
+A Telegram leech bot written in Go. It downloads direct links, Mega, Google Drive,
+yt-dlp sites and Telegram files, and uploads them back to Telegram (or to a DDL host with `/mirror`).
+For our own use only.
 
 ---
-| Command | Description |
+
+## Commands
+
+| Command | What it does |
 |---|---|
-| `/leech [link/reply]` | Download and leech to Telegram |
-| `/unzipleech [link/reply]` | Download, extract archive in-place, and leech contents |
-| `/zipleech [link/reply]` | Download, compress into `.zip`, and leech |
-| `/ytdl [link]` | Download video/audio via yt-dlp and leech to Telegram |
-| `/ytdlzip [link]` | Download via yt-dlp, package as zip, and leech |
-| `/status` | View real-time progress, speed, ETA, and queue status |
-| `/cancel [gid]` | Cancel a specific running task |
-| `/cancelall` | Cancel all running tasks |
-| `/settings` | Open interactive user settings menu (Thumbnails, Prefixes, Fonts) |
-| `/speedtest` | Test server download and upload bandwidth |
-| `/ping` | Check bot responsiveness and latency |
-| `/stats` | View bot and system resource usage |
-| `/help` | Display command usage and instructions |
+| `/leech` `/l` | Download and upload to Telegram (`/l` alone shows all flags) |
+| `/zipleech` `/unzipleech` | Same, zip / extract first |
+| `/mirror` `/m` | Upload to GoFile, PixelDrain, BuzzHeavier, StreamTape and more |
+| `/ytdl` `/y` | yt-dlp with quality buttons |
+| `/status` `/s` | Running tasks |
+| `/cancel_GID` · `/cancelall` | Stop a task / all tasks |
+| `/us` | User settings |
+| `/bs` | Bot settings (owner) |
+| `/mediainfo` · `/history` · `/stats` · `/ping` · `/log` · `/help` | Tools |
+
+With `CMD_SUFFIX` (e.g. `1`) every command gets the suffix: `/l1`, `/s1`, `/cancel1_GID` …
 
 ---
 
-## 🛠️ Deployment Methods
+## Deploy on Heroku
 
-Choose between **Heroku CLI (Server-side Build)**, **Automated GitHub Actions CD**, or **Linux VPS (Docker Compose)**.
+Heroku builds the `Dockerfile` itself (container stack), nothing is built on your PC.
 
----
-
-### Method 1: Deploy on Heroku (Heroku CLI - Server Build)
-
-Deploys `AZML-Go` using Heroku's **Container Stack** where Heroku builds the `Dockerfile` directly on their remote build servers via `heroku.yml` (no local Docker build required).
-
-#### 1. Prerequisites
-- Install the [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli):
-  ```bash
-  curl https://cli-assets.heroku.com/install.sh | sh
-  ```
-
-#### 2. Clone the Repository
+### 1. Get the code
 ```bash
 git clone https://github.com/Tj-Bots/azml-go.git
-cd azml-X-ZxZone
+cd azml-go
 ```
 
-#### 3. Log In to Heroku
+### 2. Create the app
 ```bash
 heroku login
+heroku apps:create APP_NAME --stack=container
+# in a team:  heroku apps:create APP_NAME --stack=container --team TEAM_NAME
+heroku git:remote -a APP_NAME
 ```
 
-#### 4. Create Heroku App with Container Stack
+### 3. Variables
 ```bash
-# If creating a new app:
-heroku apps:create your-app-name --stack=container
-
-# Or if linking an existing app:
-heroku git:remote -a your-app-name
-heroku stack:set container -a your-app-name
+heroku config:set -a APP_NAME \
+  BOT_TOKEN="123:ABC" \
+  OWNER_ID="123456789" \
+  TELEGRAM_API="12345" \
+  TELEGRAM_HASH="abcdef..." \
+  DATABASE_URL="mongodb+srv://..." \
+  DUMP_CHAT_ID="-100..." \
+  BASE_URL="https://APP_NAME-xxxx.herokuapp.com"
 ```
+`BASE_URL` = the `Web URL` from `heroku info -a APP_NAME` (needed for file selection with `-s`).
+Everything else is set later from `/bs` and saved in the database.
 
-#### 5. Configure Environment Variables
-Set your configuration variables on Heroku:
+### 4. Deploy / update
 ```bash
-# Grab your live App Web URL to use as BASE_URL
-APP_URL=$(heroku apps:info -a your-app-name --json | jq -r '.app.web_url')
-
-# Set configuration variables
-heroku config:set BOT_TOKEN="your_bot_token" -a your-app-name
-heroku config:set OWNER_ID="your_telegram_id" -a your-app-name
-heroku config:set TELEGRAM_API="your_api_id" -a your-app-name
-heroku config:set TELEGRAM_HASH="your_api_hash" -a your-app-name
-heroku config:set BASE_URL="$APP_URL" -a your-app-name
+git pull
+git push heroku main -f
+heroku logs --tail -a APP_NAME
 ```
+Always update with `git push`. `/restart` does not rebuild on Heroku.
 
-#### 6. Deploy Code (Remote Docker Build on Heroku)
-When pushing to Heroku git, Heroku detects `heroku.yml` and builds the Docker container directly on their servers:
+---
+
+## A second bot
+
+1. Create a new bot in @BotFather (new `BOT_TOKEN`).
+2. Update the first bot once with this version (it keeps its database).
+3. Create a second app and give it its own git remote:
+   ```bash
+   heroku apps:create APP_NAME_2 --stack=container
+   heroku git:remote -a APP_NAME_2 -r heroku2
+   ```
+4. Same variables as above, with the new token, its own `BASE_URL` and a suffix:
+   ```bash
+   heroku config:set -a APP_NAME_2 BOT_TOKEN="NEW:TOKEN" CMD_SUFFIX="2" ...
+   ```
+5. Deploy it:
+   ```bash
+   git push heroku2 main -f
+   ```
+
+Both bots can use the same `DATABASE_URL`: every bot gets its own database automatically
+(`DATABASE_NAME` sets one by hand). In a shared group, use `/l` for one bot and `/l2` for the other.
+
+---
+
+## VPS (Docker)
 ```bash
-git push heroku master
+# create config.env with the variables above (one KEY=value per line), then:
+docker compose up -d --build
 ```
-
-#### 7. View Live Logs
-```bash
-heroku logs --tail -a your-app-name
-```
-
-#### 8. Authors
-
-Thanks to the code owner @aquib4040
-
-

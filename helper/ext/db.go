@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,11 +53,12 @@ func InitDB() *DatabaseManager {
 			client, err := mongo.Connect(ctx, clientOpts)
 			if err == nil && client.Ping(ctx, nil) == nil {
 				mgr.client = client
-				mgr.usersCol = client.Database("azml").Collection("users")
-				mgr.settingsCol = client.Database("azml").Collection("settings")
-				mgr.peersCol = client.Database("azml").Collection("peers")
+				name := databaseName(ctx, client, cfg.BotToken)
+				mgr.usersCol = client.Database(name).Collection("users")
+				mgr.settingsCol = client.Database(name).Collection("settings")
+				mgr.peersCol = client.Database(name).Collection("peers")
 				mgr.isMongo = true
-				log.Println("[DB] Connected to MongoDB successfully")
+				log.Printf("[DB] Connected to MongoDB successfully (database %s)", name)
 			} else {
 				log.Printf("[DB] MongoDB connection failed (%v), falling back to local file", err)
 			}
@@ -328,4 +330,32 @@ func (d *DatabaseManager) SavePeer(key string, hash int64) {
 	if data, err := json.Marshal(peers); err == nil {
 		_ = os.WriteFile(localPeersFile, data, 0644)
 	}
+}
+
+// databaseName gives every bot its own database on the same DATABASE_URL, so several bots
+// can share one MongoDB without mixing settings. The first bot keeps "azml" (old data stays);
+// another bot gets "azml_<bot id>". DATABASE_NAME overrides it.
+func databaseName(ctx context.Context, client *mongo.Client, botToken string) string {
+	if n := strings.TrimSpace(os.Getenv("DATABASE_NAME")); n != "" {
+		return n
+	}
+	botID := strings.SplitN(strings.TrimSpace(botToken), ":", 2)[0]
+	if botID == "" {
+		return "azml"
+	}
+	col := client.Database("azml").Collection("settings")
+	var doc struct {
+		Value string `bson:"value"`
+	}
+	err := col.FindOne(ctx, bson.M{"_id": "_OWNER_BOT_ID"}).Decode(&doc)
+	switch {
+	case err == nil && doc.Value == botID:
+		return "azml"
+	case err == nil && doc.Value != "":
+		return "azml_" + botID
+	}
+	// "azml" has no owner yet: the bot that used it so far (or the first one) takes it
+	_, _ = col.UpdateOne(ctx, bson.M{"_id": "_OWNER_BOT_ID"},
+		bson.M{"$set": bson.M{"value": botID}}, options.Update().SetUpsert(true))
+	return "azml"
 }

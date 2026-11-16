@@ -87,12 +87,6 @@ func copyMessageGetID(botToken string, toChatID int64, fromChatID int64, msgID i
 			}
 			return 1
 		}
-		// too many requests: wait as told and try again (else the link falls back to the dump)
-		if res.Parameters.RetryAfter > 0 && res.Parameters.RetryAfter <= 60 {
-			log.Printf("[AZML-Go Uploader] copyMessage to %d: wait %ds", toChatID, res.Parameters.RetryAfter)
-			time.Sleep(time.Duration(res.Parameters.RetryAfter)*time.Second + 300*time.Millisecond)
-			continue
-		}
 		log.Printf("[AZML-Go Uploader] copyMessage failed to %d: %s", toChatID, res.Description)
 		return 0
 	}
@@ -556,7 +550,9 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		clientToUse = u.userClient
 		// When uploading with user session string (>2GB files):
 		// Flow MUST BE: upload to Dump Channel first, then dump/forward to User DM!
-		if effectiveDumpChatID != 0 {
+		if effectiveLogChatID < 0 && telegram.ResolveUserChannelHash(ctx, u.userClient, effectiveLogChatID) != 0 {
+			targetUploadChatID = effectiveLogChatID
+		} else if effectiveDumpChatID != 0 {
 			targetUploadChatID = effectiveDumpChatID
 		} else if opt.UserID != 0 {
 			targetUploadChatID = opt.UserID
@@ -569,10 +565,12 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		// Priority 2: effectiveLogChatID (Leech Log Channel)
 		// Priority 3: User PM (opt.UserID)
 		// Priority 4: Command chat (fromChatID)
-		if transitBinChatID != 0 {
-			targetUploadChatID = transitBinChatID
-		} else if effectiveLogChatID != 0 {
+		// like the Python bot: straight into the leech log (its link is the one users can open),
+		// the dump channel gets a copy
+		if effectiveLogChatID != 0 {
 			targetUploadChatID = effectiveLogChatID
+		} else if transitBinChatID != 0 {
+			targetUploadChatID = transitBinChatID
 		} else if opt.UserID != 0 {
 			targetUploadChatID = opt.UserID
 		} else {
@@ -1260,6 +1258,11 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		// 2. Send to Leech Log ID via Main Bot (Main Bot is already admin in Leech Log)
 		if effectiveLogChatID != 0 {
 			deliverMedia(effectiveLogChatID, 0, "Leech Log")
+		}
+
+		// 3. the dump channel keeps a copy of everything (the upload went to the log)
+		if transitBinChatID != 0 && !opt.NoLog {
+			deliverMedia(transitBinChatID, 0, "Dump")
 		}
 
 		// 3. Clean up intermediate upload in group chat if it was only used for worker bot transfer

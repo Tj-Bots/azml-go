@@ -99,10 +99,6 @@ func copyMessagesGetIDs(botToken string, toChatID, fromChatID int64, msgIDs []in
 			}
 			return ids
 		}
-		if res.Parameters.RetryAfter > 0 && res.Parameters.RetryAfter <= 60 { // too many requests
-			time.Sleep(time.Duration(res.Parameters.RetryAfter)*time.Second + 300*time.Millisecond)
-			continue
-		}
 		log.Printf("[Media Group] copyMessages to %d failed: %s", toChatID, res.Description)
 		return nil
 	}
@@ -154,8 +150,18 @@ func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, 
 			log.Printf("[Media Group] album failed in %d, delivering the parts one by one", destChat)
 		}
 
+		if destChat == logChat && start == 0 { // uploaded straight into the log (like the Python bot)
+			first.LogChatID, first.LogMsgID = destChat, first.MsgID
+		}
+		dump := u.dumpChatID
+		if dump == 0 {
+			dump = cfg.DumpChatID
+		}
+		if opt.NoLog {
+			dump = 0
+		}
 		sent := map[int64]bool{destChat: true}
-		for _, target := range []int64{opt.DumpChatID, opt.UserID, logChat} {
+		for _, target := range []int64{opt.DumpChatID, opt.UserID, logChat, dump} {
 			if target == 0 || sent[target] {
 				continue
 			}

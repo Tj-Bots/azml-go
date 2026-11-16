@@ -1095,3 +1095,42 @@ func ResolveUserChannelHash(ctx context.Context, client *tg.Client, chatID int64
 	}
 	return h
 }
+
+// KeyboardWithout returns the Bot API keyboard of markup without buttons whose callback data
+// is drop (used by Save Message, so the copy has no Save button).
+func KeyboardWithout(markup tg.ReplyMarkupClass, drop string) string {
+	inline, ok := markup.(*tg.ReplyInlineMarkup)
+	if !ok {
+		return ""
+	}
+	var rows []tg.KeyboardInlineButtonRow
+	for _, r := range inline.Rows {
+		var keep []tg.KeyboardInlineButton
+		for _, b := range r.Buttons {
+			if cb, ok := b.Type.(*tg.InlineButtonTypeCallback); ok && string(cb.Data) == drop {
+				continue
+			}
+			keep = append(keep, b)
+		}
+		if len(keep) > 0 {
+			rows = append(rows, tg.KeyboardInlineButtonRow{Buttons: keep})
+		}
+	}
+	if len(rows) == 0 {
+		return ""
+	}
+	raw, err := buildBotAPIKeyboard(&tg.ReplyInlineMarkup{Rows: rows})
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+// AnswerCallbackURL answers a button with a t.me/<bot>?start link (opens the bot).
+func (m *MessageSender) AnswerCallbackURL(ctx context.Context, queryID int64, url string) error {
+	_, err := m.rawClient.MessagesSetBotCallbackAnswer(ctx, &tg.MessagesSetBotCallbackAnswerRequest{
+		QueryID: queryID,
+		URL:     url,
+	})
+	return err
+}

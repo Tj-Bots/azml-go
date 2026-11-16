@@ -9,8 +9,9 @@ import (
 )
 
 type UserSettings struct {
-	YtOpt          string            `json:"yt_opt,omitempty" bson:"yt_opt,omitempty"`         // extra yt-dlp options
-	YtCookies      string            `json:"yt_cookies,omitempty" bson:"yt_cookies,omitempty"` // the user's cookies.txt
+	MediaInfoSet   bool              `json:"mediainfo_set,omitempty" bson:"mediainfo_set,omitempty"` // the user chose in /us (else SHOW_MEDIAINFO)
+	YtOpt          string            `json:"yt_opt,omitempty" bson:"yt_opt,omitempty"`               // extra yt-dlp options
+	YtCookies      string            `json:"yt_cookies,omitempty" bson:"yt_cookies,omitempty"`       // the user's cookies.txt
 	UserID         int64             `json:"user_id" bson:"_id"`
 	Name           string            `json:"name" bson:"name"`
 	IsAuth         bool              `json:"is_auth" bson:"is_auth"`
@@ -211,4 +212,15 @@ func (m *SafeUserMap) GetAllUsers() []*UserSettings {
 		list = append(list, u)
 	}
 	return list
+}
+
+// MediaInfoOn: the user's choice in /us, or SHOW_MEDIAINFO from /bs when he never chose.
+func (u *UserSettings) MediaInfoOn(botDefault bool) bool {
+	if u == nil {
+		return botDefault
+	}
+	if u.MediaInfoSet || u.MediaInfo { // MediaInfo=true from before this field existed
+		return u.MediaInfo
+	}
+	return botDefault
 }

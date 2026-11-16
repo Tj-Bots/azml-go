@@ -333,7 +333,7 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.AutoThumb || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" ||
-		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfo
+		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -748,6 +748,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.Screenshots = 0
 		u.SampleSec = 0
 		u.MediaInfo = false
+		u.MediaInfoSet = false
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1157,7 +1158,8 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "Deleted", false)
 
 	case "mediainfo":
-		u.MediaInfo = !u.MediaInfo
+		u.MediaInfo = !u.MediaInfoOn(config.Get().ShowMediaInfo)
+		u.MediaInfoSet = true
 		go func(usr *types.UserSettings) { _ = ext.DB.SaveUser(usr) }(u)
 		_ = m.sender.AnswerCallback(ctx, queryID, "MediaInfo is now "+onOff(u.MediaInfo), false)
 		text, btn := m.buildUniversalMenu(u)
@@ -1616,7 +1618,7 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 		"┠ <b>YT-DLP Options :</b> <i>%s</i>\n"+
 		"┠ <b>YT-DLP Cookies :</b> <i>%s</i>\n"+
 		"╰ <b>MediaInfo Mode :</b> <i>%s</i></blockquote>",
-		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), existsText(u.YtOpt != ""), existsText(u.YtCookies != ""), onOff(u.MediaInfo))
+		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), existsText(u.YtOpt != ""), existsText(u.YtCookies != ""), onOff(u.MediaInfoOn(config.Get().ShowMediaInfo)))
 	btn := telegram.NewButtonMaker()
 	if u.YtOpt != "" {
 		btn.IButtonStyled("✓ YT-DLP Options", fmt.Sprintf("userset %d ytopt", u.UserID), "success")
@@ -1629,7 +1631,7 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 		btn.IButton("YT-DLP Cookies", fmt.Sprintf("userset %d ycookies", u.UserID))
 	}
 	btn.Row()
-	if u.MediaInfo {
+	if u.MediaInfoOn(config.Get().ShowMediaInfo) {
 		btn.IButtonStyled("✓ MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID), "success")
 	} else {
 		btn.IButton("MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID))

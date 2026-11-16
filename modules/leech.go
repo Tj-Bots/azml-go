@@ -311,6 +311,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	cfg := config.Get()
 	user := m.userMap.Get(msg.UserID)
 	isPremium := telegram.IsPremium(msg.UserID, m.userMap)
+	sourceURL := link // for the Source Link button (before any direct-link resolving)
+	if sourceURL == "" && msg.IsReply && msg.ReplyToID > 0 && msg.ChatID < 0 {
+		sourceURL = channelMessageLink(msg.ChatID, msg.ReplyToID)
+	}
 
 	var downloadedPath string
 	var dlErr error
@@ -1437,7 +1441,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 		partResults := make([]uploader.UploadResult, len(splitParts))
 		var fileButtons *telegram.ButtonMaker
-		if cfg.ShowMediaInfo || (user != nil && user.MediaInfo) {
+		if user.MediaInfoOn(cfg.ShowMediaInfo) {
 			setStep(uTask, "MediaInfo")
 			if miLink := mediaInfoLink(curFile, finalName); miLink != "" {
 				fileButtons = telegram.NewButtonMaker()
@@ -1452,6 +1456,12 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 		if fileButtons != nil {
 			fileButtons.Row()
+		}
+		if cfg.SaveMsg {
+			if fileButtons == nil {
+				fileButtons = telegram.NewButtonMaker()
+			}
+			saveMsgButton(fileButtons)
 		}
 		uTask.SetStatus(types.StatusUploading, ext.EngineName("telegram"))
 		var groupOpt, lastUpOpt uploader.UploadOptions
@@ -1661,6 +1671,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 
+	if cfg.SourceLink && (ext.IsURL(sourceURL) || strings.HasPrefix(sourceURL, "https://t.me/")) && !ext.IsMagnet(sourceURL) {
+		finishBtn.UButtonStyled("Source Link", sourceURL, "primary")
+		finishBtn.Row()
+	}
+	if cfg.SaveMsg {
+		saveMsgButton(finishBtn)
+	}
 	// Send completion message into the group / chat where leech was initiated, replying to user's command
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, sb.String(), msg.MessageID, finishBtn, 1)
 

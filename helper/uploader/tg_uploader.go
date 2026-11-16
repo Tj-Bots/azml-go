@@ -1319,3 +1319,12 @@ func (t *UploadTask) Update(curr, total int64, speed float64, eta string) {
 	t.speed = speed
 	t.eta = eta
 }
+
+// CopyMessage copies a message with the Bot API (no forward tag), with an optional keyboard.
+func CopyMessage(toChatID, fromChatID int64, msgID int, markupJSON string) bool {
+	token := config.Get().BotToken
+	if token == "" {
+		token = os.Getenv("BOT_TOKEN")
+	}
+	return copyMessageViaBotAPI(token, toChatID, fromChatID, msgID, markupJSON)
+}

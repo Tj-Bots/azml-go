@@ -56,6 +56,7 @@ type BotApp struct {
 	ytdlHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	ytdlCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	selectCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	saveCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	statusHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	statusCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	cancelHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -450,6 +451,11 @@ func (b *BotApp) SetAdminHandlers(blacklist, rmBlacklist, users func(ctx context
 	b.blacklistHandler = blacklist
 	b.rmBlacklistHandler = rmBlacklist
 	b.usersHandler = users
+}
+
+// SetSaveHandler: the Save Message button.
+func (b *BotApp) SetSaveHandler(h func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
+	b.saveCbHandler = h
 }
 
 // SetSelectHandler: buttons of the torrent file selection.
@@ -940,6 +946,10 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 	case strings.HasPrefix(data, "retry "):
 		if b.retryCbHandler != nil {
 			b.retryCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
+		}
+	case data == "save":
+		if b.saveCbHandler != nil {
+			b.saveCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
 	case strings.HasPrefix(data, "sel "):
 		if b.selectCbHandler != nil {

@@ -2,6 +2,8 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"SAVE_MSG":                     "Adds a 📨 Save Message button to leeched files and the finish message: whoever presses it gets a copy in his PM (good for groups and the log channel). Bool",
+	"SOURCE_LINK":                  "Adds a Source Link button to the finish message with the original link (or the Telegram message of the file). Bool",
 	"FSUB_IDS":                     "Force subscribe: channel IDs (-100...) separated by space. In groups users must join them before starting a task, they get Join buttons. The bot must be admin in those channels. Owner and sudo are not checked. Str",
 	"DISABLE_TORRENTS":             "Block torrents: magnet links, .torrent links and .torrent files are refused, and aria2 does not follow a link that turns out to be a torrent. Everything else keeps working. Default is False. Bool",
 	"TORRENT_TIMEOUT":              "Dead torrent timeout in seconds: a torrent or magnet that downloads nothing for this long is cancelled (Dead Torrent!). 0 = never. Default is 600. Int",

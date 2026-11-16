@@ -422,6 +422,12 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.ShortenerEnabled = val == "true" || val == "1"
 	case "TOKEN_TIMEOUT":
 		GlobalConfig.TokenTimeout, _ = strconv.ParseInt(val, 10, 64)
+	case "SAVE_MSG":
+		GlobalConfig.SaveMsg = val == "true" || val == "1"
+	case "SOURCE_LINK":
+		GlobalConfig.SourceLink = val == "true" || val == "1"
+	case "SHOW_MEDIAINFO":
+		GlobalConfig.ShowMediaInfo = val == "true" || val == "1"
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -559,6 +565,9 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"SAVE_MSG":                     strconv.FormatBool(GlobalConfig.SaveMsg),
+		"SOURCE_LINK":                  strconv.FormatBool(GlobalConfig.SourceLink),
+		"SHOW_MEDIAINFO":               strconv.FormatBool(GlobalConfig.ShowMediaInfo),
 		"FSUB_IDS":                     GlobalConfig.FsubIDs,
 		"DISABLE_TORRENTS":             strconv.FormatBool(GlobalConfig.DisableTorrents),
 		"OWNER_USERNAME":               GlobalConfig.OwnerUsername,

@@ -37,7 +37,7 @@ func (m *CancelModule) HandleCancel(ctx context.Context, peer tg.InputPeerClass,
 
 	if ext.IsPendingThumbSession(msg.UserID) {
 		ext.ClearPendingThumbSession(msg.UserID)
-		_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail upload cancelled.</b>", msg.MessageID, nil)
+		m.replyAndVanish(peer, msg, "✓ <b>Custom thumbnail upload cancelled.</b>")
 		return
 	}
 
@@ -66,19 +66,19 @@ func (m *CancelModule) HandleCancel(ctx context.Context, peer tg.InputPeerClass,
 
 	if gid == "" {
 		reply := "Reply to an active Command message which was used to start the download or send <code>/cancel_GID</code> to cancel it!"
-		_, _ = m.sender.SendMessage(ctx, peer, reply, msg.MessageID, nil)
+		m.replyAndVanish(peer, msg, reply)
 		return
 	}
 
 	task := m.taskMgr.GetTask(gid)
 	if task == nil {
-		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("GID: <code>%s</code> Not Found.", gid), msg.MessageID, nil)
+		m.replyAndVanish(peer, msg, fmt.Sprintf("GID: <code>%s</code> Not Found.", gid))
 		return
 	}
 
 	// Permission: Owner, Sudo, or the user who started the task (same as Python AZML)
 	if !telegram.IsOwner(msg.UserID) && !telegram.IsSudo(msg.UserID, m.userMap) && task.UserID() != msg.UserID {
-		_, _ = m.sender.SendMessage(ctx, peer, "This task is not for you!", msg.MessageID, nil)
+		m.replyAndVanish(peer, msg, "This task is not for you!")
 		return
 	}
 
@@ -89,7 +89,7 @@ func (m *CancelModule) HandleCancel(ctx context.Context, peer tg.InputPeerClass,
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, _ = m.sender.SendMessage(bgCtx, peer, fmt.Sprintf("✓ Task <code>%s</code> cancelled successfully!", gid), msg.MessageID, nil)
+		m.replyAndVanish(peer, msg, fmt.Sprintf("✓ Task <code>%s</code> cancelled successfully!", gid))
 		if m.statusMod != nil {
 			if m.taskMgr.Count() == 0 {
 				m.statusMod.DeleteAllMessages(bgCtx)
@@ -102,13 +102,13 @@ func (m *CancelModule) HandleCancel(ctx context.Context, peer tg.InputPeerClass,
 
 func (m *CancelModule) HandleCancelAll(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	if !telegram.IsOwner(msg.UserID) && !telegram.IsSudo(msg.UserID, m.userMap) {
-		_, _ = m.sender.SendMessage(ctx, peer, "This command is only for Sudo/Owner!", msg.MessageID, nil)
+		m.replyAndVanish(peer, msg, "This command is only for Sudo/Owner!")
 		return
 	}
 
 	tasks := m.taskMgr.GetAllTasks()
 	if len(tasks) == 0 {
-		_, _ = m.sender.SendMessage(ctx, peer, "No active tasks!", msg.MessageID, nil)
+		m.replyAndVanish(peer, msg, "No active tasks!")
 		return
 	}
 
@@ -152,4 +152,21 @@ func (m *CancelModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 			go m.statusMod.UpdateAllMessages(ctx, true)
 		}
 	}
+}
+
+// replyAndVanish answers the command in reply, then deletes the answer and the command after 3s.
+func (m *CancelModule) replyAndVanish(peer tg.InputPeerClass, msg *types.MessageContext, text string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	id, _ := m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
+	go func() {
+		time.Sleep(3 * time.Second)
+		dctx, dcancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer dcancel()
+		ids := []int{msg.MessageID}
+		if id > 0 {
+			ids = append([]int{id}, ids...)
+		}
+		_ = m.sender.DeleteMessage(dctx, peer, ids)
+	}()
 }

@@ -40,6 +40,11 @@ func NewMegaDownloader() *MegaDownloader {
 func (m *MegaDownloader) Download(ctx context.Context, megaURL, outDir string, onProgress func(cur, total int64, speed float64, eta string)) (string, error) {
 	_ = os.MkdirAll(outDir, 0755)
 
+	// native client first (public file/folder links, old and new formats)
+	if _, ok := ParseMegaLink(megaURL); ok {
+		return MegaDownloadLink(ctx, megaURL, outDir, nil, onProgress)
+	}
+
 	// Helper to track outDir file growth during external CLI process execution
 	trackProgress := func(stopChan chan struct{}) {
 		if onProgress == nil {
@@ -114,19 +119,7 @@ func (m *MegaDownloader) Download(ctx context.Context, megaURL, outDir string, o
 		}
 	}
 
-	// 3. Fallback to Aria2c RPC direct download
-	aria := GetAria2Client()
-	gid, err := aria.AddURI(megaURL, outDir, "", nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to start mega download via aria2c: %v", err)
-	}
-
-	task := NewAria2DownloadTask(gid, "Mega Download", outDir, 0, 0, 0)
-	return task.PollUntilComplete(ctx, func(c, t int64) {
-		if onProgress != nil {
-			onProgress(c, t, task.Speed(), task.ETA())
-		}
-	})
+	return "", fmt.Errorf("MEGA: unsupported link format")
 }
 
 type MegaDownloadTask struct {
@@ -175,5 +168,5 @@ func (t *MegaDownloadTask) Cancel() error {
 }
 
 func IsMegaLink(link string) bool {
-	return strings.Contains(link, "mega.nz")
+	return strings.Contains(link, "mega.nz") || strings.Contains(link, "mega.co.nz")
 }

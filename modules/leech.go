@@ -350,7 +350,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// Try Direct Link Generator for host URLs (Mediafire, Pixeldrain, Solidfiles)
-	if ext.IsURL(link) && !opt.Ytdl {
+	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) {
 		if directURL, err := ext.GenerateDirectLink(link); err == nil && directURL != "" {
 			link = directURL
 		}
@@ -393,7 +393,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// For HTTP/HTTPS links: probe remote headers to resolve true filename (Content-Disposition) & extension in background
-	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMagnet(link) && !strings.Contains(strings.ToLower(link), ".torrent") {
+	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) && !ext.IsMagnet(link) && !strings.Contains(strings.ToLower(link), ".torrent") {
 		resolvedName, finalURL, resolvedSize, _ := ext.ResolveDownloadMetadata(ctx, link)
 		if resolvedName != "" {
 			if opt.CustomName == "" {
@@ -585,7 +585,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 					// User session (premium): the bot copies the file to the dump channel and the
 					// user session downloads it from there (it can't read the bot's own chats).
-					if !dlSuccess && m.userRawAPI != nil && effectiveDumpChatID != 0 {
+					// the bot downloads by itself (USER_DOWNLOAD=true: the premium session first)
+					if !dlSuccess && os.Getenv("USER_DOWNLOAD") == "true" && m.userRawAPI != nil && effectiveDumpChatID != 0 {
 						targetMsgID := msg.ReplyToID
 						if targetMsgID == 0 {
 							targetMsgID = msg.MessageID
@@ -612,9 +613,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 						// the bot's own file location: only the bot account can use it
 						downloadClient := m.rawAPI
 						chunkDL := downloader.NewTelegramChunkDownloader(downloadClient)
-						if dcClients, closeFn := dcDownloadClients(ctx, telegram.ActiveBotTD(), doc.DCID); len(dcClients) > 0 {
+						botTD, where := telegram.ActiveBotMediaTD(), "media servers"
+						if botTD == nil {
+							botTD, where = telegram.ActiveBotTD(), "normal servers"
+						}
+						if dcClients, closeFn := dcDownloadClients(ctx, botTD, doc.DCID); len(dcClients) > 0 {
 							defer closeFn()
-							log.Printf("[LEECH] Bot download on DC%d with %d connections", doc.DCID, dcPoolSize)
+							log.Printf("[LEECH] Bot download on DC%d (%s) with %d connections", doc.DCID, where, dcPoolSize)
 							chunkDL = downloader.NewTelegramChunkDownloaderPool(dcClients)
 						}
 						loc := doc.AsInputDocumentFileLocation("")
@@ -813,28 +818,49 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			downloadedPath = filepath.Join(taskDir, fName)
 		}
 	} else if ext.IsMegaLink(link) {
-		megaDl := downloader.NewMegaDownloader()
+		uTask.SetStatus(types.StatusDownloading, "Mega")
+		var only map[string]bool
 		if opt.Select {
-			uidStr := fmt.Sprintf("%d", notifyID)
-			mockFiles := []downloader.MegaFileInfo{
-				{ID: "0", Name: opt.CustomName, Size: 0, Selected: true},
-			}
-			doneChan := RegisterMegaSelectCache(uidStr, mockFiles, msg.UserID)
-			buttons := BuildMegaSelectionButtons(uidStr)
-			_ = m.sender.EditMessage(ctx, peer, notifyID, "Your MEGA download paused. Choose files from selection web link then press Done Selecting button.", buttons)
-
-			select {
-			case ok := <-doneChan:
-				if !ok {
-					m.sendDownloadError(ctx, peer, msg, notifyID, "MEGA file selection cancelled by user", modeStr, taskStartTime)
-					return
-				}
-			case <-ctx.Done():
+			// real file list of the folder, chosen on the web page (BASE_URL)
+			nodes, lErr := downloader.MegaList(ctx, link)
+			if lErr != nil {
+				m.sendDownloadError(ctx, peer, msg, notifyID, lErr.Error(), modeStr, taskStartTime)
 				return
 			}
+			if len(nodes) > 1 {
+				uidStr := fmt.Sprintf("%d", notifyID)
+				var files []downloader.MegaFileInfo
+				for _, n := range nodes {
+					files = append(files, downloader.MegaFileInfo{ID: n.Handle, Name: n.Name, Size: n.Size, Path: n.Path})
+				}
+				doneChan := RegisterMegaSelectCache(uidStr, files, msg.UserID)
+				_ = m.sender.EditMessage(ctx, peer, notifyID, fmt.Sprintf("㊂ <b><u>MEGA Folder :</u></b>\n\n<blockquote>%d files. Choose them on the web page, then press Done Selecting.</blockquote>", len(files)), BuildMegaSelectionButtons(uidStr))
+				select {
+				case ok := <-doneChan:
+					if !ok {
+						ClearMegaSelectCache(uidStr)
+						m.sendDownloadError(ctx, peer, msg, notifyID, "MEGA file selection cancelled by user", modeStr, taskStartTime)
+						return
+					}
+				case <-ctx.Done():
+					ClearMegaSelectCache(uidStr)
+					return
+				}
+				only = map[string]bool{}
+				if c := GetMegaSelectCache(uidStr); c != nil {
+					for _, f := range c.Files {
+						if f.Selected {
+							only[f.ID] = true
+						}
+					}
+				}
+				ClearMegaSelectCache(uidStr)
+			}
 		}
-		uTask.SetStatus(types.StatusDownloading, "Mega")
-		downloadedPath, dlErr = megaDl.Download(ctx, link, taskDir, func(cur, total int64, speed float64, eta string) {
+		downloadedPath, dlErr = downloader.MegaDownloadLink(ctx, link, taskDir, only, func(cur, total int64, speed float64, eta string) {
+			if speed > maxDLSpeed {
+				maxDLSpeed = speed
+			}
 			uTask.SetProgress(cur, total, speed, eta)
 		})
 	} else if ext.IsMagnet(link) || strings.Contains(strings.ToLower(link), ".torrent") || ext.IsURL(link) || (func() bool { fi, err := os.Stat(link); return err == nil && !fi.IsDir() }()) {

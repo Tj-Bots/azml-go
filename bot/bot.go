@@ -358,7 +358,9 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 		b.userRawAPI = newUserClient.API()
 		telegram.SetActiveTD(b.client, newUserClient)
 		// downloads like wzgram: a second connection of the session on Telegram's media servers
-		go telegram.StartMediaClient(config.Get().TelegramAPI, config.Get().TelegramHash, sessionStr)
+		if os.Getenv("USER_DOWNLOAD") == "true" {
+			go telegram.StartMediaClient(config.Get().TelegramAPI, config.Get().TelegramHash, sessionStr)
+		}
 
 		uname := res.user.Username
 		if uname == "" {
@@ -1003,6 +1005,8 @@ func (b *BotApp) Start(ctx context.Context) error {
 		} else {
 			log.Println("[AZML-Go Bot Client] Logged in successfully with Bot Token")
 		}
+		// downloads like wzgram: a second bot connection on Telegram's media servers
+		go telegram.StartBotMediaClient(cfg.TelegramAPI, cfg.TelegramHash, cfg.BotToken)
 
 		// Register all bot commands in Telegram's autocomplete list
 		b.registerBotCommands(ctx)

@@ -19,7 +19,7 @@ import (
 var (
 	urlRegex  = regexp.MustCompile(`(?i)\bhttps?://[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|/))`)
 	magnetReg = regexp.MustCompile(`(?i)^magnet:\?xt=urn:[a-z0-9]+:[a-z0-9]{32,40}`)
-	megaReg   = regexp.MustCompile(`(?i)https?://mega\.nz/(file|folder)/[a-zA-Z0-9_-]+(#|!)[a-zA-Z0-9_-]+`)
+	megaReg   = regexp.MustCompile(`(?i)https?://(www\.)?mega\.(nz|co\.nz)/((file|folder)/[a-zA-Z0-9_-]+(#|!)[a-zA-Z0-9_-]+|#F?![a-zA-Z0-9_-]+![a-zA-Z0-9_-]+)`)
 	tgLinkReg = regexp.MustCompile(`(?i)https?://t\.me/(c/)?([a-zA-Z0-9_]+)/([0-9]+)`)
 )
 

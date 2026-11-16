@@ -56,3 +56,18 @@ func TestFlowGateHyper(t *testing.T) {
 		t.Fatalf("max: %d", lim)
 	}
 }
+
+func TestParseMegaLink(t *testing.T) {
+	for link, want := range map[string]MegaLink{
+		"https://mega.nz/#!Y1wVzKDD!c9mA5NS3":              {ID: "Y1wVzKDD", Key: "c9mA5NS3"},
+		"https://mega.nz/file/Y1wVzKDD#c9mA5NS3":           {ID: "Y1wVzKDD", Key: "c9mA5NS3"},
+		"https://mega.nz/folder/AbC123#KeyKey":             {Folder: true, ID: "AbC123", Key: "KeyKey"},
+		"https://mega.nz/#F!AbC123!KeyKey":                 {Folder: true, ID: "AbC123", Key: "KeyKey"},
+		"https://mega.nz/folder/AbC123#KeyKey/file/Sub999": {Folder: true, ID: "AbC123", Key: "KeyKey", Sub: "Sub999"},
+	} {
+		got, ok := ParseMegaLink(link)
+		if !ok || got != want {
+			t.Errorf("%s: %+v", link, got)
+		}
+	}
+}

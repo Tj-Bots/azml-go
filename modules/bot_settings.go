@@ -159,6 +159,9 @@ func configValue(cfgMap map[string]string, key string) string {
 	if v, ok := cfgMap[key]; ok {
 		return v
 	}
+	if v, ok := config.StartupValues()[key]; ok {
+		return v
+	}
 	return os.Getenv(key)
 }
 

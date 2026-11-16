@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/gotd/td/session"
 	td "github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/dcs"
 	"github.com/gotd/td/tg"
@@ -20,10 +22,13 @@ var mediaDCAddrs = map[int]string{
 
 // mediaResolver sends every connection of this client to the media server of the DC
 // (when there is one), with the account's normal auth key – like wzgram's media sessions.
-type mediaResolver struct{ plain dcs.Resolver }
+type mediaResolver struct {
+	plain dcs.Resolver
+	on    *atomic.Bool // nil = always on
+}
 
 func (r mediaResolver) Primary(ctx context.Context, dc int, list dcs.List) (transport.Conn, error) {
-	if ip, ok := mediaDCAddrs[dc]; ok {
+	if ip, ok := mediaDCAddrs[dc]; ok && (r.on == nil || r.on.Load()) {
 		media := list
 		media.Options = []tg.DCOption{{ID: dc, IPAddress: ip, Port: 443}}
 		for _, o := range list.Options {
@@ -49,74 +54,109 @@ func (r mediaResolver) CDN(ctx context.Context, dc int, list dcs.List) (transpor
 	return r.plain.CDN(ctx, dc, list)
 }
 
+type mediaSlot struct {
+	client *td.Client
+	cancel context.CancelFunc
+}
+
 var (
-	mediaMu     sync.Mutex
-	mediaClient *td.Client
-	mediaCancel context.CancelFunc
+	mediaMu    sync.Mutex
+	mediaSlots = map[string]*mediaSlot{}
 )
 
 // StartMediaClient opens a second connection of the user session, only for downloads,
 // on Telegram's media servers. A previous one is stopped.
 func StartMediaClient(appID int, appHash, sessionStr string) {
-	StopMediaClient()
 	storage, err := ParseSessionString(context.Background(), sessionStr)
 	if err != nil {
 		log.Printf("[Media Client] bad session: %v", err)
 		return
 	}
+	startMedia("user", appID, appHash, storage, "")
+}
+
+// StartBotMediaClient: the same for the bot (it logs in with the token once).
+func StartBotMediaClient(appID int, appHash, botToken string) {
+	startMedia("bot", appID, appHash, &session.StorageMemory{}, botToken)
+}
+
+func startMedia(kind string, appID int, appHash string, storage session.Storage, botToken string) {
+	stopMedia(kind)
+	on := &atomic.Bool{}
 	client := td.NewClient(appID, appHash, td.Options{
 		SessionStorage: storage,
-		Resolver:       mediaResolver{plain: dcs.Plain(dcs.PlainOptions{})},
+		Resolver:       mediaResolver{plain: dcs.Plain(dcs.PlainOptions{}), on: on},
 		NoUpdates:      true,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	mediaMu.Lock()
-	mediaCancel = cancel
+	mediaSlots[kind] = &mediaSlot{cancel: cancel}
 	mediaMu.Unlock()
 	ready := make(chan struct{})
 	go func() {
 		err := client.Run(ctx, func(ctx context.Context) error {
+			if botToken != "" {
+				if st, err := client.Auth().Status(ctx); err != nil || !st.Authorized {
+					if _, err := client.Auth().Bot(ctx, botToken); err != nil {
+						return err
+					}
+				}
+			}
 			if _, err := client.Self(ctx); err != nil {
 				return err
 			}
+			on.Store(true) // from now on new connections go to the media servers
 			mediaMu.Lock()
-			mediaClient = client
+			if sl := mediaSlots[kind]; sl != nil {
+				sl.client = client
+			}
 			mediaMu.Unlock()
-			log.Printf("[Media Client] user session connected to the media servers (DC%d)", client.Config().ThisDC)
+			log.Printf("[Media Client] %s connected, downloads use the media servers (DC%d)", kind, client.Config().ThisDC)
 			close(ready)
 			<-ctx.Done()
 			return nil
 		})
+		if err != nil && ctx.Err() == nil {
+			log.Printf("[Media Client] %s stopped: %v", kind, err)
+		}
 		mediaMu.Lock()
-		if mediaClient == client {
-			mediaClient = nil
+		if sl := mediaSlots[kind]; sl != nil && sl.client == client {
+			sl.client = nil
 		}
 		mediaMu.Unlock()
-		if err != nil && ctx.Err() == nil {
-			log.Printf("[Media Client] stopped: %v", err)
-		}
 	}()
 	select {
 	case <-ready:
-	case <-time.After(20 * time.Second):
-		log.Printf("[Media Client] not ready after 20s, downloads use the normal connection")
+	case <-time.After(30 * time.Second):
+		log.Printf("[Media Client] %s not ready after 30s, downloads use the normal connection", kind)
 	}
 }
 
-// StopMediaClient closes the media connection.
-func StopMediaClient() {
+func stopMedia(kind string) {
 	mediaMu.Lock()
 	defer mediaMu.Unlock()
-	if mediaCancel != nil {
-		mediaCancel()
-		mediaCancel = nil
+	if sl := mediaSlots[kind]; sl != nil {
+		if sl.cancel != nil {
+			sl.cancel()
+		}
+		delete(mediaSlots, kind)
 	}
-	mediaClient = nil
+}
+
+// StopMediaClient closes the user session's media connection.
+func StopMediaClient() { stopMedia("user") }
+
+func activeMedia(kind string) *td.Client {
+	mediaMu.Lock()
+	defer mediaMu.Unlock()
+	if sl := mediaSlots[kind]; sl != nil {
+		return sl.client
+	}
+	return nil
 }
 
 // ActiveMediaTD is the media client of the user session (nil when not running).
-func ActiveMediaTD() *td.Client {
-	mediaMu.Lock()
-	defer mediaMu.Unlock()
-	return mediaClient
-}
+func ActiveMediaTD() *td.Client { return activeMedia("user") }
+
+// ActiveBotMediaTD is the media client of the bot (nil when not running).
+func ActiveBotMediaTD() *td.Client { return activeMedia("bot") }

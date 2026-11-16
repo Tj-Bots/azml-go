@@ -189,7 +189,7 @@ func LoadConfig(path string) (*Config, error) {
 		SourceLink:                getEnvBool("SOURCE_LINK", false),
 		Metadata:                  getEnv("METADATA", ""),
 		TitleName:                 getEnv("TITLE_NAME", ""),
-		AuthorName:                getEnv("AUTHOR_NAME", ""),
+		AuthorName:                getEnv("AUTHOR_NAME", "Tj Bots"),
 		AuthorURL:                 getEnv("AUTHOR_URL", "https://t.me/TJ_Bots"),
 		BotTheme:                  getEnv("BOT_THEME", "minimal"),
 		ShowExtraCmds:             getEnvBool("SHOW_EXTRA_CMDS", true),
@@ -589,5 +589,53 @@ func GetConfigMap() map[string]string {
 		"DEVUPLOADS_KEY":               GlobalConfig.DevUploadsKey,
 		"STREAMTAPE_API":               GlobalConfig.StreamTapeAPI,
 		"VIKINGFILE_USER":              GlobalConfig.VikingFileUser,
+	}
+}
+
+// StartupValues are the vars read only at start, with their current (or default) value,
+// so /bs can show them instead of "None".
+func StartupValues() map[string]string {
+	configLock.RLock()
+	defer configLock.RUnlock()
+	c := GlobalConfig
+	ids := func(l []int64) string {
+		var out []string
+		for _, v := range l {
+			out = append(out, strconv.FormatInt(v, 10))
+		}
+		return strings.Join(out, " ")
+	}
+	b := strconv.FormatBool
+	return map[string]string{
+		"DOWNLOAD_DIR":                 c.DownloadDir,
+		"CMD_SUFFIX":                   c.CmdSuffix,
+		"AUTHORIZED_CHATS":             ids(c.AuthorizedChats),
+		"BLACKLIST_USERS":              ids(c.BlacklistUsers),
+		"BOT_PM":                       b(c.BotPM),
+		"CAP_FONT":                     c.CapFont,
+		"LEECH_FILENAME_REMNAME_AUTO":  c.LeechFilenameRemnameAuto,
+		"LEECH_FILENAME_REMNAME_REGEX": c.LeechFilenameRemnameRegex,
+		"ARIA2_PORT":                   strconv.Itoa(c.Aria2Port),
+		"BASE_URL_PORT":                strconv.Itoa(c.BaseURLPort),
+		"MEGA_EMAIL":                   c.MegaEmail,
+		"MEGA_PASSWORD":                c.MegaPassword,
+		"TOKEN_IN_PM":                  b(c.TokenInPM),
+		"SCREENSHOTS_MODE":             b(c.ScreenshotsMode),
+		"SHOW_MEDIAINFO":               b(c.ShowMediaInfo),
+		"METADATA":                     c.Metadata,
+		"AUTHOR_NAME":                  c.AuthorName,
+		"AUTHOR_URL":                   c.AuthorURL,
+		"SHOW_EXTRA_CMDS":              b(c.ShowExtraCmds),
+		"TIMEZONE":                     c.Timezone,
+		"ENABLE_FFMPEG_CMDS":           b(c.EnableFFmpegCmds),
+		"FFMPEG_ENCODING":              b(c.FFmpegEncoding),
+		"TMDB_ACCESS_TOKEN":            c.TMDBAccessToken,
+		"DDL_API":                      c.DDLAPI,
+		"QUEUE_ALL":                    strconv.Itoa(c.QueueAll),
+		"QUEUE_DOWNLOAD":               strconv.Itoa(c.QueueDownload),
+		"QUEUE_UPLOAD":                 strconv.Itoa(c.QueueUpload),
+		"ARCHIVE_LIMIT":                strconv.FormatInt(c.ArchiveLimit, 10),
+		"EXTRACT_LIMIT":                strconv.FormatInt(c.ExtractLimit, 10),
+		"STORAGE_THRESHOLD":            strconv.FormatInt(c.StorageThreshold, 10),
 	}
 }

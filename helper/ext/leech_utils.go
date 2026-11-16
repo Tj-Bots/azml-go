@@ -42,6 +42,8 @@ var (
 	seasonRegex        = regexp.MustCompile(`(?i)[Ss](?:eason[\s\.\-]*)?0*(\d+)`)
 	qualRegex          = regexp.MustCompile(`(?i)(\d{3,4}[pP]|4K|2160[pP])`)
 	mathOffset         = regexp.MustCompile(`\{(episode|season):([+\-])(\d+)\}`)
+	bracketRegex       = regexp.MustCompile(`[(\[].*?[)\]]`)
+	trailingNumRegex   = regexp.MustCompile(`[\s\-]+0*\d{1,4}\s*$`)
 
 	regexCache   = make(map[string]*regexp.Regexp)
 	regexCacheMu sync.RWMutex
@@ -123,12 +125,27 @@ func ExtractMetadataFromFilename(filename string) ExtractedMeta {
 		if m := p.FindStringSubmatch(clean); len(m) > 1 {
 			title := strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(m[1], ".", " "), "-", " "))
 			title = yearRegex.ReplaceAllString(title, " ")
-			meta.Title = strings.TrimSpace(title)
+			title = bracketRegex.ReplaceAllString(title, " ")                       // (1080p) [tags]
+			title = trailingNumRegex.ReplaceAllString(strings.TrimSpace(title), "") // the episode number at the end
+			meta.Title = strings.Join(strings.Fields(title), " ")
+			if meta.Title == "" {
+				meta.Title = "Unknown"
+			}
 			if len(m) >= 4 {
 				meta.Season = fmt.Sprintf("%02d", mustAtoi(m[2]))
 				meta.Episode = fmt.Sprintf("%02d", mustAtoi(m[3]))
 			}
 			break
+		}
+	}
+
+	if meta.Title == "Unknown" { // no pattern: the name itself, without number and tags
+		base := strings.TrimSuffix(clean, filepath.Ext(clean))
+		base = strings.NewReplacer(".", " ", "_", " ").Replace(base)
+		base = qualRegex.ReplaceAllString(bracketRegex.ReplaceAllString(base, " "), " ")
+		base = trailingNumRegex.ReplaceAllString(strings.TrimSpace(base), "")
+		if t := strings.Join(strings.Fields(base), " "); t != "" {
+			meta.Title = t
 		}
 	}
 

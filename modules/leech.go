@@ -1245,6 +1245,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		go m.statusMod.UpdateAllMessages(context.Background(), true)
 	}
 
+	// "Leech Started" in the leech log, like the Python bot (CLEAN_LOG_MSG deletes it after the upload)
+	logStartID, logStartPeer := m.sendLogStart(ctx, msg, sourceURL, opt.IsMirror)
+	defer func() {
+		if logStartID > 0 && config.Get().CleanLogMsg {
+			_ = m.sender.DeleteMessage(context.Background(), logStartPeer, []int{logStartID})
+		}
+	}()
+
 	var dumpID int64
 	if opt.UserDump != 0 {
 		dumpID = opt.UserDump
@@ -2342,4 +2350,32 @@ func isLocalTorrent(p string) bool {
 	}
 	fi, err := os.Stat(p)
 	return err == nil && !fi.IsDir()
+}
+
+// sendLogStart posts "Leech Started" in LEECH_LOG_ID (user + source link).
+func (m *LeechModule) sendLogStart(ctx context.Context, msg *types.MessageContext, source string, mirror bool) (int, tg.InputPeerClass) {
+	logID := config.Get().LeechLogID
+	if logID == 0 || mirror {
+		return 0, nil
+	}
+	hash := telegram.ResolveChannelAccessHash(ctx, m.rawAPI, logID)
+	if hash == 0 {
+		return 0, nil
+	}
+	logPeer := &tg.InputPeerChannel{ChannelID: pool.RawChannelID(logID), AccessHash: hash}
+	mention := fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, telegram.EscapeHTML(msg.SenderName))
+	if msg.Username != "" {
+		mention = "@" + msg.Username
+	}
+	src := "Telegram"
+	if ext.IsURL(source) || strings.HasPrefix(source, "https://t.me/") {
+		src = fmt.Sprintf("<a href=\"%s\">Click Here</a>", telegram.EscapeHTML(source))
+	}
+	text := fmt.Sprintf("➲ <b><u>Leech Started :</u></b>\n\n<blockquote>╭ <b>User :</b> %s ( #ID%d )\n╰ <b>Source :</b> %s</blockquote>", mention, msg.UserID, src)
+	id, err := m.sender.SendMessage(ctx, logPeer, text, 0, nil)
+	if err != nil {
+		log.Printf("[LEECH] log start message failed: %v", err)
+		return 0, nil
+	}
+	return id, logPeer
 }

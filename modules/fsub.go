@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"azml-go/config"
+	"azml-go/helper/ext"
 	"azml-go/helper/pool"
 	"azml-go/helper/telegram"
 	"azml-go/types"
@@ -180,9 +181,15 @@ func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, ms
 func (m *LeechModule) gateFollow(peer tg.InputPeerClass, userID int64, msgID int, tag string, g gateState) {
 	ctx := context.Background()
 	last := g.key()
+	kick, stop := ext.GateWatch(userID)
+	defer stop()
 	deadline := time.Now().Add(10 * time.Minute)
 	for time.Now().Before(deadline) {
-		time.Sleep(4 * time.Second)
+		select {
+		case <-kick: // he joined a channel / started the bot: check now
+			time.Sleep(700 * time.Millisecond)
+		case <-time.After(4 * time.Second):
+		}
 		cur := m.gateCheck(ctx, userID)
 		if cur.empty() {
 			done := fmt.Sprintf("<b><i>User:</i> %s</b>,\n\n✓ <b>All set!</b> Send the command again.", tag)

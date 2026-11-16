@@ -556,6 +556,16 @@ func (b *BotApp) registerDispatcher() {
 		return nil
 	})
 
+	// someone joined a channel the bot is admin in: his "join first" message updates now
+	b.dispatcher.OnChannelParticipant(func(ctx context.Context, e tg.Entities, update *tg.UpdateChannelParticipant) error {
+		if update.NewParticipant != nil {
+			if _, left := update.NewParticipant.(*tg.ChannelParticipantLeft); !left {
+				ext.GateKick(update.UserID)
+			}
+		}
+		return nil
+	})
+
 	// buttons of ephemeral messages (seen only by one user) come as their own update
 	b.dispatcher.OnEphemeralBotCallbackQuery(func(ctx context.Context, e tg.Entities, update *tg.UpdateEphemeralBotCallbackQuery) error {
 		for uID, u := range e.Users {
@@ -613,6 +623,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 
 	// Automatically record user has started/interacted in PM
 	if chatID == senderID {
+		defer ext.GateKick(senderID) // his "start the bot" message updates now
 		u := b.userMap.GetOrCreate(senderID)
 		if !u.StartedInPM {
 			u.StartedInPM = true

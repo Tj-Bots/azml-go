@@ -362,7 +362,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// Try Direct Link Generator for host URLs (Mediafire, Pixeldrain, Solidfiles)
-	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) {
+	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) && !downloader.IsGofileLink(link) {
 		if directURL, err := ext.GenerateDirectLink(link); err == nil && directURL != "" {
 			link = directURL
 		}
@@ -405,7 +405,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// For HTTP/HTTPS links: probe remote headers to resolve true filename (Content-Disposition) & extension in background
-	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) && !ext.IsMagnet(link) && !strings.Contains(strings.ToLower(link), ".torrent") {
+	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) && !downloader.IsGofileLink(link) && !ext.IsMagnet(link) && !strings.Contains(strings.ToLower(link), ".torrent") {
 		resolvedName, finalURL, resolvedSize, _ := ext.ResolveDownloadMetadata(ctx, link)
 		if resolvedName != "" {
 			if opt.CustomName == "" {
@@ -815,6 +815,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				uTask.SetProgress(curr, total, speed, eta)
 			})
 			downloadedPath = filepath.Join(taskDir, fName)
+		}
+	} else if downloader.IsGofileLink(link) {
+		modeStr = "#Leech | #GoFile"
+		uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
+		downloadedPath, dlErr = m.downloadGofile(ctx, peer, msg, opt, link, taskDir, uTask)
+		if dlErr == errSelectionCancelled {
+			m.sendDownloadError(ctx, peer, msg, notifyID, "File selection cancelled by user", modeStr, taskStartTime)
+			return
 		}
 	} else if ext.IsMegaLink(link) {
 		uTask.SetStatus(types.StatusDownloading, ext.EngineName("mega"))
@@ -2482,4 +2490,84 @@ func autoDeletePair(sender *telegram.MessageSender, peer tg.InputPeerClass, botM
 		defer cancel()
 		_ = sender.DeleteMessage(ctx, peer, []int{botMsg, cmdMsg})
 	}()
+}
+
+var errSelectionCancelled = fmt.Errorf("selection cancelled")
+
+// downloadGofile: every file of a GoFile link (or the ones chosen with -s) through aria2.
+func (m *LeechModule) downloadGofile(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, opt types.LeechOptions, link, taskDir string, uTask *ext.UnifiedTask) (string, error) {
+	files, header, err := downloader.GofileList(ctx, link)
+	if err != nil {
+		return "", err
+	}
+	if opt.Select && len(files) > 1 {
+		uid := fmt.Sprintf("gf%d", time.Now().UnixNano()%1e9)
+		var infos []downloader.MegaFileInfo
+		for _, f := range files {
+			infos = append(infos, downloader.MegaFileInfo{ID: f.ID, Name: f.Name, Size: f.Size, Path: f.Path})
+		}
+		done := RegisterMegaSelectCache(uid, infos, msg.UserID)
+		selMsg, _ := m.sender.SendMessage(ctx, peer, fmt.Sprintf("㊂ <b><u>GoFile Folder :</u></b>\n\n<blockquote>%d files. Choose them on the web page, then press Done Selecting.</blockquote>", len(files)), msg.MessageID, BuildMegaSelectionButtons(uid))
+		defer func() {
+			if selMsg > 0 {
+				_ = m.sender.DeleteMessage(context.Background(), peer, []int{selMsg})
+			}
+		}()
+		select {
+		case ok := <-done:
+			if !ok {
+				ClearMegaSelectCache(uid)
+				return "", errSelectionCancelled
+			}
+		case <-ctx.Done():
+			ClearMegaSelectCache(uid)
+			return "", ctx.Err()
+		}
+		chosen := map[string]bool{}
+		if c := GetMegaSelectCache(uid); c != nil {
+			for _, f := range c.Files {
+				if f.Selected {
+					chosen[f.ID] = true
+				}
+			}
+		}
+		ClearMegaSelectCache(uid)
+		var keep []downloader.GofileFile
+		for _, f := range files {
+			if chosen[f.ID] {
+				keep = append(keep, f)
+			}
+		}
+		if len(keep) == 0 {
+			return "", fmt.Errorf("no files selected")
+		}
+		files = keep
+	}
+	aria := downloader.GetAria2Client()
+	var last string
+	for i, f := range files {
+		dir := filepath.Join(taskDir, f.Path)
+		name := strings.NewReplacer("/", "_", "\\", "_").Replace(f.Name)
+		uTask.SetName(fmt.Sprintf("[%d/%d] %s", i+1, len(files), name))
+		gid, err := aria.AddURI(f.URL, dir, name, []string{header, "User-Agent: Mozilla/5.0"})
+		if err != nil {
+			return "", err
+		}
+		task := downloader.NewAria2DownloadTask(gid, name, dir, 0, msg.ChatID, msg.UserID)
+		p, err := task.PollUntilComplete(ctx, func(cur, total int64) {
+			uTask.SetProgress(cur, total, task.Speed(), task.ETA())
+		})
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", f.Name, err)
+		}
+		last = p
+	}
+	if len(files) == 1 {
+		return last, nil
+	}
+	entries, _ := os.ReadDir(taskDir)
+	if len(entries) == 1 && entries[0].IsDir() {
+		return filepath.Join(taskDir, entries[0].Name()), nil
+	}
+	return taskDir, nil
 }

@@ -325,6 +325,28 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	cfg := config.Get()
 	user := m.userMap.Get(msg.UserID)
 	isPremium := telegram.IsPremium(msg.UserID, m.userMap)
+	// DELETE_LINKS (like the Python bot): the command and the replied link/file are deleted when
+	// the task starts; a replied Telegram file right after the bot read it.
+	var delOnce sync.Once
+	deleteLinks := func() {
+		if !cfg.DeleteLinks || msg.Internal {
+			return
+		}
+		delOnce.Do(func() {
+			ids := []int{msg.MessageID}
+			if msg.IsReply && msg.ReplyToID > 0 {
+				ids = append(ids, msg.ReplyToID)
+			}
+			go func() {
+				dctx, dcancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer dcancel()
+				_ = m.sender.DeleteMessage(dctx, peer, ids)
+			}()
+		})
+	}
+	if link != "" || (!msg.HasMedia && msg.RawMedia == nil && !msg.IsReply) {
+		deleteLinks() // a link: nothing more is needed from the messages
+	}
 	sourceURL := link // for the Source Link button (before any direct-link resolving)
 	if sourceURL == "" && msg.IsReply && msg.ReplyToID > 0 && msg.ChatID < 0 {
 		sourceURL = channelMessageLink(msg.ChatID, msg.ReplyToID)
@@ -615,6 +637,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					// User session (premium): the bot copies the file to the dump channel and the
 					// user session downloads it from there (it can't read the bot's own chats).
 					// the premium user session is only for uploads; the bot downloads by itself
+					// the file is known now (location + reference): the messages can go
+					deleteLinks()
 					// Fallback to single-client chunk downloader if multi-bot was not active or failed
 					if !dlSuccess {
 						uTask.SetStatus(types.StatusDownloading, ext.EngineName("telegram"))
@@ -667,6 +691,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				}
 			} else if photoMedia, ok := mediaSource.(*tg.MessageMediaPhoto); ok {
 				// Case 1B: Photo Media
+				deleteLinks()
 				if photo, ok := photoMedia.Photo.(*tg.Photo); ok {
 					fileName := fmt.Sprintf("photo_%d.jpg", photo.ID)
 					if opt.CustomName != "" {
@@ -1298,19 +1323,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	ulStartTime = time.Now()
 
-	// DELETE_LINKS: the command and the replied link/file are removed to keep the group clean
-	// (after the download, the bot still needed the replied file until now)
-	if cfg.DeleteLinks && !msg.Internal {
-		ids := []int{msg.MessageID}
-		if msg.IsReply && msg.ReplyToID > 0 {
-			ids = append(ids, msg.ReplyToID)
-		}
-		go func() {
-			dctx, dcancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer dcancel()
-			_ = m.sender.DeleteMessage(dctx, peer, ids)
-		}()
-	}
+	deleteLinks() // fallback (e.g. multi-bot download needed the message until now)
 
 	setStep(uTask, "Preparing Upload")
 	taskThumb := ""

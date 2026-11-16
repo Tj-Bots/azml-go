@@ -15,7 +15,7 @@ var varDescriptions = map[string]string{
 	"LEECH_FILENAME_REMNAME":       "Remove words from every leeched file name. Separate them by | (e.g. www.site.com|[Group]). Str",
 	"EXTENSION_FILTER":             "File extensions that won't be uploaded, for all users (e.g. .txt .nfo .url). Separate them by space. Users can add their own in /us. Str",
 	"EXCEP_CHATS":                  "Chats (IDs separated by space) that don't use logging: no Leech Started and no copy in LEECH_LOG_ID for tasks started there. Str",
-	"DELETE_LINKS":                 "Delete the command and the replied TgLink/Magnet/File when the task starts uploading, to keep the group clean. Default is False. Bool",
+	"DELETE_LINKS":                 "Delete TgLink/Magnet/File on Start of Task to Auto Clean Group. Default is False. Bool",
 	"RICH_MESSAGES":                "Send the status as a Telegram Rich Message: a Cancel button inside every task and lines between tasks, instead of /cancel commands. Default is False. Bool",
 	"CLEAN_LOG_MSG":                "Delete the \"Leech Started\" message in LEECH_LOG_ID after the upload is done. Default is False. Bool",
 	"USER_TIME_INTERVAL":           "Seconds a user must wait between two tasks (0 = no wait). Owner and sudo are not limited. Int",

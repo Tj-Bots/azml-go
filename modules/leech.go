@@ -352,6 +352,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 
+	// Debrid (DEBRID_LINK_API / REAL_DEBRID_API) like the Python bot; Mega only without a MEGA account
+	if ext.IsURL(link) && !opt.Ytdl && (cfg.DebridLinkAPI != "" || cfg.RealDebridAPI != "") &&
+		(!ext.IsMegaLink(link) || cfg.MegaEmail == "") {
+		if d, err := ext.DebridLink(ctx, link); err == nil && d != "" {
+			log.Printf("[LEECH] Debrid link for %s", link)
+			link = d
+		}
+	}
+
 	// Try Direct Link Generator for host URLs (Mediafire, Pixeldrain, Solidfiles)
 	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) {
 		if directURL, err := ext.GenerateDirectLink(link); err == nil && directURL != "" {

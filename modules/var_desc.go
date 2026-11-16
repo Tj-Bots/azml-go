@@ -2,6 +2,8 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"REAL_DEBRID_API":              "real-debrid.com API token: the same for the hosters Real-Debrid supports (used when DEBRID_LINK_API is not set or fails). Str",
+	"DEBRID_LINK_API":              "debrid-link.com API key: links of 360+ hosters (Mega, 1fichier, Rapidgator, Uptobox ...) are downloaded through debrid-link, fast and without the host's limits. Str",
 	"SAFE_MODE":                    "Hide the file names and the source link in the leech log and the finish message (only the file links stay). Default is False. Bool",
 	"AUTO_DELETE_MESSAGE_DURATION": "Seconds after which the bot deletes its short messages (usage, errors like limits or access) together with the command. 0 = keep them. Int",
 	"PM_ACCESS":                    "Let everyone use the bot in private chat, like in authorized groups. Blacklisted users stay blocked. Default is False. Bool",

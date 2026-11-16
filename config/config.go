@@ -56,6 +56,8 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	RealDebridAPI             string
+	DebridLinkAPI             string
 	SafeMode                  bool
 	PmAccess                  bool
 	SetCommands               bool
@@ -200,6 +202,8 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		RealDebridAPI:             getEnv("REAL_DEBRID_API", ""),
+		DebridLinkAPI:             getEnv("DEBRID_LINK_API", ""),
 		SafeMode:                  getEnvBool("SAFE_MODE", false),
 		PmAccess:                  getEnvBool("PM_ACCESS", false),
 		SetCommands:               getEnvBool("SET_COMMANDS", true),
@@ -482,6 +486,10 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.PmAccess = val == "true" || val == "1"
 	case "SAFE_MODE":
 		GlobalConfig.SafeMode = val == "true" || val == "1"
+	case "DEBRID_LINK_API":
+		GlobalConfig.DebridLinkAPI = val
+	case "REAL_DEBRID_API":
+		GlobalConfig.RealDebridAPI = val
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -619,6 +627,8 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"REAL_DEBRID_API":              GlobalConfig.RealDebridAPI,
+		"DEBRID_LINK_API":              GlobalConfig.DebridLinkAPI,
 		"SAFE_MODE":                    strconv.FormatBool(GlobalConfig.SafeMode),
 		"PM_ACCESS":                    strconv.FormatBool(GlobalConfig.PmAccess),
 		"SET_COMMANDS":                 strconv.FormatBool(GlobalConfig.SetCommands),

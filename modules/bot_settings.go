@@ -46,6 +46,8 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"REAL_DEBRID_API",
+	"DEBRID_LINK_API",
 	"SAFE_MODE",
 	"AUTO_DELETE_MESSAGE_DURATION",
 	"PM_ACCESS",

@@ -7,6 +7,7 @@ import (
 	td "github.com/gotd/td/telegram"
 	"log"
 	"maps"
+	"mime"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -850,6 +851,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 		}
 	} else if downloader.IsGDriveLink(link) {
+		modeStr = "#Leech | #GDrive"
 		gdrive := downloader.GetGDriveClient()
 		fileID := downloader.ExtractGDriveID(link)
 		if fileID == "" {
@@ -1845,35 +1847,47 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		maxULSpeed = avgULSpeed * 1.25
 	}
 
-	// Build completion message exactly matching Image 1
+	// The finish message of the Python bot (themes: NAME, SIZE, ELAPSE, MODE, L_TOTAL_FILES, L_CC)
 	var sb strings.Builder
 	mainName := displayName
-	if len(uploadedNames) > 0 {
+	if len(uploadedNames) == 1 {
 		mainName = uploadedNames[0]
 	}
-	if cfg.SafeMode {
-		mainName = "Task Completed"
+	if cfg.SafeMode && msg.ChatID != msg.UserID {
+		mainName = "Task has been Completed!"
 	}
-	sb.WriteString(fmt.Sprintf("<b>%s</b>\n", mainName))
-	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Size:</b> %s\n", ext.GetReadableFileSize(totalSize)))
-	sb.WriteString(fmt.Sprintf("┠ <b>Elapsed:</b> %s\n", ext.GetReadableTime(int64(overallElapsed.Seconds()))))
-	sb.WriteString(fmt.Sprintf("┠ <b>Avg DL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(avgDLSpeed))))
-	sb.WriteString(fmt.Sprintf("┠ <b>Avg UL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(avgULSpeed))))
-	sb.WriteString(fmt.Sprintf("┠ <b>Mode:</b> %s\n", modeStr))
-	sb.WriteString(fmt.Sprintf("┠ <b>Max DL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(maxDLSpeed))))
-	sb.WriteString(fmt.Sprintf("┠ <b>Max UL Speed:</b> %s/s\n", ext.GetReadableFileSize(int64(maxULSpeed))))
-	sb.WriteString(fmt.Sprintf("┠ <b>Total Files:</b> %d\n", len(uploadedNames)))
-
 	userTag := fmt.Sprintf("@%s", msg.Username)
 	if msg.Username == "" {
-		userTag = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, msg.SenderName)
+		userTag = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, telegram.EscapeHTML(msg.SenderName))
 	}
-	sb.WriteString(fmt.Sprintf("╰ <b>By:</b> %s</blockquote>\n\n", userTag))
+	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Name:</b> <code>%s</code>\n", telegram.EscapeHTML(mainName)))
+	sb.WriteString(fmt.Sprintf("┊ <b>Size: </b>%s\n", ext.GetReadableFileSize(totalSize)))
+	sb.WriteString(fmt.Sprintf("┊ <b>Elapsed: </b>%s\n", ext.GetReadableTime(int64(overallElapsed.Seconds()))))
+	sb.WriteString(fmt.Sprintf("┊ <b>Mode: </b>%s\n", pythonMode(modeStr, opt)))
+	if opt.IsMirror {
+		typ := "Folder"
+		if len(uploadedNames) == 1 {
+			typ = mimeOfName(uploadedNames[0])
+		} else {
+			sb.WriteString(fmt.Sprintf("┊ <b>Type: </b>%s\n", typ))
+			sb.WriteString(fmt.Sprintf("┊ <b>Files: </b>%d\n", len(uploadedNames)))
+			typ = ""
+		}
+		if typ != "" {
+			sb.WriteString(fmt.Sprintf("┊ <b>Type: </b>%s\n", typ))
+		}
+		sb.WriteString(fmt.Sprintf("╰ <b>By: </b>%s\n\n</blockquote>", userTag))
+	} else {
+		sb.WriteString(fmt.Sprintf("┊ <b>Total Files: </b>%d\n", len(uploadedNames)))
+		sb.WriteString(fmt.Sprintf("╰ <b>By: </b>%s</blockquote>\n\n", userTag))
+	}
+	_, _ = avgDLSpeed, avgULSpeed
 
 	botPM := cfg.BotPM || (user != nil && user.BotPM) || (msg.ChatID != msg.UserID)
 	if opt.IsMirror {
-		sb.WriteString(fmt.Sprintf("➲ <b><i>Uploaded to %s :</i></b>\n", mirrorHostName(opt.MirrorHost)))
-		sb.WriteString(finishFileList(uploadedNames, mirrorLinks))
+		if len(uploadedNames) > 1 { // one file: its link is the button, like the Python bot
+			sb.WriteString(finishFileList(uploadedNames, mirrorLinks))
+		}
 	} else {
 		if botPM {
 			sb.WriteString("➲ <b><i>File(s) have been Sent to Bot PM (Private)</i></b>\n")
@@ -3021,4 +3035,37 @@ func trackStep(t *ext.UnifiedTask, dir string, total int64) func() {
 	}()
 	var once sync.Once
 	return func() { once.Do(func() { close(stop) }) }
+}
+
+// pythonMode: the Mode line of the Python bot: " #Leech (Zip) | #Aria2".
+func pythonMode(modeStr string, opt types.LeechOptions) string {
+	kind := "#Leech"
+	if opt.IsMirror {
+		kind = "#DDL"
+	}
+	if opt.IsZip {
+		kind += " (Zip)"
+	} else if opt.IsExtract {
+		kind += " (Unzip)"
+	}
+	eng := "#Aria2"
+	switch {
+	case strings.Contains(modeStr, "YtDlp"):
+		eng = "#ytdlp"
+	case strings.Contains(modeStr, "Telegram"), strings.Contains(modeStr, "Folder"):
+		eng = "#Tg"
+	case strings.Contains(modeStr, "Mega"):
+		eng = "#Mega"
+	case strings.Contains(modeStr, "GDrive"):
+		eng = "#GDrive"
+	}
+	return kind + " | " + eng
+}
+
+// mimeOfName: the Type line of a mirrored file.
+func mimeOfName(name string) string {
+	if t := mime.TypeByExtension(strings.ToLower(filepath.Ext(name))); t != "" {
+		return strings.SplitN(t, ";", 2)[0]
+	}
+	return "application/octet-stream"
 }

@@ -287,6 +287,18 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 		tag = "@" + msg.Username
 	}
 
+	// stopped by the user (Cancel button, /cancel): the reason of the Python bot, not the raw error
+	stopped := ctx.Err() != nil
+	if stopped {
+		ctx = context.Background() // the task's context is done: the message must still go out
+	}
+	if low := strings.ToLower(errStr); strings.Contains(low, "context canceled") || stopped {
+		if strings.HasPrefix(low, "upload") || strings.Contains(low, " upload failed") {
+			errStr = "Your upload has been stopped!"
+		} else {
+			errStr = "Download stopped by user!"
+		}
+	}
 	elapsed := ext.TimeSinceFormatted(startTime)
 	errMsg := fmt.Sprintf("<i><b>Download Stopped!</b></i>\n"+
 		"<blockquote>╭ <b>Task for:</b> %s\n"+
@@ -2899,7 +2911,7 @@ func (m *LeechModule) sameDirFailed(peer tg.InputPeerClass, msg *types.MessageCo
 // noRetry: Retry makes no sense when the user stopped the task himself or the bot refuses it.
 func noRetry(reason string) bool {
 	r := strings.ToLower(reason)
-	for _, k := range []string{"cancel", "disabled", "limit", "not supported", "closed"} {
+	for _, k := range []string{"cancel", "stopped", "disabled", "limit", "not supported", "closed"} {
 		if strings.Contains(r, k) {
 			return true
 		}

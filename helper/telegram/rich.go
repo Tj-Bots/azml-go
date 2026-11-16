@@ -73,7 +73,7 @@ func botAPICall(ctx context.Context, method string, payload map[string]interface
 func richPayload(chatID int64, html string, btn *ButtonMaker) map[string]interface{} {
 	p := map[string]interface{}{
 		"chat_id":      chatID,
-		"rich_message": map[string]interface{}{"html": html, "skip_entity_detection": true},
+		"rich_message": map[string]interface{}{"html": html}, // hashtags, links, @users clickable (like the Python bot)
 	}
 	if btn != nil {
 		if kb := btn.BuildBotAPIKeyboard(3); kb != "" {

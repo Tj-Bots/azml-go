@@ -2,6 +2,8 @@ package modules
 
 import (
 	"context"
+	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -114,7 +116,7 @@ func (m *StatusModule) HandleStatus(ctx context.Context, peer tg.InputPeerClass,
 	}
 
 	text, btn := m.taskMgr.BuildStatusMessage(page)
-	sentID, err := m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 3)
+	sentID, err := m.sendStatus(ctx, peer, text, msg.MessageID, btn)
 	if err != nil || sentID <= 0 {
 		return
 	}
@@ -423,7 +425,7 @@ func (m *StatusModule) UpdateAllMessages(ctx context.Context, force bool) {
 		if (!hasStatus || info == nil || info.MessageID <= 0) && hasPeer && peer != nil {
 			page := m.getChatPage(cID)
 			text, btn := m.taskMgr.BuildStatusMessage(page)
-			sentID, err := m.sender.SendMessageWithButtons(ctx, peer, text, 0, btn, 3)
+			sentID, err := m.sendStatus(ctx, peer, text, 0, btn)
 			if err == nil && sentID > 0 {
 				m.mu.Lock()
 				m.statusReplies[cID] = &StatusReplyInfo{
@@ -477,7 +479,7 @@ func (m *StatusModule) UpdateAllMessages(ctx context.Context, force bool) {
 		}
 
 		text, btn := m.taskMgr.BuildStatusMessage(targetPage)
-		err := m.sender.EditMessageWithButtons(ctx, r.Peer, r.MessageID, text, btn, 3)
+		err := m.editStatus(ctx, r, text, btn)
 		if err != nil {
 			errStr := strings.ToUpper(err.Error())
 			// MESSAGE_NOT_MODIFIED is normal Telegram behavior when text hasn't changed.
@@ -552,4 +554,56 @@ func (m *StatusModule) UpdateAllMessages(ctx context.Context, force bool) {
 			m.mu.Unlock()
 		}
 	}
+}
+
+// sendStatus sends a status message (rich when RICH_MESSAGES is on, plain if that fails).
+func (m *StatusModule) sendStatus(ctx context.Context, peer tg.InputPeerClass, text string, replyTo int, btn *telegram.ButtonMaker) (int, error) {
+	if config.Get().RichMessages {
+		if id, err := m.sender.SendRich(ctx, peer, richStatus(text), replyTo, btn); err == nil {
+			return id, nil
+		} else {
+			log.Printf("[Status] rich message failed (%v), sending plain text", err)
+		}
+	}
+	return m.sender.SendMessageWithButtons(ctx, peer, text, replyTo, btn, 3)
+}
+
+// editStatus edits the status; a plain message can't become rich, so then a new rich one replaces it.
+func (m *StatusModule) editStatus(ctx context.Context, r *StatusReplyInfo, text string, btn *telegram.ButtonMaker) error {
+	if !config.Get().RichMessages {
+		return m.sender.EditMessageWithButtons(ctx, r.Peer, r.MessageID, text, btn, 3)
+	}
+	err := m.sender.EditRich(ctx, r.Peer, r.MessageID, richStatus(text), btn)
+	if err == nil {
+		m.mu.Lock()
+		r.LastEdit = time.Now()
+		m.mu.Unlock()
+		return nil
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "too many requests") {
+		return err
+	}
+	newID, sErr := m.sender.SendRich(ctx, r.Peer, richStatus(text), 0, btn)
+	if sErr != nil {
+		log.Printf("[Status] rich status failed (%v), using plain text", sErr)
+		return m.sender.EditMessageWithButtons(ctx, r.Peer, r.MessageID, text, btn, 3)
+	}
+	old := r.MessageID
+	m.mu.Lock()
+	r.MessageID = newID
+	r.LastEdit = time.Now()
+	m.mu.Unlock()
+	_ = m.sender.DeleteMessage(ctx, r.Peer, []int{old})
+	return nil
+}
+
+var cancelLineRe = regexp.MustCompile(`╰ /cancel[^_\s]*_(\S+?)</blockquote>\n*`)
+
+// richStatus: the plain status with a Cancel button inside every task and a line between tasks.
+func richStatus(text string) string {
+	text = cancelLineRe.ReplaceAllStringFunc(text, func(line string) string {
+		gid := cancelLineRe.FindStringSubmatch(line)[1]
+		return "╰ " + telegram.RichButton("Cancel Task", "status cancel "+gid, "danger") + "</blockquote><hr/>\n"
+	})
+	return telegram.ToRichHTML(text)
 }

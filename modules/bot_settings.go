@@ -46,6 +46,7 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"RICH_MESSAGES",
 	"CLEAN_LOG_MSG",
 	"USER_TIME_INTERVAL",
 	"SAVE_MSG",
@@ -174,7 +175,7 @@ func configValue(cfgMap map[string]string, key string) string {
 
 func isBoolVar(key string) bool {
 	switch key {
-	case "CLEAN_LOG_MSG", "DISABLE_TORRENTS", "AS_DOCUMENT", "AUTO_THUMBNAIL", "EQUAL_SPLITS", "MEDIA_GROUP", "SHORTENER_ENABLED",
+	case "RICH_MESSAGES", "CLEAN_LOG_MSG", "DISABLE_TORRENTS", "AS_DOCUMENT", "AUTO_THUMBNAIL", "EQUAL_SPLITS", "MEDIA_GROUP", "SHORTENER_ENABLED",
 		"BOT_PM", "TOKEN_IN_PM", "SCREENSHOTS_MODE", "SHOW_MEDIAINFO", "SAVE_MSG", "SOURCE_LINK",
 		"SHOW_EXTRA_CMDS", "ENABLE_FFMPEG_CMDS", "UPDATE_ON_STARTUP":
 		return true

@@ -2,6 +2,7 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"RICH_MESSAGES":                "Send the status as a Telegram Rich Message: a Cancel button inside every task and lines between tasks, instead of /cancel commands. Default is False. Bool",
 	"CLEAN_LOG_MSG":                "Delete the \"Leech Started\" message in LEECH_LOG_ID after the upload is done. Default is False. Bool",
 	"USER_TIME_INTERVAL":           "Seconds a user must wait between two tasks (0 = no wait). Owner and sudo are not limited. Int",
 	"SAVE_MSG":                     "Adds a 📨 Save Message button to leeched files and the finish message: whoever presses it gets a copy in his PM (good for groups and the log channel). Bool",

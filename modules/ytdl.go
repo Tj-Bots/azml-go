@@ -98,6 +98,9 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 		return
 	}
 
+	if !m.leech.forceSubOK(ctx, peer, msg) {
+		return
+	}
 	link, quality := parseYtdlArgs(msg.Text)
 	if link == "" && msg.IsReply && msg.ReplyText != "" {
 		for _, w := range strings.Fields(msg.ReplyText) {

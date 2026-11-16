@@ -46,6 +46,7 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"FSUB_IDS",
 	"DISABLE_TORRENTS",
 	"TORRENT_TIMEOUT",
 	"USER_SESSION_STRING",

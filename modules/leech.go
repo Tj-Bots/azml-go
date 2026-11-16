@@ -81,6 +81,9 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		_, _ = m.sender.SendMessage(ctx, peer, msgText, msg.MessageID, markup)
 		return
 	}
+	if !m.forceSubOK(ctx, peer, msg) {
+		return
+	}
 
 	opt, link := parseLeechArgs(msg.Text)
 	opt.IsMirror = msg.IsMirror

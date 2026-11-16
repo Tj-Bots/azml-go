@@ -56,6 +56,7 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	UserMaxTasks              int
 	RealDebridAPI             string
 	DebridLinkAPI             string
 	SafeMode                  bool
@@ -202,6 +203,7 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		UserMaxTasks:              getEnvInt("USER_MAX_TASKS", 0),
 		RealDebridAPI:             getEnv("REAL_DEBRID_API", ""),
 		DebridLinkAPI:             getEnv("DEBRID_LINK_API", ""),
 		SafeMode:                  getEnvBool("SAFE_MODE", false),
@@ -235,7 +237,7 @@ func LoadConfig(path string) (*Config, error) {
 		CoverImage:                getEnv("COVER_IMAGE", "https://graph.org/file/60f9f8bcb97d27f76f5c0.jpg"),
 		DDLAPI:                    getEnv("DDL_API", getEnv("THUNDER_API", "")),
 		QueueAll:                  getEnvInt("QUEUE_ALL", getEnvInt("BOT_MAX_TASKS", 4)),
-		QueueDownload:             getEnvInt("QUEUE_DOWNLOAD", getEnvInt("USER_MAX_TASKS", 2)),
+		QueueDownload:             getEnvInt("QUEUE_DOWNLOAD", 2),
 		QueueUpload:               getEnvInt("QUEUE_UPLOAD", 2),
 		LeechLimit:                getEnvInt64("LEECH_LIMIT", 0),
 		TorrentLimit:              getEnvInt64("TORRENT_LIMIT", 0),
@@ -514,7 +516,9 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.BaseURLPort, _ = strconv.Atoi(val)
 	case "QUEUE_ALL", "BOT_MAX_TASKS":
 		GlobalConfig.QueueAll, _ = strconv.Atoi(val)
-	case "QUEUE_DOWNLOAD", "USER_MAX_TASKS":
+	case "USER_MAX_TASKS":
+		GlobalConfig.UserMaxTasks, _ = strconv.Atoi(val)
+	case "QUEUE_DOWNLOAD":
 		GlobalConfig.QueueDownload, _ = strconv.Atoi(val)
 	case "QUEUE_UPLOAD":
 		GlobalConfig.QueueUpload, _ = strconv.Atoi(val)
@@ -668,7 +672,7 @@ func GetConfigMap() map[string]string {
 		"TORRENT_TIMEOUT":              strconv.Itoa(GlobalConfig.TorrentTimeout),
 		"BASE_URL":                     GlobalConfig.BaseURL,
 		"BOT_MAX_TASKS":                strconv.Itoa(GlobalConfig.QueueAll),
-		"USER_MAX_TASKS":               strconv.Itoa(GlobalConfig.QueueDownload),
+		"USER_MAX_TASKS":               strconv.Itoa(GlobalConfig.UserMaxTasks),
 		"LEECH_LIMIT":                  strconv.FormatInt(GlobalConfig.LeechLimit, 10),
 		"TORRENT_LIMIT":                strconv.FormatInt(GlobalConfig.TorrentLimit, 10),
 		"DIRECT_LIMIT":                 strconv.FormatInt(GlobalConfig.DirectLimit, 10),

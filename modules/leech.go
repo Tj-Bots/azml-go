@@ -2511,7 +2511,10 @@ func isExcepChat(chatID int64) bool {
 
 // userTasksOK: USER_TASKS_LIMIT, tasks one user may run at once.
 func (m *LeechModule) userTasksOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
-	limit := config.Get().UserTasksLimit
+	limit := config.Get().UserMaxTasks // USER_MAX_TASKS (USER_TASKS_LIMIT is the old name)
+	if limit <= 0 {
+		limit = config.Get().UserTasksLimit
+	}
 	if limit <= 0 || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
 		return true
 	}

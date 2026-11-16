@@ -293,11 +293,13 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 				// ask first: a message only the presser sees (ephemeral), else a normal one
 				q := telegram.NewButtonMaker()
 				q.IButtonStyled("✓ Yes, Cancel", "status ycancel "+gid, "danger")
-				q.IButtonStyled("✘ No", "status ncancel", "primary")
+				q.IButtonStyled("✘ No", "status ncancel "+gid, "primary")
 				q.Row()
 				text := fmt.Sprintf("<b>Cancel this task?</b>\n<code>%s</code>", telegram.EscapeHTML(task.Name()))
-				if _, err := m.sender.SendEphemeral(ctx, peer, queryID, text, q); err != nil {
-					_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, 0, q, 2)
+				// a normal message (an ephemeral one could not be deleted): only the task's user can
+				// press it, it goes away after the answer or after 30 seconds
+				if id, err := m.sender.SendMessageWithButtons(ctx, peer, text, msgID, q, 2); err == nil && id > 0 {
+					m.sender.AutoDeleteMessage(peer, id, 30)
 				}
 				_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 				return
@@ -307,6 +309,12 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 		}
 
 	case "ncancel":
+		if len(parts) >= 3 {
+			if t := m.taskMgr.GetTask(parts[2]); t != nil && fromUID != 0 && t.UserID() != fromUID && !telegram.IsOwner(fromUID) {
+				_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+				return
+			}
+		}
 		_ = m.sender.AnswerCallback(ctx, queryID, "The task goes on.", false)
 		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 		return
@@ -331,6 +339,7 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 				}
 				return
 			}
+			_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 			_ = m.sender.AnswerCallback(ctx, queryID, "Task already finished or not found!", true)
 			return
 		}

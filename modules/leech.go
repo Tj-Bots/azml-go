@@ -1545,7 +1545,21 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				log.Printf("[AZML-Go Leech] Screenshots album failed: %v", err)
 			}
 		}
-		if len(partResults) > 0 {
+		if len(splitParts) > 1 && len(uploadedNames) > 0 {
+			// like the Python bot: every part on its own line, Total Files counts the parts
+			uploadedNames = uploadedNames[:len(uploadedNames)-1]
+			for idx, part := range splitParts {
+				uploadedNames = append(uploadedNames, filepath.Base(part))
+				link := ""
+				switch {
+				case useGroup && len(partResults) > 0 && partResults[0].MsgID > 0:
+					link = channelMessageLink(partResults[0].ChatID, partResults[0].MsgID+idx) // album = consecutive ids
+				case idx < len(partResults):
+					link = channelMessageLink(partResults[idx].ChatID, partResults[idx].MsgID)
+				}
+				fileLinks = append(fileLinks, link)
+			}
+		} else if len(partResults) > 0 {
 			fileLinks = append(fileLinks, channelMessageLink(partResults[0].ChatID, partResults[0].MsgID))
 		} else {
 			fileLinks = append(fileLinks, "")

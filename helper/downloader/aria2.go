@@ -584,8 +584,22 @@ func (t *Aria2DownloadTask) ETA() string {
 	if remBytes <= 0 {
 		return "0s"
 	}
-	sec := int64(float64(remBytes) / t.speed)
-	return fmt.Sprintf("%ds", sec)
+	return readableSeconds(int64(float64(remBytes) / t.speed))
+}
+
+// readableSeconds: 1150 -> 19m 10s (like the other engines).
+func readableSeconds(sec int64) string {
+	d, h, m := sec/86400, sec%86400/3600, sec%3600/60
+	s := sec % 60
+	switch {
+	case d > 0:
+		return fmt.Sprintf("%dd %dh %dm", d, h, m)
+	case h > 0:
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	case m > 0:
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
 }
 func (t *Aria2DownloadTask) Status() types.TaskStatus {
 	t.mu.RLock()

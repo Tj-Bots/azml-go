@@ -11,7 +11,7 @@ func TestRichStatus(t *testing.T) {
 	if !strings.Contains(r, `data="status cancel abc123"`) || !strings.Contains(r, `data="status cancel zz9"`) {
 		t.Fatalf("buttons missing: %s", r)
 	}
-	if strings.Contains(r, "/cancel") || strings.Count(r, "<hr/>") != 2 || strings.Contains(r, "\n") {
+	if strings.Contains(r, "/cancel") || strings.Count(r, "<hr/>") != 1 || strings.Contains(r, "\n") {
 		t.Fatalf("bad rich: %s", r)
 	}
 }

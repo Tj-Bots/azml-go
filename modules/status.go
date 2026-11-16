@@ -696,6 +696,10 @@ func richStatus(text string) string {
 		gid := cancelLineRe.FindStringSubmatch(line)[1]
 		return "╰ " + telegram.RichButton("Cancel Task", "status cancel "+gid, "danger") + "</blockquote><hr/>\n"
 	})
+	// a line only between tasks: none after the last one (above Bot Stats)
+	if i := strings.LastIndex(text, "<hr/>"); i >= 0 {
+		text = text[:i] + text[i+len("<hr/>"):]
+	}
 	return telegram.ToRichHTML(text)
 }
 

@@ -587,6 +587,11 @@ func (b *BotApp) registerDispatcher() {
 }
 
 func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.Entities) {
+	// like the Python bot (Pyrogram skip_updates): messages sent before this start are old
+	// updates Telegram delivers again after a restart; running them would start the tasks again
+	if m.Date > 0 && int64(m.Date) < b.startTime.Unix()-5 {
+		return
+	}
 	peer := b.getPeerWithEntities(m.PeerID, entities)
 	if peer == nil {
 		log.Printf("[AZML-Go Bot Client] Could not resolve peer for msg %d", m.ID)

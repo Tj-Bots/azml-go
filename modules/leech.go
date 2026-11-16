@@ -1746,15 +1746,17 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				uploadedNames = append(uploadedNames, filepath.Base(part))
 				link := ""
 				switch {
+				case useGroup && len(partResults) > 0 && partResults[0].LogMsgID > 0:
+					link = channelMessageLink(partResults[0].LogChatID, partResults[0].LogMsgID+idx) // the album in the leech log
 				case useGroup && len(partResults) > 0 && partResults[0].MsgID > 0:
 					link = channelMessageLink(partResults[0].ChatID, partResults[0].MsgID+idx) // album = consecutive ids
 				case idx < len(partResults):
-					link = channelMessageLink(partResults[idx].ChatID, partResults[idx].MsgID)
+					link = resultLink(partResults[idx])
 				}
 				fileLinks = append(fileLinks, link)
 			}
 		} else if len(partResults) > 0 {
-			fileLinks = append(fileLinks, channelMessageLink(partResults[0].ChatID, partResults[0].MsgID))
+			fileLinks = append(fileLinks, resultLink(partResults[0]))
 		} else {
 			fileLinks = append(fileLinks, "")
 		}
@@ -2793,4 +2795,12 @@ func parseChannelLink(link string) (int64, int, bool) {
 		return 0, 0, false
 	}
 	return -1000000000000 - id, msgID, true
+}
+
+// resultLink: the file in the leech log (the channel people are in), else in the dump channel.
+func resultLink(r uploader.UploadResult) string {
+	if r.LogMsgID > 0 {
+		return channelMessageLink(r.LogChatID, r.LogMsgID)
+	}
+	return channelMessageLink(r.ChatID, r.MsgID)
 }

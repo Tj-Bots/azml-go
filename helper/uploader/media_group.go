@@ -58,8 +58,13 @@ func sentMessageIDs(res tg.UpdatesClass) []int {
 }
 
 func copyMessagesViaBotAPI(botToken string, toChatID, fromChatID int64, msgIDs []int) bool {
+	return len(copyMessagesGetIDs(botToken, toChatID, fromChatID, msgIDs)) > 0
+}
+
+// copyMessagesGetIDs copies several messages and returns the new ids (nil on failure).
+func copyMessagesGetIDs(botToken string, toChatID, fromChatID int64, msgIDs []int) []int {
 	if botToken == "" || toChatID == 0 || fromChatID == 0 || len(msgIDs) == 0 {
-		return false
+		return nil
 	}
 	payload, _ := json.Marshal(map[string]interface{}{
 		"chat_id":      toChatID,
@@ -68,18 +73,28 @@ func copyMessagesViaBotAPI(botToken string, toChatID, fromChatID int64, msgIDs [
 	})
 	resp, err := botAPICopyClient.Post(fmt.Sprintf("https://api.telegram.org/bot%s/copyMessages", botToken), "application/json", bytes.NewReader(payload))
 	if err != nil {
-		return false
+		return nil
 	}
 	defer func() { _ = resp.Body.Close() }()
 	var res struct {
 		Ok          bool   `json:"ok"`
 		Description string `json:"description"`
+		Result      []struct {
+			MessageID int `json:"message_id"`
+		} `json:"result"`
 	}
 	if json.NewDecoder(resp.Body).Decode(&res) == nil && res.Ok {
-		return true
+		ids := []int{}
+		for _, r := range res.Result {
+			ids = append(ids, r.MessageID)
+		}
+		if len(ids) == 0 {
+			ids = []int{0}
+		}
+		return ids
 	}
 	log.Printf("[Media Group] copyMessages to %d failed: %s", toChatID, res.Description)
-	return false
+	return nil
 }
 
 // SendAlbum turns the uploaded parts of one file into a media group (up to 10 per album),
@@ -133,7 +148,10 @@ func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, 
 				continue
 			}
 			sent[target] = true
-			if copyMessagesViaBotAPI(botToken, target, destChat, deliverIDs) {
+			if ids := copyMessagesGetIDs(botToken, target, destChat, deliverIDs); len(ids) > 0 {
+				if target == logChat && start == 0 && ids[0] > 0 {
+					first.LogChatID, first.LogMsgID = target, ids[0]
+				}
 				continue
 			}
 			// fallback: forward (keeps the album when all ids go together)

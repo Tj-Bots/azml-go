@@ -41,8 +41,13 @@ func randID() int64 {
 }
 
 func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msgID int, markupJSON string, replyTo ...int) bool {
+	return copyMessageGetID(botToken, toChatID, fromChatID, msgID, markupJSON, replyTo...) > 0
+}
+
+// copyMessageGetID copies and returns the new message id (0 on failure).
+func copyMessageGetID(botToken string, toChatID int64, fromChatID int64, msgID int, markupJSON string, replyTo ...int) int {
 	if botToken == "" || toChatID == 0 || fromChatID == 0 || msgID <= 0 {
-		return false
+		return 0
 	}
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/copyMessage", botToken)
 	payload := map[string]interface{}{
@@ -60,19 +65,25 @@ func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msg
 	resp, err := botAPICopyClient.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		log.Printf("[AZML-Go Uploader] copyMessage HTTP error to %d: %v", toChatID, err)
-		return false
+		return 0
 	}
 	defer func() { _ = resp.Body.Close() }()
 	var res struct {
 		Ok          bool   `json:"ok"`
 		Description string `json:"description"`
+		Result      struct {
+			MessageID int `json:"message_id"`
+		} `json:"result"`
 	}
 	if json.NewDecoder(resp.Body).Decode(&res) == nil && res.Ok {
 		log.Printf("[AZML-Go Uploader] copyMessage succeeded to %d without forward tag!", toChatID)
-		return true
+		if res.Result.MessageID > 0 {
+			return res.Result.MessageID
+		}
+		return 1
 	}
 	log.Printf("[AZML-Go Uploader] copyMessage failed to %d: %s", toChatID, res.Description)
-	return false
+	return 0
 }
 
 func deleteMessageViaBotAPI(botToken string, chatID int64, msgID int) bool {
@@ -189,8 +200,10 @@ type UploadOptions struct {
 
 // UploadResult is where an uploaded file landed.
 type UploadResult struct {
-	ChatID int64
-	MsgID  int
+	ChatID    int64
+	MsgID     int
+	LogChatID int64 // the copy in the leech log (the link users can open)
+	LogMsgID  int
 }
 
 func isTransientUploadError(err error) bool {
@@ -987,6 +1000,9 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 	if opt.Result != nil {
 		opt.Result.ChatID = actualDestChatID
 		opt.Result.MsgID = msgID
+		if actualDestChatID == effectiveLogChatID {
+			opt.Result.LogChatID, opt.Result.LogMsgID = actualDestChatID, msgID
+		}
 	}
 	if opt.SkipDelivery {
 		return &res, nil
@@ -1063,8 +1079,11 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 				if targetChatID == effectiveLogChatID {
 					reply = opt.LogReplyTo
 				}
-				if copyMessageViaBotAPI(botToken, targetChatID, actualDestChatID, msgID, mk, reply) {
+				if newID := copyMessageGetID(botToken, targetChatID, actualDestChatID, msgID, mk, reply); newID > 0 {
 					log.Printf("[AZML-Go Uploader] Successfully copied media to %s (%d) via Bot API", desc, targetChatID)
+					if targetChatID == effectiveLogChatID && opt.Result != nil && newID > 1 {
+						opt.Result.LogChatID, opt.Result.LogMsgID = targetChatID, newID
+					}
 					return true
 				}
 			}

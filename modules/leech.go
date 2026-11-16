@@ -1861,24 +1861,24 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		userTag = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, telegram.EscapeHTML(msg.SenderName))
 	}
 	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Name:</b> <code>%s</code>\n", telegram.EscapeHTML(mainName)))
-	sb.WriteString(fmt.Sprintf("┊ <b>Size: </b>%s\n", ext.GetReadableFileSize(totalSize)))
-	sb.WriteString(fmt.Sprintf("┊ <b>Elapsed: </b>%s\n", ext.GetReadableTime(int64(overallElapsed.Seconds()))))
-	sb.WriteString(fmt.Sprintf("┊ <b>Mode: </b>%s\n", pythonMode(modeStr, opt)))
+	sb.WriteString(fmt.Sprintf("┠ <b>Size: </b>%s\n", ext.GetReadableFileSize(totalSize)))
+	sb.WriteString(fmt.Sprintf("┠ <b>Elapsed: </b>%s\n", ext.GetReadableTime(int64(overallElapsed.Seconds()))))
+	sb.WriteString(fmt.Sprintf("┠ <b>Mode: </b>%s\n", pythonMode(modeStr, opt)))
 	if opt.IsMirror {
 		typ := "Folder"
 		if len(uploadedNames) == 1 {
 			typ = mimeOfName(uploadedNames[0])
 		} else {
-			sb.WriteString(fmt.Sprintf("┊ <b>Type: </b>%s\n", typ))
-			sb.WriteString(fmt.Sprintf("┊ <b>Files: </b>%d\n", len(uploadedNames)))
+			sb.WriteString(fmt.Sprintf("┠ <b>Type: </b>%s\n", typ))
+			sb.WriteString(fmt.Sprintf("┠ <b>Files: </b>%d\n", len(uploadedNames)))
 			typ = ""
 		}
 		if typ != "" {
-			sb.WriteString(fmt.Sprintf("┊ <b>Type: </b>%s\n", typ))
+			sb.WriteString(fmt.Sprintf("┠ <b>Type: </b>%s\n", typ))
 		}
 		sb.WriteString(fmt.Sprintf("╰ <b>By: </b>%s\n\n</blockquote>", userTag))
 	} else {
-		sb.WriteString(fmt.Sprintf("┊ <b>Total Files: </b>%d\n", len(uploadedNames)))
+		sb.WriteString(fmt.Sprintf("┠ <b>Total Files: </b>%d\n", len(uploadedNames)))
 		sb.WriteString(fmt.Sprintf("╰ <b>By: </b>%s</blockquote>\n\n", userTag))
 	}
 	_, _ = avgDLSpeed, avgULSpeed
@@ -2655,7 +2655,7 @@ func (m *LeechModule) sendLogStart(ctx context.Context, msg *types.MessageContex
 	} else if ext.IsURL(source) || strings.HasPrefix(source, "https://t.me/") {
 		src = fmt.Sprintf("<a href=\"%s\">Click Here</a>", telegram.EscapeHTML(source))
 	}
-	text := fmt.Sprintf("➲ <b><u>Leech Started </u></b>🏁\n┊\n┊ <b>User :</b> %s ( #ID%d )\n╰ <b>Source :</b> %s", mention, msg.UserID, src)
+	text := fmt.Sprintf("➲ <b><u>Leech Started </u></b>🏁\n┠\n┠ <b>User :</b> %s ( #ID%d )\n╰ <b>Source :</b> %s", mention, msg.UserID, src)
 	id, err := m.sender.SendMessage(ctx, logPeer, text, 0, nil)
 	if err != nil {
 		log.Printf("[LEECH] log start message failed: %v", err)
@@ -2701,7 +2701,7 @@ func (m *LeechModule) sendLinksLog(ctx context.Context, msg *types.MessageContex
 	if source != "" {
 		src = "<code>" + telegram.EscapeHTML(source) + "</code>"
 	}
-	text := fmt.Sprintf("<b><i>Task Started</i></b>\n<blockquote>┊ <b>Mode:</b> %s\n╰ <b>By:</b> %s\n\n➲ <b>Source:</b>\n╰ <b>Added On:</b> %s</blockquote>\n------------------------------------------\n%s\n------------------------------------------",
+	text := fmt.Sprintf("<b><i>Task Started</i></b>\n<blockquote>┠ <b>Mode:</b> %s\n╰ <b>By:</b> %s\n\n➲ <b>Source:</b>\n╰ <b>Added On:</b> %s</blockquote>\n------------------------------------------\n%s\n------------------------------------------",
 		mode, userTagOf(msg), time.Now().In(loc).Format("02/01/06, 03:04:05 PM"), src)
 	if _, err := m.sender.SendMessage(ctx, lp, text, 0, nil); err != nil {
 		log.Printf("[LINKS_LOG] %v", err)
@@ -2719,7 +2719,7 @@ func (m *LeechModule) sendPMStart(ctx context.Context, msg *types.MessageContext
 	}
 	text := "➲ <b><u>Task Started </u></b>🏁"
 	if link != "" && !config.Get().SafeMode {
-		text += fmt.Sprintf("\n┊\n╰ <b>Link:</b> <a href=\"%s\">Click Here</a>", telegram.EscapeHTML(link))
+		text += fmt.Sprintf("\n┠\n╰ <b>Link:</b> <a href=\"%s\">Click Here</a>", telegram.EscapeHTML(link))
 	}
 	id, err := m.sender.SendMessage(ctx, &tg.InputPeerUser{UserID: msg.UserID, AccessHash: telegram.GetUserAccessHash(msg.UserID)}, text, 0, nil)
 	if err != nil {

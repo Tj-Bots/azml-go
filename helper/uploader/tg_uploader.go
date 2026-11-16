@@ -815,6 +815,10 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			log.Printf("[AZML-Go Uploader] Uploading to channel %d", targetUploadChatID)
 		} else {
 			log.Printf("[AZML-Go Uploader] Warning: Could not resolve access hash for target channel %d", targetUploadChatID)
+			if clientToUse == u.userClient {
+				// the user session is not in the channel: say so instead of trying the group
+				return nil, fmt.Errorf("the user session (needed for files over 2GB) can't post in the log channel %d: add the session account there as admin with \"Post messages\"", targetUploadChatID)
+			}
 		}
 	} else if targetUploadChatID == opt.UserID && opt.UserID != 0 {
 		uHash := opt.UserAccessHash

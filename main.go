@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"syscall"
@@ -31,9 +32,16 @@ type istLogWriter struct {
 	loc *time.Location
 }
 
+// botTokenRe: a bot token inside a log line (e.g. a Bot API URL in an error) is hidden.
+var botTokenRe = regexp.MustCompile(`\d{6,}:[A-Za-z0-9_-]{30,}`)
+
 func (w *istLogWriter) Write(p []byte) (n int, err error) {
 	now := time.Now().In(w.loc).Format("2006/01/02 15:04:05 IST")
-	return fmt.Fprintf(w.out, "%s %s", now, p)
+	line := botTokenRe.ReplaceAll(p, []byte("<bot-token>"))
+	if _, err := fmt.Fprintf(w.out, "%s %s", now, line); err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 func setupISTLogging() {

@@ -388,6 +388,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		return
 	}
 
+	// HLS (m3u8): aria2 would only save the playlist text, yt-dlp downloads the stream
+	if !opt.Ytdl && isHLSLink(link) {
+		useYtdlForHLS(&opt)
+	}
+
 	// Try DDL API for Telegram links (t.me/... or t.me/c/...) if a link was provided
 	if cfg.DDLAPI != "" && link != "" && !opt.Ytdl {
 		if cid, mid, ok := ext.ParseTelegramLink(link); ok {
@@ -460,6 +465,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	// For HTTP/HTTPS links: probe remote headers to resolve true filename (Content-Disposition) & extension in background
 	if ext.IsURL(link) && !opt.Ytdl && !ext.IsMegaLink(link) && !downloader.IsGofileLink(link) && !ext.IsMagnet(link) && !strings.Contains(strings.ToLower(link), ".torrent") {
 		resolvedName, finalURL, resolvedSize, _ := ext.ResolveDownloadMetadata(ctx, link)
+		if low := strings.ToLower(resolvedName); strings.HasSuffix(low, ".m3u8") || strings.HasSuffix(low, ".m3u") {
+			resolvedName = "" // an HLS playlist behind a link without .m3u8: yt-dlp takes it
+			useYtdlForHLS(&opt)
+		}
 		if resolvedName != "" {
 			if opt.CustomName == "" {
 				opt.CustomName = resolvedName
@@ -826,6 +835,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}, opt.YtdlArgs...)
 		if dlErr == nil {
 			downloadedPath = ytdlResult(taskDir, file)
+			if fi, sErr := os.Stat(downloadedPath); sErr == nil && !fi.IsDir() && opt.CustomName != "" && downloadedPath != "" {
+				// -n: the new name, with the extension yt-dlp gave
+				nn := strings.TrimSuffix(opt.CustomName, filepath.Ext(opt.CustomName)) + filepath.Ext(downloadedPath)
+				np := filepath.Join(filepath.Dir(downloadedPath), filepath.Base(nn))
+				if os.Rename(downloadedPath, np) == nil {
+					downloadedPath = np
+				}
+			}
 			if downloadedPath == "" {
 				dlErr = fmt.Errorf("yt-dlp finished but no file was downloaded")
 			} else {
@@ -2888,4 +2905,27 @@ func resultLink(r uploader.UploadResult) string {
 		return channelMessageLink(r.LogChatID, r.LogMsgID)
 	}
 	return channelMessageLink(r.ChatID, r.MsgID)
+}
+
+// isHLSLink: an m3u8 playlist (HLS stream).
+func isHLSLink(link string) bool {
+	if !ext.IsURL(link) {
+		return false
+	}
+	l := strings.ToLower(link)
+	path := strings.SplitN(strings.SplitN(l, "?", 2)[0], "#", 2)[0]
+	return strings.HasSuffix(path, ".m3u8") || strings.Contains(path, ".m3u8/") ||
+		strings.Contains(l, "format=m3u8") || strings.Contains(l, "type=m3u8")
+}
+
+// useYtdlForHLS: the task goes through yt-dlp (best quality, one mp4), keeping -n and -h.
+func useYtdlForHLS(opt *types.LeechOptions) {
+	opt.Ytdl = true
+	if opt.YtdlFormat == "" {
+		opt.YtdlFormat = "bv*+ba/b"
+	}
+	opt.YtdlArgs = append(opt.YtdlArgs, "--merge-output-format", "mp4")
+	for _, h := range taskHeaders(opt.Headers, opt.Username, opt.Password) {
+		opt.YtdlArgs = append(opt.YtdlArgs, "--add-header", h)
+	}
 }

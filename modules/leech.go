@@ -1271,7 +1271,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 	if opt.Join {
 		setStep(uTask, "Join Parts")
+		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
 		downloadedPath = joinParts(downloadedPath)
+		done()
 	}
 
 	// 2. Post-processing: Forceful Archive Extraction (/leech -e, -extract, -uz, -p)
@@ -1282,7 +1284,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if isArch {
 			log.Printf("[LEECH -e] Detected archive format '%s' via binary header for: %s", archType, downloadedPath)
 			extractDir := filepath.Join(taskDir, "extracted")
-			if outDir, err := ext.ForceExtractArchive(downloadedPath, extractDir, opt.Password); err == nil {
+			done := trackStep(uTask, taskDir, pathSize(downloadedPath))
+			outDir, err := ext.ForceExtractArchive(downloadedPath, extractDir, opt.Password)
+			done()
+			if err == nil {
 				_ = os.Remove(downloadedPath)
 				_ = os.Remove(downloadedPath + ".hatchzip")
 				_ = os.Remove(downloadedPath + ".hatchzip-tail")
@@ -1312,7 +1317,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	// media tools from our Python bot, before zip
 	if opt.ExtractStrm {
 		setStep(uTask, "Extract Streams (FFmpeg)")
-		if out, err := extractAllStreams(downloadedPath, filepath.Join(taskDir, "streams_"+ext.RandomHex(3))); err == nil {
+		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
+		out, err := extractAllStreams(downloadedPath, filepath.Join(taskDir, "streams_"+ext.RandomHex(3)))
+		done()
+		if err == nil {
 			_ = os.RemoveAll(downloadedPath)
 			downloadedPath = out
 		} else {
@@ -1321,17 +1329,23 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	if opt.ExtractAud != "" {
 		setStep(uTask, "Extract Audio (FFmpeg)")
+		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
 		downloadedPath = extractAudio(downloadedPath, opt.ExtractAud)
+		done()
 	}
 	if opt.ConvVideo != "" || opt.ConvAudio != "" {
 		setStep(uTask, "Convert Media (FFmpeg)")
+		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
 		downloadedPath = convertMedia(downloadedPath, opt.ConvVideo, opt.ConvAudio)
+		done()
 	}
 
 	if vtSel != nil && !vtSel.empty() {
 		setStep(uTask, "Video Tools (FFmpeg)")
 		var shots int
+		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
 		downloadedPath, shots = runVideoTools(downloadedPath, vtSel)
+		done()
 		if shots > 0 {
 			opt.Screenshots = shots
 		}
@@ -1341,7 +1355,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		uTask.SetStatus(types.StatusArchiving, "7-Zip")
 		// Compression requested (-z / -zip)
 		zipTarget := filepath.Join(taskDir, filepath.Base(downloadedPath)+".zip")
-		if err := ext.CompressToZip(downloadedPath, zipTarget, opt.Password); err == nil {
+		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
+		zErr := ext.CompressToZip(downloadedPath, zipTarget, opt.Password)
+		done()
+		if err := zErr; err == nil {
 			_ = os.RemoveAll(downloadedPath)
 			downloadedPath = zipTarget
 		}
@@ -1363,7 +1380,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		ffDir := filepath.Join(taskDir, "ff_tmp")
 		_ = os.MkdirAll(ffDir, 0755)
 		outFFmpeg := filepath.Join(ffDir, filepath.Base(downloadedPath))
-		if fErr := ext.ExecuteCustomFFmpeg(downloadedPath, outFFmpeg, rawCmd, cfg.FFmpegEncoding); fErr == nil {
+		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
+		fErr := ext.ExecuteCustomFFmpeg(downloadedPath, outFFmpeg, rawCmd, cfg.FFmpegEncoding)
+		done()
+		if fErr == nil {
 			_ = os.Remove(downloadedPath)
 			downloadedPath = outFFmpeg
 		} else {
@@ -1588,7 +1608,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		splitParts := []string{curFile}
 		if !opt.IsMirror {
 			var splitErr error
+			var done func()
+			if fi, sErr := os.Stat(curFile); sErr == nil && fi.Size() > splitSize {
+				done = trackStep(uTask, splitDir, fi.Size()) // only when it really splits
+			}
+			_ = os.MkdirAll(splitDir, 0755)
 			splitParts, splitErr = ext.SplitFile(curFile, splitSize, splitDir, equalSplits)
+			if done != nil {
+				done()
+			}
 			if splitErr != nil || len(splitParts) == 0 {
 				splitParts = []string{curFile}
 			}
@@ -2928,4 +2956,69 @@ func useYtdlForHLS(opt *types.LeechOptions) {
 	for _, h := range taskHeaders(opt.Headers, opt.Username, opt.Password) {
 		opt.YtdlArgs = append(opt.YtdlArgs, "--add-header", h)
 	}
+}
+
+// pathSize: a file's size, or everything inside a folder.
+func pathSize(p string) int64 {
+	var n int64
+	_ = filepath.Walk(p, func(_ string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			n += info.Size()
+		}
+		return nil
+	})
+	return n
+}
+
+// trackStep shows a processing step (extract, zip, split, video tools, FFmpeg) like a transfer:
+// Processed, Speed and ETA come from the files the step writes in dir. total is the expected
+// output (the input size). Call the returned func when the step ends.
+func trackStep(t *ext.UnifiedTask, dir string, total int64) func() {
+	start := time.Now()
+	stop := make(chan struct{})
+	t.SetProgress(0, total, 0, "-")
+	// the files already there: only new or changed ones are the step's output
+	type st struct {
+		size int64
+		mod  time.Time
+	}
+	before := map[string]st{}
+	_ = filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			before[p] = st{info.Size(), info.ModTime()}
+		}
+		return nil
+	})
+	go func() {
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-tick.C:
+			}
+			var cur int64
+			_ = filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
+				if err == nil && !info.IsDir() {
+					if old, ok := before[p]; !ok || old.size != info.Size() || !old.mod.Equal(info.ModTime()) {
+						cur += info.Size() // written since the step began
+					}
+				}
+				return nil
+			})
+			if total > 0 && cur > total {
+				cur = total
+			}
+			el := time.Since(start).Seconds()
+			spd := float64(cur) / el
+			eta := "-"
+			if spd > 0 && total > cur {
+				eta = ext.GetReadableTime(int64(float64(total-cur) / spd))
+			}
+			t.SetProgress(cur, total, spd, eta)
+		}
+	}()
+	var once sync.Once
+	return func() { once.Do(func() { close(stop) }) }
 }

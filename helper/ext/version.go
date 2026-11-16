@@ -16,7 +16,7 @@ import (
 // PATCH for fixes, MINOR for new features, MAJOR for big changes.
 const (
 	verMajor = 2
-	verMinor = 1
+	verMinor = 2
 	verPatch = 0
 	verState = "go"
 )

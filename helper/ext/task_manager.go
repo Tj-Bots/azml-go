@@ -217,10 +217,11 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 	var totalUL float64
 	for _, t := range tasks {
 		spd := t.Speed()
-		if t.Status() == types.StatusUploading {
+		switch t.Status() {
+		case types.StatusUploading:
 			totalUL += spd
-		} else {
-			totalDL += spd
+		case types.StatusDownloading:
+			totalDL += spd // processing steps (zip, split, FFmpeg) are not network speed
 		}
 	}
 

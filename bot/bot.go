@@ -1086,6 +1086,16 @@ func (b *BotApp) Start(ctx context.Context) error {
 		// downloads like wzgram: a second bot connection on Telegram's media servers
 		go telegram.StartBotMediaClient(cfg.TelegramAPI, cfg.TelegramHash, cfg.BotToken)
 
+		// uploads: the parts go over several connections of the bot (one connection ~2MB/s)
+		if upPool, pErr := b.client.Pool(8); pErr == nil {
+			if b.uploader != nil {
+				b.uploader.SetBotUploadClients([]*tg.Client{tg.NewClient(upPool)})
+			}
+			log.Printf("[AZML-Go Bot Client] Upload pool ready (8 connections)")
+		} else {
+			log.Printf("[AZML-Go Bot Client] Upload pool failed: %v", pErr)
+		}
+
 		// Register all bot commands in Telegram's autocomplete list
 		b.registerBotCommands(ctx)
 

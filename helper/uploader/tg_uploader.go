@@ -133,13 +133,14 @@ func deleteMessageViaBotAPI(botToken string, chatID int64, msgID int) bool {
 }
 
 type TelegramUploader struct {
-	botClient   *tg.Client
-	botUp       *uploader.Uploader
-	userClient  *tg.Client
-	userClients []*tg.Client
-	userUp      *uploader.Uploader
-	sessPool    *pool.SessionPool
-	dumpChatID  int64
+	botClient    *tg.Client
+	botUpClients []*tg.Client // the bot's upload connections (SetBotUploadClients)
+	botUp        *uploader.Uploader
+	userClient   *tg.Client
+	userClients  []*tg.Client
+	userUp       *uploader.Uploader
+	sessPool     *pool.SessionPool
+	dumpChatID   int64
 }
 
 func NewTelegramUploader(botClient *tg.Client, userClient *tg.Client) *TelegramUploader {
@@ -162,6 +163,12 @@ func NewTelegramUploader(botClient *tg.Client, userClient *tg.Client) *TelegramU
 func (u *TelegramUploader) SetSessionPool(sessPool *pool.SessionPool, dumpChatID int64) {
 	u.sessPool = sessPool
 	u.dumpChatID = dumpChatID
+}
+
+// SetBotUploadClients: extra connections of the bot for uploads. One connection carried all the
+// parts and the bot uploaded at ~2MB/s; parts spread over several connections go much faster.
+func (u *TelegramUploader) SetBotUploadClients(clients []*tg.Client) {
+	u.botUpClients = clients
 }
 
 func (u *TelegramUploader) SetUserClient(userClient *tg.Client) {
@@ -551,10 +558,14 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		clientToUse = u.userClient
 		// When uploading with user session string (>2GB files):
 		// Flow MUST BE: upload to Dump Channel first, then dump/forward to User DM!
-		if effectiveLogChatID < 0 && telegram.ResolveUserChannelHash(ctx, u.userClient, effectiveLogChatID) != 0 {
-			targetUploadChatID = effectiveLogChatID
-		} else if effectiveDumpChatID != 0 {
-			targetUploadChatID = effectiveDumpChatID
+		// like the Python bot: the user session posts only in our main channel; a user's own
+		// dump channel gets a copy from the bot afterwards (our account never goes into it)
+		ours := effectiveLogChatID
+		if ours == 0 {
+			ours = transitBinChatID
+		}
+		if ours != 0 {
+			targetUploadChatID = ours
 		} else if opt.UserID != 0 {
 			targetUploadChatID = opt.UserID
 		} else {
@@ -674,6 +685,10 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		uploadClients := []*tg.Client{clientToUse}
 		numWorkers := 8
 		maxWorkers := 8
+		if clientToUse == u.botClient && len(u.botUpClients) > 0 {
+			uploadClients = u.botUpClients // several connections of the bot
+			numWorkers, maxWorkers = 16, 20
+		}
 		if isUserUpload {
 			if len(u.userClients) > 0 {
 				uploadClients = u.userClients
@@ -1247,8 +1262,9 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			}
 			log.Printf("[AZML-Go Uploader] Main Bot forward (drop_author=false) to %s failed: %v", desc, pErr2)
 
-			// Method C: User Session Client forward (Premium authorized, handles 4GB transfers)
-			if u.userClient != nil && userClientSourcePeer != nil {
+			// Method C: User Session Client forward (Premium authorized, handles 4GB transfers),
+			// only into our own log channel, never into a user's channel
+			if u.userClient != nil && userClientSourcePeer != nil && targetChatID == effectiveLogChatID {
 				log.Printf("[AZML-Go Uploader] Attempting forward to %s (%d) via User Session client...", desc, targetChatID)
 				fwU, uErr := u.userClient.MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 					FromPeer:   userClientSourcePeer,

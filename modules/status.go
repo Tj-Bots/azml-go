@@ -280,6 +280,16 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 	}
 	m.mu.RUnlock()
 
+	// Refresh / pages: one press per 2 seconds on a status message, more presses only made
+	// Telegram slow the bot down (flood wait) and then the edits came all at once
+	switch parts[1] {
+	case "ref", "page", "nex", "pre":
+		if left := statusPressWait(peer, msgID); left > 0 {
+			_ = m.sender.AnswerCallback(ctx, queryID, fmt.Sprintf("Don't spam! Wait %.1fs", left.Seconds()), false)
+			return
+		}
+	}
+
 	switch parts[1] {
 	case "cancel":
 		if len(parts) >= 3 {
@@ -381,9 +391,9 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 			m.mu.Unlock()
 		}
 
+		_ = m.sender.AnswerCallback(ctx, queryID, "Status Refreshed!", false)
 		text, btn := m.taskMgr.BuildStatusMessage(page)
 		_ = m.editStatusID(ctx, peer, msgID, text, btn)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Status Refreshed!", false)
 
 	case "page", "nex", "pre":
 		page := 1
@@ -422,10 +432,38 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 			m.mu.Unlock()
 		}
 
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.taskMgr.BuildStatusMessage(page)
 		_ = m.editStatusID(ctx, peer, msgID, text, btn)
-		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	}
+}
+
+var (
+	pressMu   sync.Mutex
+	lastPress = map[string]time.Time{}
+)
+
+const statusPressGap = 2 * time.Second
+
+// statusPressWait returns how long to wait before this status message may be pressed again (0 = now).
+func statusPressWait(peer tg.InputPeerClass, msgID int) time.Duration {
+	key := fmt.Sprintf("%d:%d", telegram.PeerToChatID(peer), msgID)
+	pressMu.Lock()
+	defer pressMu.Unlock()
+	if t, ok := lastPress[key]; ok {
+		if d := statusPressGap - time.Since(t); d > 0 {
+			return d
+		}
+	}
+	lastPress[key] = time.Now()
+	if len(lastPress) > 500 {
+		for k, t := range lastPress {
+			if time.Since(t) > time.Minute {
+				delete(lastPress, k)
+			}
+		}
+	}
+	return 0
 }
 
 // UpdateAllMessages periodically refreshes active status messages on their current active page
@@ -621,8 +659,8 @@ func (m *StatusModule) editStatus(ctx context.Context, r *StatusReplyInfo, text 
 		m.mu.Unlock()
 		return nil
 	}
-	if strings.Contains(strings.ToLower(err.Error()), "too many requests") {
-		return err
+	if !richUnsupported(err) {
+		return err // flood wait, not modified, network: keep the rich message, try next time
 	}
 	newID, sErr := m.sender.SendRich(ctx, r.Peer, richStatus(text), 0, btn)
 	if sErr != nil {
@@ -636,6 +674,18 @@ func (m *StatusModule) editStatus(ctx context.Context, r *StatusReplyInfo, text 
 	m.mu.Unlock()
 	_ = m.sender.DeleteMessage(ctx, r.Peer, []int{old})
 	return nil
+}
+
+// richUnsupported: the edit failed because of the rich format itself (then plain text is used);
+// any other error (too many requests, not modified, timeout) must not turn the status plain.
+func richUnsupported(err error) bool {
+	e := strings.ToLower(err.Error())
+	for _, k := range []string{"too many requests", "retry after", "flood", "not modified", "timeout", "deadline", "context", "connection", "eof"} {
+		if strings.Contains(e, k) {
+			return false
+		}
+	}
+	return true
 }
 
 var cancelLineRe = regexp.MustCompile(`╰ /cancel[^_\s]*_(\S+?)</blockquote>\n*`)
@@ -652,8 +702,9 @@ func richStatus(text string) string {
 // editStatusID edits a status message by id (rich when RICH_MESSAGES is on).
 func (m *StatusModule) editStatusID(ctx context.Context, peer tg.InputPeerClass, msgID int, text string, btn *telegram.ButtonMaker) error {
 	if config.Get().RichMessages {
-		if err := m.sender.EditRich(ctx, peer, msgID, richStatus(text), btn); err == nil {
-			return nil
+		err := m.sender.EditRich(ctx, peer, msgID, richStatus(text), btn)
+		if err == nil || !richUnsupported(err) {
+			return err // flood wait etc.: the next update edits it again, still rich
 		}
 	}
 	return m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 3)

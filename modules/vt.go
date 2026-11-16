@@ -28,7 +28,7 @@ import (
 const vtTimeout = 180 * time.Second
 
 var (
-	vtExtract = [][2]string{{"audio", "Audio"}, {"subs", "Subtitles"}, {"video", "Video Only"}}
+	vtExtract = [][2]string{{"audio", "Audio"}, {"subs", "Subtitles"}, {"video", "Video Only"}, {"all", "Everything"}}
 	vtRemove  = [][2]string{{"subs", "Subtitles"}, {"audio", "Extra Audio"}, {"attach", "Attachments"}}
 	vtConvert = [][2]string{{"mkv", "MKV"}, {"mp4", "MP4"}, {"mp3", "MP3 (Audio)"}, {"m4a", "M4A (Audio)"}}
 	vtShots   = []int{3, 5, 10}
@@ -43,7 +43,7 @@ type VTSelection struct {
 	MergeVideo bool
 	MergeAudio bool
 	MergeSubs  bool
-	Extract    string // audio | subs | video
+	Extract    string // audio | subs | video | all
 	Remove     string // subs | audio | attach
 	TrimStart  string
 	TrimEnd    string
@@ -528,7 +528,7 @@ func vtExtractStreams(path, kind string) {
 				tag = "." + l
 			}
 			switch {
-			case s.CodecType == "audio" && kind == "audio":
+			case s.CodecType == "audio" && (kind == "audio" || kind == "all"):
 				e, ok := audioExt[s.CodecName]
 				if !ok {
 					e = "mka"
@@ -536,7 +536,7 @@ func vtExtractStreams(path, kind string) {
 				if runFFmpeg("-i", video, "-map", fmt.Sprintf("0:%d", s.Index), "-c", "copy", fmt.Sprintf("%s.%d%s.%s", base, s.Index, tag, e)) == nil {
 					done = true
 				}
-			case s.CodecType == "subtitle" && kind == "subs":
+			case s.CodecType == "subtitle" && (kind == "subs" || kind == "all"):
 				e, ok := subExt[s.CodecName]
 				codec := "copy"
 				if s.CodecName == "mov_text" {
@@ -549,7 +549,7 @@ func vtExtractStreams(path, kind string) {
 				}
 			}
 		}
-		if kind == "video" && runFFmpeg("-i", video, "-map", "0:v", "-c", "copy", base+".video"+ext) == nil {
+		if (kind == "video" || kind == "all") && runFFmpeg("-i", video, "-map", "0:v", "-c", "copy", base+".video"+ext) == nil {
 			done = true
 		}
 		if done {

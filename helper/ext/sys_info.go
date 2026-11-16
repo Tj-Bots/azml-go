@@ -584,9 +584,13 @@ func RenderBotLimits() string {
 		bt = fmt.Sprintf("%d", cfg.QueueAll)
 	}
 
+	torrentLine := fmt.Sprintf("┠ <b>Torrent Limit :</b> %s GB\n", tl)
+	if cfg.DisableTorrents {
+		torrentLine = "┠ <b>Torrents :</b> Disabled\n"
+	}
 	return fmt.Sprintf("⌬ <b><i>BOT LIMITATIONS :</i></b>\n"+
 		"<blockquote>╭ <b>Direct Limit :</b> %s GB\n"+
-		"┠ <b>Torrent Limit :</b> %s GB\n"+
+		"%s"+
 		"┠ <b>YT-DLP Limit :</b> %s GB\n"+
 		"┠ <b>Mega Limit :</b> %s GB\n"+
 		"┠ <b>Archive Limit :</b> %s GB\n"+
@@ -597,5 +601,5 @@ func RenderBotLimits() string {
 		"<blockquote>╭ <b>Token Validity :</b> %s\n"+
 		"┠ <b>User Parallel Tasks :</b> %s\n"+
 		"╰ <b>Bot Parallel Tasks :</b> %s</blockquote>",
-		dl, tl, yl, ml, al, el, daily, st, ll, tv, ut, bt)
+		dl, torrentLine, yl, ml, al, el, daily, st, ll, tv, ut, bt)
 }

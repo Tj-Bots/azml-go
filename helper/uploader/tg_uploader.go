@@ -62,28 +62,59 @@ func copyMessageGetID(botToken string, toChatID int64, fromChatID int64, msgID i
 		payload["reply_parameters"] = map[string]interface{}{"message_id": replyTo[0], "allow_sending_without_reply": true}
 	}
 	body, _ := json.Marshal(payload)
-	resp, err := botAPICopyClient.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		log.Printf("[AZML-Go Uploader] copyMessage HTTP error to %d: %v", toChatID, err)
+	for attempt := 0; attempt < 4; attempt++ {
+		resp, err := botAPICopyClient.Post(url, "application/json", bytes.NewReader(body))
+		if err != nil {
+			log.Printf("[AZML-Go Uploader] copyMessage HTTP error to %d: %v", toChatID, err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		var res struct {
+			Ok          bool   `json:"ok"`
+			Description string `json:"description"`
+			Result      struct {
+				MessageID int `json:"message_id"`
+			} `json:"result"`
+			Parameters struct {
+				RetryAfter int `json:"retry_after"`
+			} `json:"parameters"`
+		}
+		dErr := json.NewDecoder(resp.Body).Decode(&res)
+		_ = resp.Body.Close()
+		if dErr == nil && res.Ok {
+			if res.Result.MessageID > 0 {
+				return res.Result.MessageID
+			}
+			return 1
+		}
+		// too many requests: wait as told and try again (else the link falls back to the dump)
+		if res.Parameters.RetryAfter > 0 && res.Parameters.RetryAfter <= 60 {
+			log.Printf("[AZML-Go Uploader] copyMessage to %d: wait %ds", toChatID, res.Parameters.RetryAfter)
+			time.Sleep(time.Duration(res.Parameters.RetryAfter)*time.Second + 300*time.Millisecond)
+			continue
+		}
+		log.Printf("[AZML-Go Uploader] copyMessage failed to %d: %s", toChatID, res.Description)
 		return 0
+	}
+	return 0
+}
+
+// setMarkupViaBotAPI puts buttons on a message the bot sent (e.g. after a forward).
+func setMarkupViaBotAPI(botToken string, chatID int64, msgID int, markupJSON string) bool {
+	if botToken == "" || chatID == 0 || msgID <= 0 || markupJSON == "" {
+		return false
+	}
+	payload := map[string]interface{}{"chat_id": chatID, "message_id": msgID, "reply_markup": json.RawMessage(markupJSON)}
+	body, _ := json.Marshal(payload)
+	resp, err := botAPICopyClient.Post(fmt.Sprintf("https://api.telegram.org/bot%s/editMessageReplyMarkup", botToken), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return false
 	}
 	defer func() { _ = resp.Body.Close() }()
 	var res struct {
-		Ok          bool   `json:"ok"`
-		Description string `json:"description"`
-		Result      struct {
-			MessageID int `json:"message_id"`
-		} `json:"result"`
+		Ok bool `json:"ok"`
 	}
-	if json.NewDecoder(resp.Body).Decode(&res) == nil && res.Ok {
-		log.Printf("[AZML-Go Uploader] copyMessage succeeded to %d without forward tag!", toChatID)
-		if res.Result.MessageID > 0 {
-			return res.Result.MessageID
-		}
-		return 1
-	}
-	log.Printf("[AZML-Go Uploader] copyMessage failed to %d: %s", toChatID, res.Description)
-	return 0
+	return json.NewDecoder(resp.Body).Decode(&res) == nil && res.Ok
 }
 
 func deleteMessageViaBotAPI(botToken string, chatID int64, msgID int) bool {
@@ -997,6 +1028,30 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 	log.Printf("[AZML-Go Uploader] Successfully sent uploaded media for %s to peer %T!", opt.FileName, uploadPeer)
 
 	msgID := telegram.ExtractMessageID(res)
+
+	// like the Python bot: a file the user session posted has no buttons (accounts can't send
+	// them), so the bot posts a copy with the buttons in the same chat and the original goes
+	botTok := os.Getenv("BOT_TOKEN")
+	if cfg != nil && cfg.BotToken != "" {
+		botTok = cfg.BotToken
+	}
+	if clientToUse == u.userClient && u.userClient != nil && msgID > 0 && markupJSON != "" && actualDestChatID < 0 {
+		reply := 0
+		if actualDestChatID == effectiveLogChatID {
+			reply = opt.LogReplyTo
+		}
+		if newID := copyMessageGetID(botTok, actualDestChatID, actualDestChatID, msgID, markupJSON, reply); newID > 1 {
+			if !deleteMessageViaBotAPI(botTok, actualDestChatID, msgID) {
+				_, _ = u.userClient.ChannelsDeleteMessages(ctx, &tg.ChannelsDeleteMessagesRequest{
+					Channel: &tg.InputChannel{ChannelID: getChannelID(actualDestChatID),
+						AccessHash: telegram.ResolveUserChannelHash(ctx, u.userClient, actualDestChatID)},
+					ID: []int{msgID},
+				})
+			}
+			msgID = newID
+			clientToUse = u.botClient
+		}
+	}
 	if opt.Result != nil {
 		opt.Result.ChatID = actualDestChatID
 		opt.Result.MsgID = msgID
@@ -1070,8 +1125,8 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			}
 			sentChats[targetChatID] = true
 
-			// 1. Try copyMessageViaBotAPI for files <= 2GB (clean copy without forward tag)
-			if fileSize <= twoGB {
+			// 1. Bot API copy (no forward tag, with buttons); copying moves no data, so big files too
+			{
 				mk, reply := markupJSON, 0
 				if targetChatID == opt.UserID {
 					mk = pmMarkupJSON
@@ -1112,7 +1167,22 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			}
 
 			// Method A: Main Bot forward with DropAuthor: true
-			_, pErr := u.botClient.MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
+			// a bot forward: give it the buttons and remember the log link
+			botForwarded := func(fw tg.UpdatesClass) {
+				fid := telegram.ExtractMessageID(fw)
+				if fid <= 0 {
+					return
+				}
+				mk := markupJSON
+				if targetChatID == opt.UserID {
+					mk = pmMarkupJSON
+				}
+				setMarkupViaBotAPI(botToken, targetChatID, fid, mk)
+				if targetChatID == effectiveLogChatID && opt.Result != nil {
+					opt.Result.LogChatID, opt.Result.LogMsgID = targetChatID, fid
+				}
+			}
+			fw, pErr := u.botClient.MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 				FromPeer:   mainBotSourcePeer,
 				ToPeer:     toPeer,
 				ID:         []int{msgID},
@@ -1120,13 +1190,14 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 				DropAuthor: true,
 			})
 			if pErr == nil {
+				botForwarded(fw)
 				log.Printf("[AZML-Go Uploader] Successfully forwarded media to %s (%d) via Main Bot (drop_author=true)", desc, targetChatID)
 				return true
 			}
 			log.Printf("[AZML-Go Uploader] Main Bot forward (drop_author=true) to %s failed: %v. Retrying with drop_author=false...", desc, pErr)
 
 			// Method B: Main Bot forward with DropAuthor: false (standard forward allowed for >2GB on Telegram)
-			_, pErr2 := u.botClient.MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
+			fw2, pErr2 := u.botClient.MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 				FromPeer:   mainBotSourcePeer,
 				ToPeer:     toPeer,
 				ID:         []int{msgID},
@@ -1134,6 +1205,7 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 				DropAuthor: false,
 			})
 			if pErr2 == nil {
+				botForwarded(fw2)
 				log.Printf("[AZML-Go Uploader] Successfully forwarded media to %s (%d) via Main Bot (drop_author=false)", desc, targetChatID)
 				return true
 			}
@@ -1142,7 +1214,7 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			// Method C: User Session Client forward (Premium authorized, handles 4GB transfers)
 			if u.userClient != nil && userClientSourcePeer != nil {
 				log.Printf("[AZML-Go Uploader] Attempting forward to %s (%d) via User Session client...", desc, targetChatID)
-				_, uErr := u.userClient.MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
+				fwU, uErr := u.userClient.MessagesForwardMessages(ctx, &tg.MessagesForwardMessagesRequest{
 					FromPeer:   userClientSourcePeer,
 					ToPeer:     toPeer,
 					ID:         []int{msgID},
@@ -1151,6 +1223,9 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 				})
 				if uErr == nil {
 					log.Printf("[AZML-Go Uploader] Successfully forwarded media to %s (%d) via User Session (drop_author=true)", desc, targetChatID)
+					if fid := telegram.ExtractMessageID(fwU); fid > 0 && targetChatID == effectiveLogChatID && opt.Result != nil {
+						opt.Result.LogChatID, opt.Result.LogMsgID = targetChatID, fid
+					}
 					return true
 				}
 				log.Printf("[AZML-Go Uploader] User Session forward (drop_author=true) to %s failed: %v. Retrying with drop_author=false...", desc, uErr)

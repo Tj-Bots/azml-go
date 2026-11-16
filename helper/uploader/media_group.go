@@ -71,29 +71,41 @@ func copyMessagesGetIDs(botToken string, toChatID, fromChatID int64, msgIDs []in
 		"from_chat_id": fromChatID,
 		"message_ids":  msgIDs,
 	})
-	resp, err := botAPICopyClient.Post(fmt.Sprintf("https://api.telegram.org/bot%s/copyMessages", botToken), "application/json", bytes.NewReader(payload))
-	if err != nil {
+	for attempt := 0; attempt < 4; attempt++ {
+		resp, err := botAPICopyClient.Post(fmt.Sprintf("https://api.telegram.org/bot%s/copyMessages", botToken), "application/json", bytes.NewReader(payload))
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		var res struct {
+			Ok          bool   `json:"ok"`
+			Description string `json:"description"`
+			Result      []struct {
+				MessageID int `json:"message_id"`
+			} `json:"result"`
+			Parameters struct {
+				RetryAfter int `json:"retry_after"`
+			} `json:"parameters"`
+		}
+		dErr := json.NewDecoder(resp.Body).Decode(&res)
+		_ = resp.Body.Close()
+		if dErr == nil && res.Ok {
+			ids := []int{}
+			for _, r := range res.Result {
+				ids = append(ids, r.MessageID)
+			}
+			if len(ids) == 0 {
+				ids = []int{0}
+			}
+			return ids
+		}
+		if res.Parameters.RetryAfter > 0 && res.Parameters.RetryAfter <= 60 { // too many requests
+			time.Sleep(time.Duration(res.Parameters.RetryAfter)*time.Second + 300*time.Millisecond)
+			continue
+		}
+		log.Printf("[Media Group] copyMessages to %d failed: %s", toChatID, res.Description)
 		return nil
 	}
-	defer func() { _ = resp.Body.Close() }()
-	var res struct {
-		Ok          bool   `json:"ok"`
-		Description string `json:"description"`
-		Result      []struct {
-			MessageID int `json:"message_id"`
-		} `json:"result"`
-	}
-	if json.NewDecoder(resp.Body).Decode(&res) == nil && res.Ok {
-		ids := []int{}
-		for _, r := range res.Result {
-			ids = append(ids, r.MessageID)
-		}
-		if len(ids) == 0 {
-			ids = []int{0}
-		}
-		return ids
-	}
-	log.Printf("[Media Group] copyMessages to %d failed: %s", toChatID, res.Description)
 	return nil
 }
 

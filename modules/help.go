@@ -45,7 +45,7 @@ func (m *HelpModule) getStartButtons() *telegram.ButtonMaker {
 	btn.UButtonStyled("Updates 🗞️", "https://t.me/TJ_Bots", "primary")
 	btn.UButtonStyled("Group 🧲", "https://t.me/Tj_Leech_Group", "primary")
 	btn.Row()
-	btn.IButtonStyled("Help", "start_help", "primary")
+	btn.IButtonStyled("Help 📖", "start_help", "primary")
 	btn.Row()
 	return btn
 }

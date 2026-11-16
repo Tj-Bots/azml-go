@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"azml-go/helper/telegram"
+	"azml-go/types"
 )
 
 func TestParseNewFlags(t *testing.T) {
@@ -86,5 +87,21 @@ func TestMediaTools(t *testing.T) {
 	joinParts(d4)
 	if b, err := os.ReadFile(filepath.Join(d4, "f.bin")); err != nil || string(b) != string(data) {
 		t.Fatalf("-j: %v", err)
+	}
+}
+
+func TestIsTorrentInput(t *testing.T) {
+	for l, want := range map[string]bool{
+		"magnet:?xt=urn:btih:abc":      true,
+		"https://x.com/a.torrent?dl=1": true,
+		"https://x.com/movie.mkv":      false,
+		"https://mega.nz/file/abc#def": false,
+	} {
+		if got := isTorrentInput(l, nil); got != want {
+			t.Errorf("%s: %v", l, got)
+		}
+	}
+	if !isTorrentInput("", &types.MessageContext{FileName: "Ubuntu.TORRENT"}) {
+		t.Error("torrent file")
 	}
 }

@@ -316,6 +316,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		return
 	}
 
+	if cfg.DisableTorrents && isTorrentInput(link, msg) {
+		m.sendDownloadError(ctx, peer, msg, notifyID, "Torrents and magnet links are disabled on this bot (DISABLE_TORRENTS).", "#Leech | #Torrent", time.Now())
+		return
+	}
+
 	// Try DDL API for Telegram links (t.me/... or t.me/c/...) if a link was provided
 	if cfg.DDLAPI != "" && link != "" && !opt.Ytdl {
 		if cid, mid, ok := ext.ParseTelegramLink(link); ok {
@@ -841,6 +846,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			isLocalTorrent = true
 		}
 		isRemoteTorrent := ext.IsURL(link) && strings.HasSuffix(strings.ToLower(cleanLink), ".torrent")
+		if cfg.DisableTorrents && (isLocalTorrent || isRemoteTorrent || ext.IsMagnet(link)) {
+			m.sendDownloadError(ctx, peer, msg, notifyID, "Torrents and magnet links are disabled on this bot (DISABLE_TORRENTS).", modeStr, taskStartTime)
+			return
+		}
 
 		aria := downloader.GetAria2Client()
 
@@ -1018,6 +1027,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	ext.ReleaseDownload(taskUID)
 
 	// Critical safeguard: If downloadedPath is a .torrent file, automatically extract and download its real payload!
+	if strings.HasSuffix(strings.ToLower(downloadedPath), ".torrent") && cfg.DisableTorrents {
+		m.sendDownloadError(ctx, peer, msg, notifyID, "Torrents and magnet links are disabled on this bot (DISABLE_TORRENTS).", modeStr, taskStartTime)
+		return
+	}
 	if strings.HasSuffix(strings.ToLower(downloadedPath), ".torrent") {
 		log.Printf("[LEECH] Downloaded file is a .torrent file (%s), starting real payload download...", downloadedPath)
 		torrentFile := downloadedPath
@@ -2244,4 +2257,30 @@ func leechHelpText() string {
 		"┠ <b>Direct Links :</b>\n" +
 		"┠ <code>-u user -p pass</code> — Login\n" +
 		"╰ <code>-h Referer: https://site.com</code> — Headers</blockquote>"
+}
+
+// isTorrentInput: a magnet, a .torrent link or a replied .torrent file.
+func isTorrentInput(link string, msg *types.MessageContext) bool {
+	l := strings.ToLower(strings.Split(strings.TrimSpace(link), "?")[0])
+	if ext.IsMagnet(link) || strings.HasPrefix(l, "magnet:") || strings.HasSuffix(l, ".torrent") {
+		return true
+	}
+	if link == "" && msg != nil {
+		if strings.HasSuffix(strings.ToLower(msg.FileName), ".torrent") {
+			return true
+		}
+		if dm, ok := msg.RawMedia.(*tg.MessageMediaDocument); ok {
+			if d, ok := dm.Document.(*tg.Document); ok {
+				for _, a := range d.Attributes {
+					if fn, ok := a.(*tg.DocumentAttributeFilename); ok && strings.HasSuffix(strings.ToLower(fn.FileName), ".torrent") {
+						return true
+					}
+				}
+				if d.MimeType == "application/x-bittorrent" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

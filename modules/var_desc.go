@@ -2,6 +2,7 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"DISABLE_TORRENTS":             "Block torrents: magnet links, .torrent links and .torrent files are refused, and aria2 does not follow a link that turns out to be a torrent. Everything else keeps working. Default is False. Bool",
 	"TORRENT_TIMEOUT":              "Dead torrent timeout in seconds: a torrent or magnet that downloads nothing for this long is cancelled (Dead Torrent!). 0 = never. Default is 600. Int",
 	"USER_SESSION_STRING":          "Pyrogram/Telethon style session string of a Telegram account (premium recommended). Used to download/upload faster and to upload files up to 4GB. Generate it with /bs → User Session or a session generator.",
 	"DUMP_CHAT_ID":                 "Chat ID of the transit/storage channel. Files are uploaded here first, then copied to the user and to LEECH_LOG_ID. The bot (and the user session) must be admin there. Add -100 before the channel id. Int",

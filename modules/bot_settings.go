@@ -46,6 +46,7 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"DISABLE_TORRENTS",
 	"TORRENT_TIMEOUT",
 	"USER_SESSION_STRING",
 	"DUMP_CHAT_ID",
@@ -168,7 +169,7 @@ func configValue(cfgMap map[string]string, key string) string {
 
 func isBoolVar(key string) bool {
 	switch key {
-	case "AS_DOCUMENT", "AUTO_THUMBNAIL", "EQUAL_SPLITS", "MEDIA_GROUP", "SHORTENER_ENABLED",
+	case "DISABLE_TORRENTS", "AS_DOCUMENT", "AUTO_THUMBNAIL", "EQUAL_SPLITS", "MEDIA_GROUP", "SHORTENER_ENABLED",
 		"BOT_PM", "TOKEN_IN_PM", "SCREENSHOTS_MODE", "SHOW_MEDIAINFO", "SAVE_MSG", "SOURCE_LINK",
 		"SHOW_EXTRA_CMDS", "ENABLE_FFMPEG_CMDS", "UPDATE_ON_STARTUP":
 		return true

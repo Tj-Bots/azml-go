@@ -369,6 +369,10 @@ func (a *Aria2RPCClient) AddURIWith(link, downloadDir, filename string, headers 
 	if len(headers) > 0 {
 		opts["header"] = headers
 	}
+	if config.Get().DisableTorrents {
+		opts["follow-torrent"] = "false" // a link that is a .torrent stays a file, nothing is downloaded by P2P
+		opts["follow-metalink"] = "false"
+	}
 	for k, v := range extra {
 		opts[k] = v
 	}

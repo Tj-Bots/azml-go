@@ -55,6 +55,7 @@ type Config struct {
 	ShortenerEnabled          bool
 	TokenInPM                 bool
 	ScreenshotsMode           bool
+	DisableTorrents           bool
 	ShowMediaInfo             bool
 	SaveMsg                   bool
 	SourceLink                bool
@@ -184,6 +185,7 @@ func LoadConfig(path string) (*Config, error) {
 		ShortenerEnabled:          getEnvBool("SHORTENER_ENABLED", true),
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
+		DisableTorrents:           getEnvBool("DISABLE_TORRENTS", false),
 		ShowMediaInfo:             getEnvBool("SHOW_MEDIAINFO", false),
 		SaveMsg:                   getEnvBool("SAVE_MSG", false),
 		SourceLink:                getEnvBool("SOURCE_LINK", false),
@@ -420,6 +422,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.TokenTimeout, _ = strconv.ParseInt(val, 10, 64)
 	case "SCREENSHOTS_MODE":
 		GlobalConfig.ScreenshotsMode = val == "true" || val == "1"
+	case "DISABLE_TORRENTS":
+		GlobalConfig.DisableTorrents = val == "true" || val == "1"
 	case "ENABLE_FFMPEG_CMDS":
 		GlobalConfig.EnableFFmpegCmds = val == "true" || val == "1"
 	case "FFMPEG_ENCODING":
@@ -551,6 +555,7 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"DISABLE_TORRENTS":             strconv.FormatBool(GlobalConfig.DisableTorrents),
 		"OWNER_USERNAME":               GlobalConfig.OwnerUsername,
 		"USER_SESSION_STRING":          MaskSession(GlobalConfig.UserSessionString),
 		"DUMP_CHAT_ID":                 strconv.FormatInt(GlobalConfig.DumpChatID, 10),

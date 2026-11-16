@@ -68,8 +68,9 @@ heroku config:set -a APP_NAME \
   LEECH_LOG_ID="-100..." \
   BASE_URL="https://APP_NAME-xxxx.herokuapp.com"
 ```
-`BASE_URL` is the `Web URL` from `heroku info -a APP_NAME` (needed for file selection with `-s`).
-Everything else is set later from `/bs` and saved in the database.
+> [!NOTE]
+> `BASE_URL` is the `Web URL` from `heroku info -a APP_NAME` (needed for file selection with `-s`).
+> Everything else is set later from `/bs` and saved in the database.
 
 **4. Deploy / update**
 ```bash
@@ -77,7 +78,8 @@ git pull
 git push heroku main -f
 heroku logs --tail -a APP_NAME
 ```
-Always update with `git push`. `/restart` does not rebuild on Heroku.
+> [!IMPORTANT]
+> Always update with `git push`. `/restart` does not rebuild on Heroku.
 
 ---
 
@@ -85,6 +87,9 @@ Always update with `git push`. `/restart` does not rebuild on Heroku.
 
 1. Create a new bot in @BotFather.
 2. Update the first bot once with this version (it keeps its database).
+
+   > [!WARNING]
+   > Do this **before** starting the second bot, or the second one may take the first one's database.
 3. A second app with its own remote:
    ```bash
    heroku apps:create APP_NAME_2 --stack=container
@@ -93,8 +98,9 @@ Always update with `git push`. `/restart` does not rebuild on Heroku.
    git push heroku2 main -f
    ```
 
-Both bots can use the same `DATABASE_URL`: every bot gets its own database automatically
-(`DATABASE_NAME` sets one by hand). In a shared group use `/l` for one bot and `/l2` for the other.
+> [!TIP]
+> Both bots can use the same `DATABASE_URL`: every bot gets its own database automatically
+> (`DATABASE_NAME` sets one by hand). In a shared group use `/l` for one bot and `/l2` for the other.
 
 ---
 
@@ -156,6 +162,9 @@ Like Leech-TJ, one channel for the files:
 | `MIRROR_LOG_ID` | The finish message of `/mirror` tasks. |
 
 With `BOT_PM` the user also gets "Task Started" in PM and the files under it. `EXCEP_CHATS` skips the logs.
+
+> [!IMPORTANT]
+> The bot, the helper bots (`BOT_TOKENS`) and the user session must be admins in `LEECH_LOG_ID`.
 
 ---
 

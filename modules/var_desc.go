@@ -84,7 +84,7 @@ var varDescriptions = map[string]string{
 	"AUTHOR_NAME":                  "Author name for Telegraph pages, Shown in Telegraph Page as by AUTHOR_NAME",
 	"AUTHOR_URL":                   "Author URL for Telegraph page, Put Channel URL to Show Join Channel. Str",
 	"SHOW_EXTRA_CMDS":              "Add Extra Commands beside Arg Format for -z or -e. <b>COMMANDS: </b> /unzipxxx or /zipxxx or /uzx or /zx",
-	"TIMEZONE":                     "Set your Preferred Time Zone for Restart Message. Get yours at <a href=\"http://www.timezoneconverter.com/cgi-bin/findzone.tzc\">Here</a> Str",
+	"TIMEZONE":                     "Set your Preferred Time Zone for Restart Message (e.g. Asia/Kolkata, Asia/Jerusalem). Get yours at <a href=\"http://www.timezoneconverter.com/cgi-bin/findzone.tzc\">Here</a> Str",
 	"FFMPEG_ENCODING":              "Allow re-encoding with FFmpeg (heavy on CPU/RAM). Default is False. Bool",
 	"TMDB_ACCESS_TOKEN":            "TMDB API Key or Read Access Token, used for Auto Thumbnail (movie/series poster) in User Settings. Get it from https://www.themoviedb.org/settings/api",
 	"DDL_API":                      "API URL of a Telegram direct-download service, used to get a direct link for t.me files before downloading them. Str",

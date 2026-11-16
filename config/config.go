@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -252,7 +253,7 @@ func LoadConfig(path string) (*Config, error) {
 		AuthorURL:                 getEnv("AUTHOR_URL", "https://t.me/TJ_Bots"),
 		BotTheme:                  getEnv("BOT_THEME", "minimal"),
 		ShowExtraCmds:             getEnvBool("SHOW_EXTRA_CMDS", true),
-		Timezone:                  getEnv("TIMEZONE", "Asia/Jerusalem"),
+		Timezone:                  getEnv("TIMEZONE", "Asia/Kolkata"),
 		EnableFFmpegCmds:          !getEnvBool("DISABLE_FF_MODE", !getEnvBool("ENABLE_FFMPEG_CMDS", true)),
 		FFmpegEncoding:            getEnvBool("FFMPEG_ENCODING", false),
 		TMDBAccessToken:           getEnv("TMDB_ACCESS_TOKEN", ""),
@@ -592,6 +593,15 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.DumpChatID = GlobalConfig.LeechLogID
 	case "STORAGE_THRESHOLD":
 		GlobalConfig.StorageThreshold, _ = strconv.ParseInt(val, 10, 64)
+	case "TIMEZONE": // applies at once (status times, logs, restart message)
+		val = strings.TrimSpace(val)
+		if val == "" {
+			val = "Asia/Kolkata"
+		}
+		GlobalConfig.Timezone = val
+		if loc, err := time.LoadLocation(val); err == nil {
+			time.Local = loc
+		}
 	case "UPSTREAM_REPO":
 		GlobalConfig.UpstreamRepo = strings.TrimSpace(val)
 	case "UPSTREAM_BRANCH":
@@ -677,6 +687,7 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"TIMEZONE":                     GlobalConfig.Timezone,
 		"MIRROR_LOG_ID":                strconv.FormatInt(GlobalConfig.MirrorLogID, 10),
 		"LINKS_LOG_ID":                 strconv.FormatInt(GlobalConfig.LinksLogID, 10),
 		"GDRIVE_WORKER":                GlobalConfig.GDriveWorker,

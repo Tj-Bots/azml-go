@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /usr/local/bin/azml-go
 FROM aquib4040/azmlgo:latest
 
 ENV GODEBUG="madvdontneed=1"
-ENV TZ="Asia/Jerusalem"
+ENV TZ="Asia/Kolkata"
 ENV DEBIAN_FRONTEND="noninteractive"
 
 WORKDIR /usr/src/app

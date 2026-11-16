@@ -255,3 +255,19 @@ func CloseMarkup(userID int64) tg.ReplyMarkupClass {
 	btn.Row()
 	return btn.BuildMenu(1)
 }
+
+// Without returns a copy of the buttons without the ones whose callback data is data.
+func (b *ButtonMaker) Without(data string) *ButtonMaker {
+	out := NewButtonMaker()
+	for _, r := range b.getFinalRows(1) {
+		for _, btn := range r {
+			if btn.Data == data && btn.URL == "" {
+				continue
+			}
+			out.buttons = append(out.buttons, btn)
+			out.currentRow = append(out.currentRow, btn)
+		}
+		out.Row()
+	}
+	return out
+}

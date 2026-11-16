@@ -482,6 +482,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					for _, tok := range strings.Fields(targetMsg.Message) {
 						if strings.HasPrefix(tok, "http") || strings.HasPrefix(tok, "magnet:") {
 							link = tok
+							if sourceURL == "" || strings.HasPrefix(sourceURL, "https://t.me/c/") {
+								sourceURL = tok // the replied link is the source
+							}
 							break
 						}
 					}
@@ -1470,7 +1473,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if fileButtons != nil {
 			fileButtons.Row()
 		}
-		if cfg.SaveMsg {
+		// like the Python bot: Save Message only where others see the file (leech log or a group)
+		if cfg.SaveMsg && (cfg.LeechLogID != 0 || msg.ChatID != msg.UserID) {
 			if fileButtons == nil {
 				fileButtons = telegram.NewButtonMaker()
 			}
@@ -1509,6 +1513,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 
 			upOpt.Result = &partResults[idx]
+			upOpt.LogReplyTo = logStartID
 			if useGroup {
 				partCaption = upOpt.Caption + captionLinks(fileButtons)
 				upOpt.Caption = partCaption
@@ -1681,6 +1686,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	} else {
 		if botUser != "" {
 			finishBtn.UButtonStyled("View in Bot PM", fmt.Sprintf("https://t.me/%s", botUser), "primary")
+			finishBtn.Row() // one button per row
 		}
 	}
 
@@ -1688,7 +1694,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		finishBtn.UButtonStyled("Source Link", sourceURL, "primary")
 		finishBtn.Row()
 	}
-	if cfg.SaveMsg {
+	if cfg.SaveMsg && msg.ChatID != msg.UserID { // in PM there is nothing to save
 		saveMsgButton(finishBtn)
 	}
 	// Send completion message into the group / chat where leech was initiated, replying to user's command

@@ -40,7 +40,7 @@ func randID() int64 {
 	return int64(binary.LittleEndian.Uint64(b[:]))
 }
 
-func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msgID int, markupJSON string) bool {
+func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msgID int, markupJSON string, replyTo ...int) bool {
 	if botToken == "" || toChatID == 0 || fromChatID == 0 || msgID <= 0 {
 		return false
 	}
@@ -52,6 +52,9 @@ func copyMessageViaBotAPI(botToken string, toChatID int64, fromChatID int64, msg
 	}
 	if markupJSON != "" {
 		payload["reply_markup"] = json.RawMessage(markupJSON)
+	}
+	if len(replyTo) > 0 && replyTo[0] > 0 {
+		payload["reply_parameters"] = map[string]interface{}{"message_id": replyTo[0], "allow_sending_without_reply": true}
 	}
 	body, _ := json.Marshal(payload)
 	resp, err := botAPICopyClient.Post(url, "application/json", bytes.NewReader(body))
@@ -159,6 +162,7 @@ func (u *TelegramUploader) SetDumpChatID(dumpChatID int64) {
 type UploadProgressFunc func(curr, total int64, speed float64, eta string)
 
 type UploadOptions struct {
+	LogReplyTo     int // the "Leech Started" message in the leech log: the file answers it
 	FilePath       string
 	FileName       string
 	Caption        string
@@ -896,13 +900,18 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 		Entities: captionEntities,
 		RandomID: time.Now().UnixNano(),
 	}
+	if opt.LogReplyTo > 0 && actualDestChatID == effectiveLogChatID {
+		req.ReplyTo = &tg.InputReplyToMessage{ReplyToMsgID: opt.LogReplyTo}
+	}
 	markupJSON := ""
+	pmMarkupJSON := ""
 	if opt.Buttons != nil {
 		if mk := opt.Buttons.BuildMenu(1); mk != nil {
 			if clientToUse != u.userClient { // user accounts can't send buttons; the copies get them
 				req.ReplyMarkup = mk
 			}
 			markupJSON = opt.Buttons.BuildBotAPIKeyboard(1)
+			pmMarkupJSON = opt.Buttons.Without("save").BuildBotAPIKeyboard(1) // no Save Message in PM
 		}
 	}
 
@@ -1043,7 +1052,14 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 
 			// 1. Try copyMessageViaBotAPI for files <= 2GB (clean copy without forward tag)
 			if fileSize <= twoGB {
-				if copyMessageViaBotAPI(botToken, targetChatID, actualDestChatID, msgID, markupJSON) {
+				mk, reply := markupJSON, 0
+				if targetChatID == opt.UserID {
+					mk = pmMarkupJSON
+				}
+				if targetChatID == effectiveLogChatID {
+					reply = opt.LogReplyTo
+				}
+				if copyMessageViaBotAPI(botToken, targetChatID, actualDestChatID, msgID, mk, reply) {
 					log.Printf("[AZML-Go Uploader] Successfully copied media to %s (%d) via Bot API", desc, targetChatID)
 					return true
 				}

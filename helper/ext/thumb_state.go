@@ -45,7 +45,7 @@ func IsPendingThumbSession(userID int64, chatID ...int64) bool {
 	}
 	if len(chatID) > 0 && chatID[0] != 0 && sess.ChatID != 0 {
 		// If sent in user PM (chatID == userID), always accept
-		if chatID[0] != userID && sess.ChatID != chatID[0] {
+		if chatID[0] != userID && !SameChat(sess.ChatID, chatID[0]) {
 			return false
 		}
 	}
@@ -66,7 +66,7 @@ func GetPendingThumbSession(userID int64, chatID ...int64) (*PendingThumbSession
 	}
 	if len(chatID) > 0 && chatID[0] != 0 && sess.ChatID != 0 {
 		// If sent in user PM (chatID == userID), always accept
-		if chatID[0] != userID && sess.ChatID != chatID[0] {
+		if chatID[0] != userID && !SameChat(sess.ChatID, chatID[0]) {
 			return nil, false
 		}
 	}
@@ -78,4 +78,20 @@ func ClearPendingThumbSession(userID int64) {
 	globalThumbState.mu.Lock()
 	defer globalThumbState.mu.Unlock()
 	delete(globalThumbState.pending, userID)
+}
+
+// SameChat compares chat ids written in any form: a group can come as -1001234 (Bot API style)
+// or as 1234 (the raw id of the update), and both are the same chat.
+func SameChat(a, b int64) bool {
+	return rawChatID(a) == rawChatID(b)
+}
+
+func rawChatID(id int64) int64 {
+	if id >= 0 {
+		return id
+	}
+	if id <= -1000000000000 {
+		return -id - 1000000000000
+	}
+	return -id
 }

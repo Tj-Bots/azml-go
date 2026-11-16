@@ -46,7 +46,7 @@ func GetPendingSettingSession(userID int64, chatID ...int64) (*PendingSettingSes
 		return nil, false
 	}
 	if len(chatID) > 0 && chatID[0] != 0 && sess.ChatID != 0 {
-		if sess.ChatID != chatID[0] {
+		if !SameChat(sess.ChatID, chatID[0]) {
 			return nil, false
 		}
 	}
@@ -103,7 +103,7 @@ func GetPendingBotSettingSession(userID int64, chatID ...int64) (*PendingBotSett
 		return nil, false
 	}
 	if len(chatID) > 0 && chatID[0] != 0 && sess.ChatID != 0 {
-		if sess.ChatID != chatID[0] {
+		if !SameChat(sess.ChatID, chatID[0]) {
 			return nil, false
 		}
 	}

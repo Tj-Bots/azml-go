@@ -1590,7 +1590,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 							// Refresh interactive /us settings menu if prompt was active
 							if sess != nil && sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
 								settingsPeer := peer
-								if sess.ChatID != 0 && sess.ChatID != chatID {
+								if sess.ChatID != 0 && !ext.SameChat(sess.ChatID, chatID) {
 									if p := b.getPeerForChatID(sess.ChatID); p != nil {
 										settingsPeer = p
 									}
@@ -1666,7 +1666,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 						// Refresh interactive /us settings menu if prompt was active
 						if sess != nil && sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
 							settingsPeer := peer
-							if sess.ChatID != 0 && sess.ChatID != chatID {
+							if sess.ChatID != 0 && !ext.SameChat(sess.ChatID, chatID) {
 								if p := b.getPeerForChatID(sess.ChatID); p != nil {
 									settingsPeer = p
 								}

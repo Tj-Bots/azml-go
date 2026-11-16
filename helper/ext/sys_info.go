@@ -504,9 +504,12 @@ func RenderRepoStats() string {
 		lastCommit = fmt.Sprintf("%s ( Recent )", time.Now().Format("02/01/2006"))
 	}
 
-	botVersion := "v2.0-Go"
-	latVersion := "v2.0"
-	remarks := "Up to date!"
+	botVersion := BotVersion()
+	latVersion := LatestVersion()
+	remarks := CompareVersions(botVersion, latVersion)
+	if latVersion == "" {
+		latVersion = "N/A"
+	}
 
 	return fmt.Sprintf("⌬ <b><i>REPO STATISTICS :</i></b>\n"+
 		"<blockquote>╭ <b>Bot Updated :</b> %s\n"+

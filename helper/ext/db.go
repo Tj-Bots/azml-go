@@ -192,6 +192,20 @@ func (d *DatabaseManager) LoadAllBotSettings() (map[string]string, error) {
 	return settings, nil
 }
 
+// DeleteBotSetting removes a saved /bs value (the deploy value is used again).
+func (d *DatabaseManager) DeleteBotSetting(key string) error {
+	if d == nil {
+		return nil
+	}
+	if d.isMongo {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err := d.settingsCol.DeleteOne(ctx, bson.M{"_id": key})
+		return err
+	}
+	return d.SaveBotSetting(key, "") // the file store drops empty values
+}
+
 func (d *DatabaseManager) SaveBotSetting(key, val string) error {
 	if d == nil {
 		return nil

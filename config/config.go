@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -856,4 +857,39 @@ func DefaultValue(key string) (string, bool) {
 	GlobalConfig = saved
 	v, ok := m[key]
 	return v, ok
+}
+
+// AllKeys: every variable the bot knows.
+func AllKeys() []string {
+	configLock.RLock()
+	defer configLock.RUnlock()
+	seen := map[string]bool{}
+	var out []string
+	for _, m := range []map[string]string{configMapLocked(), startupValuesLocked()} {
+		for k := range m {
+			if !seen[k] {
+				seen[k] = true
+				out = append(out, k)
+			}
+		}
+	}
+	for _, k := range CoreKeys {
+		if !seen[k] {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// CoreKeys: read only from the deploy (Heroku / config.env), never from /bs, like the Python bot.
+var CoreKeys = []string{"BOT_TOKEN", "OWNER_ID", "TELEGRAM_API", "TELEGRAM_HASH", "DATABASE_URL", "DATABASE_NAME"}
+
+func IsCoreKey(k string) bool {
+	for _, c := range CoreKeys {
+		if c == k {
+			return true
+		}
+	}
+	return false
 }

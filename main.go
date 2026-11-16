@@ -74,6 +74,13 @@ func setupEnvironment() {
 }
 
 func main() {
+	// the deploy variables (Heroku config vars / docker env) before config.env is read
+	deployEnv := map[string]string{}
+	for _, kv := range os.Environ() {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			deployEnv[k] = v
+		}
+	}
 	setupEnvironment()
 
 	// Proactive container memory ceiling - 400MB soft target for Heroku 512MB dynos
@@ -108,23 +115,45 @@ func main() {
 		telegram.LoadPeers(peers)
 		telegram.SetPeerStore(db.SavePeer)
 		log.Printf("[DB] Loaded %d saved peers", len(peers))
-		if dbSettings, err := db.LoadAllBotSettings(); err == nil && len(dbSettings) > 0 {
+		// like the Python bot (deployConfig): the /bs values apply while the deploy variables
+		// stay the same; when the Heroku config vars change, the new deploy wins and is saved
+		var snap []string
+		for _, k := range config.AllKeys() {
+			if v := deployEnv[k]; v != "" {
+				snap = append(snap, k+"="+v)
+			}
+		}
+		snapshot := strings.Join(snap, "\n")
+		oldSnapshot, _ := db.GetBotSetting("_DEPLOY_CONFIG")
+		if oldSnapshot != "" && oldSnapshot != snapshot {
+			log.Printf("[DB] Deploy variables changed: using them, the /bs values are not restored")
+			_ = db.SaveBotSetting("_DEPLOY_CONFIG", snapshot)
+			for _, k := range config.AllKeys() { // the old /bs values must not come back next time
+				if !config.IsCoreKey(k) && !strings.HasPrefix(k, "UPSTREAM_") {
+					_ = db.DeleteBotSetting(k)
+				}
+			}
+		} else if dbSettings, err := db.LoadAllBotSettings(); err == nil && len(dbSettings) > 0 {
+			if oldSnapshot == "" {
+				_ = db.SaveBotSetting("_DEPLOY_CONFIG", snapshot)
+			}
+			n := 0
 			for k, v := range dbSettings {
-				// an empty value is a Reset in /bs: it wins over the Heroku variable too
-				// (not for the variables the bot can't start without)
-				switch k {
-				case "BOT_TOKEN", "OWNER_ID", "TELEGRAM_API", "TELEGRAM_HASH", "DATABASE_URL", "DATABASE_NAME", "USER_SESSION_STRING":
-					if v == "" {
-						continue
-					}
+				// the core variables come only from the deploy; any other value (also an empty
+				// one from Reset) wins over it, like the Python bot
+				if strings.HasPrefix(k, "_") || config.IsCoreKey(k) {
+					continue
 				}
 				_ = config.UpdateConfigVar(k, v)
+				n++
 			}
-			log.Printf("[DB] Restored %d persistent setting(s) from database", len(dbSettings))
+			log.Printf("[DB] Restored %d persistent setting(s) from database", n)
 			// rebuild the config so the vars edited in /bs that are read only at start apply too
 			if reloaded, rErr := config.LoadConfig("config.env"); rErr == nil && reloaded != nil {
 				cfg = reloaded
 			}
+		} else if oldSnapshot == "" {
+			_ = db.SaveBotSetting("_DEPLOY_CONFIG", snapshot)
 		}
 		// TIMEZONE from /bs
 		if loc, lErr := time.LoadLocation(cfg.Timezone); lErr == nil && cfg.Timezone != "" {

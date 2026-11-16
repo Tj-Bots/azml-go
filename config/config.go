@@ -56,6 +56,7 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	MirrorLogID               int64
 	GDriveWorker              string
 	MediaStore                bool
 	IncompleteTaskNotifier    bool
@@ -157,6 +158,15 @@ func GetMaxSplitSize() int64 {
 	return MaxSplitSize
 }
 
+// syncLogDump: one channel like the Python bot. LEECH_LOG_ID gets the files; an old DUMP_CHAT_ID
+// is used when LEECH_LOG_ID is empty, and the code that still says "dump" means the same channel.
+func syncLogDump() {
+	if GlobalConfig.LeechLogID == 0 {
+		GlobalConfig.LeechLogID = GlobalConfig.DumpChatID
+	}
+	GlobalConfig.DumpChatID = GlobalConfig.LeechLogID
+}
+
 func LoadConfig(path string) (*Config, error) {
 	configLock.Lock()
 	defer configLock.Unlock()
@@ -209,6 +219,7 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		MirrorLogID:               getEnvInt64("MIRROR_LOG_ID", 0),
 		GDriveWorker:              getEnv("GDRIVE_WORKER", "https://gdrive.tjbot.workers.dev"),
 		MediaStore:                getEnvBool("MEDIA_STORE", false),
 		IncompleteTaskNotifier:    getEnvBool("INCOMPLETE_TASK_NOTIFIER", false),
@@ -315,6 +326,7 @@ func LoadConfig(path string) (*Config, error) {
 			}
 		}
 	}
+	syncLogDump()
 	GlobalConfig.WorkerBotTokens = workerTokens
 	if len(workerTokens) > 0 {
 		log.Printf("[Config] Loaded %d Multi-Bot Worker tokens for parallel transfers (Main Bot excluded, Dump: %d)", len(workerTokens), GlobalConfig.DumpChatID)
@@ -455,7 +467,8 @@ func UpdateConfigVar(key, val string) error {
 	case "LEECH_FILENAME_REMNAME_REGEX":
 		GlobalConfig.LeechFilenameRemnameRegex = val
 	case "LEECH_LOG_ID":
-		GlobalConfig.LeechLogID, _ = strconv.ParseInt(val, 10, 64)
+		GlobalConfig.LeechLogID, _ = strconv.ParseInt(strings.TrimSpace(val), 10, 64)
+		GlobalConfig.DumpChatID = GlobalConfig.LeechLogID
 	case "TORRENT_TIMEOUT":
 		GlobalConfig.TorrentTimeout, _ = strconv.Atoi(val)
 	case "SHORTENER":
@@ -514,6 +527,10 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.MediaStore = val == "true" || val == "1"
 	case "GDRIVE_WORKER":
 		GlobalConfig.GDriveWorker = val
+	case "LINKS_LOG_ID":
+		GlobalConfig.LinksLogID, _ = strconv.ParseInt(val, 10, 64)
+	case "MIRROR_LOG_ID":
+		GlobalConfig.MirrorLogID, _ = strconv.ParseInt(val, 10, 64)
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -568,8 +585,11 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.DailyTaskLimit, _ = strconv.Atoi(val)
 	case "USER_SESSION_STRING":
 		GlobalConfig.UserSessionString = strings.TrimSpace(val)
-	case "DUMP_CHAT_ID":
-		GlobalConfig.DumpChatID, _ = strconv.ParseInt(strings.TrimSpace(val), 10, 64)
+	case "DUMP_CHAT_ID": // old name: one channel now, like the Python bot (LEECH_LOG_ID wins)
+		if GlobalConfig.LeechLogID == 0 {
+			GlobalConfig.LeechLogID, _ = strconv.ParseInt(strings.TrimSpace(val), 10, 64)
+		}
+		GlobalConfig.DumpChatID = GlobalConfig.LeechLogID
 	case "STORAGE_THRESHOLD":
 		GlobalConfig.StorageThreshold, _ = strconv.ParseInt(val, 10, 64)
 	case "UPSTREAM_REPO":
@@ -657,6 +677,8 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"MIRROR_LOG_ID":                strconv.FormatInt(GlobalConfig.MirrorLogID, 10),
+		"LINKS_LOG_ID":                 strconv.FormatInt(GlobalConfig.LinksLogID, 10),
 		"GDRIVE_WORKER":                GlobalConfig.GDriveWorker,
 		"MEDIA_STORE":                  strconv.FormatBool(GlobalConfig.MediaStore),
 		"INCOMPLETE_TASK_NOTIFIER":     strconv.FormatBool(GlobalConfig.IncompleteTaskNotifier),

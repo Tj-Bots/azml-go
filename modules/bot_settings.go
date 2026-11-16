@@ -46,6 +46,8 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"MIRROR_LOG_ID",
+	"LINKS_LOG_ID",
 	"GDRIVE_WORKER",
 	"MEDIA_STORE",
 	"INCOMPLETE_TASK_NOTIFIER",
@@ -73,7 +75,6 @@ var configVarKeys = []string{
 	"DISABLE_TORRENTS",
 	"TORRENT_TIMEOUT",
 	"USER_SESSION_STRING",
-	"DUMP_CHAT_ID",
 	"LEECH_LOG_ID",
 	"STATUS_UPDATE_INTERVAL",
 	"STATUS_LIMIT",
@@ -140,7 +141,6 @@ var configVarKeys = []string{
 var defaultVarValues = map[string]string{
 	"OWNER_USERNAME":               "",
 	"USER_SESSION_STRING":          "",
-	"DUMP_CHAT_ID":                 "0",
 	"LEECH_LOG_ID":                 "0",
 	"STATUS_UPDATE_INTERVAL":       "10",
 	"STATUS_LIMIT":                 "4",
@@ -285,16 +285,16 @@ func (m *BotSettingsModule) HandleBotSettings(ctx context.Context, peer tg.Input
 			_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("✓ <b>USER_SESSION_STRING</b> set successfully as @%s (ID: %d)! Premium: %v", uname, uid, isPrem), msg.MessageID, nil)
 			return
 		}
-		if key == "DUMP_CHAT_ID" {
-			dID, _ := strconv.ParseInt(val, 10, 64)
-			_ = config.UpdateConfigVar("DUMP_CHAT_ID", val)
+		if key == "DUMP_CHAT_ID" || key == "LEECH_LOG_ID" { // one channel (see config.syncLogDump)
+			_ = config.UpdateConfigVar(key, val)
+			dID := config.Get().DumpChatID
 			if m.uploader != nil {
 				m.uploader.SetDumpChatID(dID)
 			}
 			if m.leechMod != nil {
 				m.leechMod.SetDumpChatID(dID)
 			}
-			_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("✓ <b>DUMP_CHAT_ID</b> set to: <code>%d</code>", dID), msg.MessageID, nil)
+			_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("✓ <b>LEECH_LOG_ID</b> set to: <code>%d</code>", dID), msg.MessageID, nil)
 			return
 		}
 		if err := config.UpdateConfigVar(key, val); err == nil {
@@ -365,8 +365,6 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 	if hasSession {
 		btn.IButtonStyled("Reset Session", "botset resetsession", "danger")
 	}
-	btn.Row()
-	btn.IButton("Set Dump Channel", "botset prompt_dump")
 	btn.Row()
 	btn.IButtonStyled("◀️", "botset back", "primary")
 	btn.IButtonStyled("❌", "botset close", "danger")
@@ -538,9 +536,9 @@ func (m *BotSettingsModule) HandleSessionValue(ctx context.Context, peer tg.Inpu
 		}
 	}
 
-	if key == "DUMP_CHAT_ID" {
-		dID, _ := strconv.ParseInt(val, 10, 64)
-		_ = config.UpdateConfigVar("DUMP_CHAT_ID", val)
+	if key == "DUMP_CHAT_ID" || key == "LEECH_LOG_ID" { // one channel (see config.syncLogDump)
+		_ = config.UpdateConfigVar(key, val)
+		dID := config.Get().DumpChatID
 		if m.uploader != nil {
 			m.uploader.SetDumpChatID(dID)
 		}

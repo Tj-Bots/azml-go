@@ -528,6 +528,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	// every early return must free the download slot, or the next task stays in QueueDL forever
 	defer ext.ReleaseDownload(taskUID)
+
+	// like the Python bot (onDownloadStart): the source in LINKS_LOG_ID, "Task Started" in PM
+	go m.sendLinksLog(context.Background(), msg, modeStr, sourceURL)
+	pmStartID := 0
+	if cfg.BotPM || (user != nil && user.BotPM) {
+		pmStartID = m.sendPMStart(ctx, msg, sourceURL)
+	}
 	if queuedDL {
 		_ = m.sender.EditMessage(ctx, peer, notifyID, "<i>Starting download from queue...</i>", nil)
 	}
@@ -585,9 +592,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if mediaSource != nil && cfg.DeleteLinks && !msg.Internal && needsCopy {
 			// DELETE_LINKS with helper bots: copy the file to the dump channel, delete the originals
 			// right away, the helper bots download from the copy (the Source Link points to it)
-			dump := m.dumpChatID
+			dump := cfg.DumpChatID // the leech log (one channel)
 			if dump == 0 {
-				dump = cfg.DumpChatID
+				dump = m.dumpChatID
 			}
 			if dump == 0 {
 				dump = cfg.LeechLogID
@@ -648,9 +655,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					uTask.SetSize(doc.Size)
 					var dlSuccess bool
 
-					effectiveDumpChatID := m.dumpChatID
-					if effectiveDumpChatID == 0 && cfg != nil {
-						effectiveDumpChatID = cfg.DumpChatID
+					effectiveDumpChatID := cfg.DumpChatID // the leech log (one channel)
+					if effectiveDumpChatID == 0 {
+						effectiveDumpChatID = m.dumpChatID
 					}
 					if effectiveDumpChatID == 0 && cfg != nil {
 						effectiveDumpChatID = cfg.LeechLogID
@@ -1681,6 +1688,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 			upOpt.Result = &partResults[idx]
 			upOpt.LogReplyTo = logStartID
+			upOpt.PMReplyTo = pmStartID
 			if useGroup {
 				partCaption = upOpt.Caption + captionLinks(fileButtons)
 				upOpt.Caption = partCaption
@@ -1881,6 +1889,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	// Send completion message into the group / chat where leech was initiated, replying to user's command
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, sb.String(), msg.MessageID, finishBtn, 1)
+
+	// MIRROR_LOG_ID: the mirror finish message with its buttons (like the Python bot)
+	if opt.IsMirror && cfg.MirrorLogID != 0 && !isExcepChat(msg.ChatID) {
+		if lp := m.logPeerFor(ctx, cfg.MirrorLogID); lp != nil {
+			if _, err := m.sender.SendMessageWithButtons(ctx, lp, sb.String(), 0, finishBtn, 1); err != nil {
+				log.Printf("[MIRROR_LOG] %v", err)
+			}
+		}
+	}
 
 	if user != nil {
 		mode := "Leech"
@@ -2579,13 +2596,77 @@ func (m *LeechModule) sendLogStart(ctx context.Context, msg *types.MessageContex
 	} else if ext.IsURL(source) || strings.HasPrefix(source, "https://t.me/") {
 		src = fmt.Sprintf("<a href=\"%s\">Click Here</a>", telegram.EscapeHTML(source))
 	}
-	text := fmt.Sprintf("➲ <b><u>Leech Started :</u></b>\n\n<blockquote>╭ <b>User :</b> %s ( #ID%d )\n╰ <b>Source :</b> %s</blockquote>", mention, msg.UserID, src)
+	text := fmt.Sprintf("➲ <b><u>Leech Started </u></b>🏁\n┊\n┊ <b>User :</b> %s ( #ID%d )\n╰ <b>Source :</b> %s", mention, msg.UserID, src)
 	id, err := m.sender.SendMessage(ctx, logPeer, text, 0, nil)
 	if err != nil {
 		log.Printf("[LEECH] log start message failed: %v", err)
 		return 0, nil
 	}
 	return id, logPeer
+}
+
+// logPeerFor resolves a log channel id to a peer (nil when the bot can't reach it).
+func (m *LeechModule) logPeerFor(ctx context.Context, id int64) tg.InputPeerClass {
+	if id == 0 {
+		return nil
+	}
+	hash := telegram.ResolveChannelAccessHash(ctx, m.rawAPI, id)
+	if hash == 0 {
+		return nil
+	}
+	return &tg.InputPeerChannel{ChannelID: pool.RawChannelID(id), AccessHash: hash}
+}
+
+func userTagOf(msg *types.MessageContext) string {
+	if msg.Username != "" {
+		return "@" + msg.Username
+	}
+	return fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, telegram.EscapeHTML(msg.SenderName))
+}
+
+// sendLinksLog: LINKS_LOG_ID gets every task's source when it starts (Python bot: onDownloadStart).
+func (m *LeechModule) sendLinksLog(ctx context.Context, msg *types.MessageContext, mode, source string) {
+	cfg := config.Get()
+	if cfg.LinksLogID == 0 || msg.Internal || isExcepChat(msg.ChatID) {
+		return
+	}
+	lp := m.logPeerFor(ctx, cfg.LinksLogID)
+	if lp == nil {
+		return
+	}
+	loc := time.Local
+	if l, err := time.LoadLocation(cfg.Timezone); err == nil {
+		loc = l
+	}
+	src := "<code>Telegram File</code>"
+	if source != "" {
+		src = "<code>" + telegram.EscapeHTML(source) + "</code>"
+	}
+	text := fmt.Sprintf("<b><i>Task Started</i></b>\n<blockquote>┊ <b>Mode:</b> %s\n╰ <b>By:</b> %s\n\n➲ <b>Source:</b>\n╰ <b>Added On:</b> %s</blockquote>\n------------------------------------------\n%s\n------------------------------------------",
+		mode, userTagOf(msg), time.Now().In(loc).Format("02/01/06, 03:04:05 PM"), src)
+	if _, err := m.sender.SendMessage(ctx, lp, text, 0, nil); err != nil {
+		log.Printf("[LINKS_LOG] %v", err)
+	}
+}
+
+// sendPMStart: a task from a group with BOT_PM, "Task Started" in the user's PM; the files answer it.
+func (m *LeechModule) sendPMStart(ctx context.Context, msg *types.MessageContext, source string) int {
+	if msg.ChatID == msg.UserID || msg.Internal {
+		return 0
+	}
+	link := source
+	if msg.ChatID < 0 {
+		link = channelMessageLink(msg.ChatID, msg.MessageID)
+	}
+	text := "➲ <b><u>Task Started </u></b>🏁"
+	if link != "" && !config.Get().SafeMode {
+		text += fmt.Sprintf("\n┊\n╰ <b>Link:</b> <a href=\"%s\">Click Here</a>", telegram.EscapeHTML(link))
+	}
+	id, err := m.sender.SendMessage(ctx, &tg.InputPeerUser{UserID: msg.UserID, AccessHash: telegram.GetUserAccessHash(msg.UserID)}, text, 0, nil)
+	if err != nil {
+		return 0
+	}
+	return id
 }
 
 // isExcepChat: EXCEP_CHATS, chats without leech log.

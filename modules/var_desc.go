@@ -2,6 +2,8 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"MIRROR_LOG_ID":                "Chat ID where the finish message of /mirror tasks is also sent, with its buttons. Int. Add -100 before the id.",
+	"LINKS_LOG_ID":                 "Chat ID where every task's link/source is logged when it starts (Task Started + Source). Int. Add -100 before the id.",
 	"GDRIVE_WORKER":                "Worker that downloads PUBLIC Google Drive files and folders when there is no token.pickle (or the token can't open the link). Empty = off.",
 	"MEDIA_STORE":                  "Default for Media Store: every leeched file gets a Store Link, anyone who opens it gets the file from the bot in PM. Users can change it for themselves in User Settings → Leech. Bool",
 	"INCOMPLETE_TASK_NOTIFIER":     "Get incomplete task messages after restart: the tasks that were running are listed (with links to their commands in groups) in the chats they were started in. Needs DATABASE_URL. Default is False. Bool",
@@ -30,8 +32,7 @@ var varDescriptions = map[string]string{
 	"DISABLE_TORRENTS":             "Block torrents: magnet links, .torrent links and .torrent files are refused, and aria2 does not follow a link that turns out to be a torrent. Everything else keeps working. Default is False. Bool",
 	"TORRENT_TIMEOUT":              "Dead torrent timeout in seconds: a torrent or magnet that downloads nothing for this long is cancelled (Dead Torrent!). 0 = never. Default is 600. Int",
 	"USER_SESSION_STRING":          "Pyrogram/Telethon style session string of a Telegram account (premium recommended). Used to download/upload faster and to upload files up to 4GB. Generate it with /bs → User Session or a session generator.",
-	"DUMP_CHAT_ID":                 "Chat ID of the transit/storage channel. Files are uploaded here first, then copied to the user and to LEECH_LOG_ID. The bot (and the user session) must be admin there. Add -100 before the channel id. Int",
-	"LEECH_LOG_ID":                 "Chat ID to where leeched files would be uploaded. Int. NOTE: Only available for superGroup/channel. Add -100 before channel/superGroup id. In short don't add bot id or your id!",
+	"LEECH_LOG_ID":                 "Chat ID to where leeched files would be uploaded (the bot copies them to the user from there). Int. NOTE: Only available for superGroup/channel. Add -100 before channel/superGroup id. In short don't add bot id or your id! The old DUMP_CHAT_ID is the same channel now.",
 	"STATUS_UPDATE_INTERVAL":       "Time in seconds after which the progress/status message will be updated. Recommended 10 seconds at least.",
 	"STATUS_LIMIT":                 "Limit the no. of tasks shown in status message with buttons. Default is 10. NOTE: Recommended limit is 4 tasks.",
 	"LEECH_SPLIT_SIZE":             "Size of split in bytes. Default is 2GB. Default is 4GB if your account is premium.",

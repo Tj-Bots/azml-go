@@ -50,7 +50,7 @@ heroku config:set -a APP_NAME \
   TELEGRAM_API="12345" \
   TELEGRAM_HASH="abcdef..." \
   DATABASE_URL="mongodb+srv://..." \
-  DUMP_CHAT_ID="-100..." \
+  LEECH_LOG_ID="-100..." \
   BASE_URL="https://APP_NAME-xxxx.herokuapp.com"
 ```
 `BASE_URL` = the `Web URL` from `heroku info -a APP_NAME` (needed for file selection with `-s`).

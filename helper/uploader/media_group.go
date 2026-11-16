@@ -153,9 +153,9 @@ func (u *TelegramUploader) SendAlbum(ctx context.Context, parts []UploadResult, 
 		if destChat == logChat && start == 0 { // uploaded straight into the log (like the Python bot)
 			first.LogChatID, first.LogMsgID = destChat, first.MsgID
 		}
-		dump := u.dumpChatID
+		dump := cfg.DumpChatID // the leech log (one channel)
 		if dump == 0 {
-			dump = cfg.DumpChatID
+			dump = u.dumpChatID
 		}
 		if opt.NoLog {
 			dump = 0

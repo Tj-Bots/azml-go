@@ -199,6 +199,7 @@ type UploadProgressFunc func(curr, total int64, speed float64, eta string)
 
 type UploadOptions struct {
 	LogReplyTo     int  // the "Leech Started" message in the leech log: the file answers it
+	PMReplyTo      int  // the "Task Started" message in the user's PM
 	NoLog          bool // EXCEP_CHATS: no copy in the leech log
 	FilePath       string
 	FileName       string
@@ -528,8 +529,8 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 	// Transit Bin Channel: The shared channel where all worker bots and Main Bot are present.
 	// Worker bots upload directly here to keep the Leech Group Chat completely clean.
 	transitBinChatID := u.dumpChatID
-	if transitBinChatID == 0 && cfg != nil {
-		transitBinChatID = cfg.DumpChatID
+	if cfg != nil && cfg.DumpChatID != 0 {
+		transitBinChatID = cfg.DumpChatID // the leech log (one channel)
 	}
 
 	// Effective Dump Chat determination:
@@ -1127,7 +1128,7 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			{
 				mk, reply := markupJSON, 0
 				if targetChatID == opt.UserID {
-					mk = pmMarkupJSON
+					mk, reply = pmMarkupJSON, opt.PMReplyTo
 				}
 				if targetChatID == effectiveLogChatID {
 					reply = opt.LogReplyTo

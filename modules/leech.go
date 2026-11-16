@@ -355,9 +355,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				ids = append(ids, msg.ReplyToID)
 			}
 			go func() {
-				dctx, dcancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer dcancel()
-				_ = m.sender.DeleteMessage(dctx, peer, ids)
+				// one by one: a message the bot may not delete must not keep the other one
+				for _, id := range ids {
+					dctx, dcancel := context.WithTimeout(context.Background(), 15*time.Second)
+					if err := m.sender.DeleteMessage(dctx, peer, []int{id}); err != nil {
+						log.Printf("[DELETE_LINKS] can't delete message %d in %d: %v (is the bot admin with 'Delete messages'?)", id, msg.ChatID, err)
+					}
+					dcancel()
+				}
 			}()
 		})
 	}

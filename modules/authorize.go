@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"azml-go/helper/ext"
+	"azml-go/helper/pool"
 	"azml-go/helper/telegram"
 	"azml-go/types"
 
@@ -82,6 +83,19 @@ func (m *AuthorizeModule) HandleUnauthorize(ctx context.Context, peer tg.InputPe
 		log.Printf("[Authorize] Failed to persist unauthorization for %d: %v", targetID, err)
 		_, _ = m.sender.SendMessage(ctx, peer, "× <b>Unauthorization was not saved.</b> Database error; please try again later.", msg.MessageID, nil)
 		return
+	}
+	// a group authorized by an older version is saved by its raw id: unauthorize that one too
+	if targetID < 0 {
+		raw := pool.RawChannelID(targetID)
+		for _, id := range []int64{raw, -raw, -1000000000000 - raw} {
+			if id == targetID {
+				continue
+			}
+			if old := m.userMap.Get(id); old != nil && old.IsAuth {
+				old.IsAuth = false
+				_ = ext.GetDB().SaveUser(old)
+			}
+		}
 	}
 	_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Unauthorized:</b> <code>%d</code>", targetID), msg.MessageID, nil)
 }

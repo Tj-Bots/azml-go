@@ -593,7 +593,8 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		return
 	}
 
-	chatID := getPeerID(m.PeerID)
+	// the chat id like the Python bot (Bot API form): groups are -100…, basic groups -…
+	chatID := botAPIChatID(m.PeerID)
 	senderID := chatID
 	senderName := "User"
 	senderUsername := ""
@@ -1393,6 +1394,19 @@ func getPeer(p tg.PeerClass) tg.InputPeerClass {
 		return &tg.InputPeerChannel{ChannelID: v.ChannelID, AccessHash: hash}
 	}
 	return nil
+}
+
+// botAPIChatID: the chat id as the Bot API / Pyrogram write it (-100… for groups and channels).
+func botAPIChatID(p tg.PeerClass) int64 {
+	switch v := p.(type) {
+	case *tg.PeerUser:
+		return v.UserID
+	case *tg.PeerChat:
+		return -v.ChatID
+	case *tg.PeerChannel:
+		return -1000000000000 - v.ChannelID
+	}
+	return 0
 }
 
 func getPeerID(p tg.PeerClass) int64 {

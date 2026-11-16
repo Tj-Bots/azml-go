@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -90,7 +91,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	if isUnzip {
 		opt.IsExtract = true
 	}
-	if opt.Password != "" && !opt.IsZip {
+	if opt.Password != "" && !opt.IsZip && opt.Username == "" {
 		opt.IsExtract = true
 	}
 
@@ -190,30 +191,11 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			for idx := 1; idx < multiCount; idx++ {
 				time.Sleep(3 * time.Second)
 				targetID := baseReplyID + idx
-				res, err := m.rawAPI.MessagesGetMessages(context.Background(), []tg.InputMessageClass{
-					&tg.InputMessageID{ID: targetID},
-				})
+				targetMsg, err := telegram.FetchMessage(context.Background(), m.rawAPI, peer, targetID)
 				if err != nil {
 					log.Printf("[LEECH -i] Failed to fetch message ID %d: %v", targetID, err)
 					continue
 				}
-
-				var targetMsg *tg.Message
-				switch mRes := res.(type) {
-				case *tg.MessagesMessages:
-					if len(mRes.Messages) > 0 {
-						targetMsg, _ = mRes.Messages[0].(*tg.Message)
-					}
-				case *tg.MessagesMessagesSlice:
-					if len(mRes.Messages) > 0 {
-						targetMsg, _ = mRes.Messages[0].(*tg.Message)
-					}
-				case *tg.MessagesChannelMessages:
-					if len(mRes.Messages) > 0 {
-						targetMsg, _ = mRes.Messages[0].(*tg.Message)
-					}
-				}
-
 				if targetMsg == nil {
 					continue
 				}
@@ -223,7 +205,8 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					MessageID:  targetMsg.ID,
 					UserID:     msg.UserID,
 					SenderName: msg.SenderName,
-					Text:       targetMsg.Message,
+					Text:       multiFollowText(msg.Text),
+					ReplyText:  targetMsg.Message,
 					HasMedia:   targetMsg.Media != nil,
 					RawMedia:   targetMsg.Media,
 					ReplyToID:  targetID,
@@ -261,32 +244,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		return
 	}
 	if link == "" && !msg.HasMedia && !msg.IsReply {
-		helpMsg := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-			"<b>%s:</b> <code>/leech [link] [flags]</code>\n\n"+
-			"<blockquote>╭ <b>%s:</b>\n"+
-			"┠ <code>-b</code> — %s\n"+
-			"┠ <code>-n</code> — %s\n"+
-			"┠ <code>-z</code> — %s\n"+
-			"┠ <code>-e</code> — %s\n"+
-			"┠ <code>-p</code> — %s\n"+
-			"┠ <code>-ss</code> — %s\n"+
-			"┠ <code>-d</code> — %s\n"+
-			"┠ <code>-med</code> — %s\n"+
-			"┠ <code>-ud</code> — %s\n"+
-			"╰ <code>-st</code> — %s</blockquote>",
-			"Leech Command Usage",
-			"Usage",
-			"Available Flags",
-			"Bulk Leech (reply to links)",
-			"Custom File Name",
-			"Compress as Zip",
-			"Extract Archive",
-			"Extraction Password",
-			"Generate Screenshots",
-			"Upload as Document",
-			"Upload as Media",
-			"Custom Dump Chat ID",
-			"Extract Video Streams")
+		helpMsg := leechHelpText()
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}
@@ -919,7 +877,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					})
 				} else {
 					log.Printf("[LEECH] AddTorrent error, fallback to AddURI: %v", tErr)
-					gid, aErr := aria.AddURI(link, taskDir, opt.CustomName, nil)
+					gid, aErr := aria.AddURI(link, taskDir, opt.CustomName, taskHeaders(opt.Headers, opt.Username, opt.Password))
 					if aErr != nil {
 						m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("Download Error: %v", aErr), modeStr, taskStartTime)
 						return
@@ -934,7 +892,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				}
 			} else {
 				log.Printf("[LEECH] DownloadHTTPFile error, fallback to AddURI: %v", err)
-				gid, aErr := aria.AddURI(link, taskDir, opt.CustomName, nil)
+				gid, aErr := aria.AddURI(link, taskDir, opt.CustomName, taskHeaders(opt.Headers, opt.Username, opt.Password))
 				if aErr != nil {
 					m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("Download Error: %v", aErr), modeStr, taskStartTime)
 					return
@@ -958,7 +916,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					ariaLink += "#" + taskUID
 				}
 			}
-			gid, err := aria.AddURI(ariaLink, taskDir, opt.CustomName, nil)
+			gid, err := aria.AddURI(ariaLink, taskDir, opt.CustomName, taskHeaders(opt.Headers, opt.Username, opt.Password))
 			if err != nil {
 				// If Aria2c is unreachable or errors on HTTP/HTTPS DDL link, seamlessly fallback to DirectDownloader!
 				if ext.IsURL(link) && (strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://")) {
@@ -1073,6 +1031,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	displayName = filepath.Base(downloadedPath)
 	uTask.SetName(displayName)
 
+	if opt.Join {
+		setStep(uTask, "Join Parts")
+		downloadedPath = joinParts(downloadedPath)
+	}
+
 	// 2. Post-processing: Forceful Archive Extraction (/leech -e, -extract, -uz, -p)
 	// Reads binary magic bytes (PK, 7z, Rar!, etc.) even if the file extension was disguised or missed
 	if opt.IsExtract {
@@ -1106,21 +1069,34 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				return nil
 			})
 		}
-	} else if opt.IsZip {
+	}
+
+	// media tools from our Python bot, before zip
+	if opt.ExtractStrm {
+		setStep(uTask, "Extract Streams (FFmpeg)")
+		if out, err := extractAllStreams(downloadedPath, filepath.Join(taskDir, "streams_"+ext.RandomHex(3))); err == nil {
+			_ = os.RemoveAll(downloadedPath)
+			downloadedPath = out
+		} else {
+			log.Printf("[LEECH -st] %v", err)
+		}
+	}
+	if opt.ExtractAud != "" {
+		setStep(uTask, "Extract Audio (FFmpeg)")
+		downloadedPath = extractAudio(downloadedPath, opt.ExtractAud)
+	}
+	if opt.ConvVideo != "" || opt.ConvAudio != "" {
+		setStep(uTask, "Convert Media (FFmpeg)")
+		downloadedPath = convertMedia(downloadedPath, opt.ConvVideo, opt.ConvAudio)
+	}
+
+	if opt.IsZip && !opt.IsExtract {
 		uTask.SetStatus(types.StatusArchiving, "7-Zip")
 		// Compression requested (-z / -zip)
 		zipTarget := filepath.Join(taskDir, filepath.Base(downloadedPath)+".zip")
 		if err := ext.CompressToZip(downloadedPath, zipTarget, opt.Password); err == nil {
 			_ = os.RemoveAll(downloadedPath)
 			downloadedPath = zipTarget
-		}
-	}
-
-	// 3. Post-processing: Stream extraction if requested
-	if opt.ExtractStrm {
-		strmDir := filepath.Join(taskDir, "extracted_streams")
-		if outputs, err := ext.ExtractStreams(downloadedPath, strmDir, []string{"video", "audio", "subtitle"}); err == nil && len(outputs) > 0 {
-			downloadedPath = outputs[0]
 		}
 	}
 
@@ -1192,6 +1168,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	ulStartTime = time.Now()
 
 	setStep(uTask, "Preparing Upload")
+	taskThumb := ""
+	if opt.ThumbURL != "" {
+		if taskThumb = m.fetchTaskThumb(ctx, peer, opt.ThumbURL); taskThumb != "" {
+			defer os.Remove(taskThumb)
+		} else {
+			log.Printf("[LEECH -t] could not get the thumbnail from %s", opt.ThumbURL)
+		}
+	}
 	if notifyID > 0 {
 		text, btn := m.taskMgr.BuildStatusMessage(1)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, notifyID, text, btn, 3)
@@ -1286,6 +1270,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if user != nil && user.CustomThumb != "" {
 			customThumb = user.CustomThumb
 		}
+		if taskThumb != "" {
+			customThumb = taskThumb
+		}
 		autoThumbEnabled := cfg.AutoThumbnail
 		if user != nil && user.AutoThumb {
 			autoThumbEnabled = true
@@ -1321,7 +1308,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 		maxSplit := config.GetMaxSplitSize()
 		splitSize := cfg.LeechSplitSize
-		if user != nil && user.SplitSize > 0 {
+		if opt.SplitSize > 0 {
+			splitSize = opt.SplitSize
+		} else if user != nil && user.SplitSize > 0 {
 			splitSize = user.SplitSize
 		}
 		if splitSize > maxSplit || splitSize <= 0 {
@@ -1681,7 +1670,8 @@ func isLeechFlag(tok string) bool {
 	case "-b", "-bulk", "-z", "-zip", "-e", "-extract", "-uz", "-unzip",
 		"-d", "-doc", "-asdoc", "-m", "-med", "-media", "-asmedia",
 		"-st", "-streams", "-n", "-name", "-p", "-password",
-		"-pssw", "-ss", "-screenshots", "-ud", "-dump", "-ff", "-i", "-s", "-select":
+		"-pssw", "-ss", "-screenshots", "-ud", "-dump", "-ff", "-i", "-s", "-select",
+		"-t", "-thumb", "-sp", "-h", "-headers", "-u", "-user", "-ea", "-cv", "-ca", "-j", "-join", "-pass":
 		return true
 	default:
 		return false
@@ -1755,6 +1745,53 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 			}
 		case "-s", "-select":
 			opt.Select = true
+		case "-t", "-thumb":
+			if i+1 < len(tokens) {
+				opt.ThumbURL = tokens[i+1]
+				i++
+			}
+		case "-sp":
+			if i+1 < len(tokens) {
+				opt.SplitSize = parseSizeArg(tokens[i+1])
+				i++
+			}
+		case "-u", "-user":
+			if i+1 < len(tokens) {
+				opt.Username = tokens[i+1]
+				i++
+			}
+		case "-pass":
+			if i+1 < len(tokens) {
+				opt.Password = tokens[i+1]
+				i++
+			}
+		case "-h", "-headers":
+			var hp []string
+			for i+1 < len(tokens) && !isLeechFlag(tokens[i+1]) {
+				hp = append(hp, tokens[i+1])
+				i++
+			}
+			opt.Headers = strings.Join(hp, " ")
+		case "-ea":
+			opt.ExtractAud = "mp3"
+			if i+1 < len(tokens) {
+				if _, ok := audioCodecArgs[strings.ToLower(tokens[i+1])]; ok {
+					opt.ExtractAud = strings.ToLower(tokens[i+1])
+					i++
+				}
+			}
+		case "-cv":
+			if i+1 < len(tokens) {
+				opt.ConvVideo = strings.ToLower(strings.TrimPrefix(tokens[i+1], "."))
+				i++
+			}
+		case "-ca":
+			if i+1 < len(tokens) {
+				opt.ConvAudio = strings.ToLower(strings.TrimPrefix(tokens[i+1], "."))
+				i++
+			}
+		case "-j", "-join":
+			opt.Join = true
 		default:
 			if strings.HasPrefix(tok, "-p") && len(tok) > 2 {
 				opt.Password = strings.TrimPrefix(tok, "-p")
@@ -1780,7 +1817,7 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 		}
 	}
 	// If password provided and user didn't specify zip, default to extract
-	if opt.Password != "" && !opt.IsZip {
+	if opt.Password != "" && !opt.IsZip && opt.Username == "" {
 		opt.IsExtract = true
 	}
 	return opt, link
@@ -2171,4 +2208,48 @@ func finishFileList(names, links []string) string {
 	}
 	out := strings.TrimRight(sb.String(), "\n")
 	return out + "</blockquote>"
+}
+
+var multiFlagRe = regexp.MustCompile(`\s-i\s+\d+`)
+
+// multiFollowText: the command of an -i run without "-i N" and without its link,
+// so the next messages keep the same flags (-z, -t, -n ...).
+func multiFollowText(text string) string {
+	text = multiFlagRe.ReplaceAllString(" "+text, " ")
+	var out []string
+	for _, w := range strings.Fields(text) {
+		if ext.IsURL(w) || ext.IsMagnet(w) {
+			continue
+		}
+		out = append(out, w)
+	}
+	return strings.Join(out, " ")
+}
+
+// leechHelpText: every flag, like the help of our Python bot.
+func leechHelpText() string {
+	return "㊂ <b><u>Leech Command Usage :</u></b>\n\n" +
+		"<b>Usage:</b> <code>/leech [link] [flags]</code> or reply to a link / file\n\n" +
+		"<blockquote expandable>╭ <b>Name & Archive :</b>\n" +
+		"┠ <code>-n name</code> — New file name\n" +
+		"┠ <code>-z</code> — Zip  ·  <code>-e</code> — Extract\n" +
+		"┠ <code>-p pass</code> — Archive password\n" +
+		"┠ <code>-j</code> — Join split parts (.001 .002 ...)\n" +
+		"┠ <b>Many Tasks :</b>\n" +
+		"┠ <code>-i 5</code> — Reply to the first: this message and the next 4\n" +
+		"┠ <code>-b</code> — Bulk: reply to a list of links (<code>-b 3:8</code> range)\n" +
+		"┠ <b>Upload :</b>\n" +
+		"┠ <code>-t link</code> — Thumbnail for this task (image link or t.me message link)\n" +
+		"┠ <code>-sp 1.5GB</code> — Split size for this task\n" +
+		"┠ <code>-d</code> / <code>-med</code> — As document / as media\n" +
+		"┠ <code>-ud chat_id</code> — Dump chat for this task\n" +
+		"┠ <code>-ss 6</code> — Screenshots album\n" +
+		"┠ <b>Media Tools :</b>\n" +
+		"┠ <code>-st</code> — Every video, audio and subtitle track as its own file\n" +
+		"┠ <code>-ea</code> — Only the audio (<code>-ea m4a</code> flac opus ogg wav)\n" +
+		"┠ <code>-cv mp4</code> — Videos to mp4 (no re-encode)  ·  <code>-ca mp3</code> — Audios to mp3\n" +
+		"┠ <code>-ff key</code> — Saved FFmpeg command\n" +
+		"┠ <b>Direct Links :</b>\n" +
+		"┠ <code>-u user -p pass</code> — Login\n" +
+		"╰ <code>-h Referer: https://site.com</code> — Headers</blockquote>"
 }

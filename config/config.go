@@ -179,7 +179,7 @@ func LoadConfig(path string) (*Config, error) {
 		AsDocument:                getEnvBool("AS_DOCUMENT", false),
 		MediaGroup:                getEnvBool("MEDIA_GROUP", false),
 		BotPM:                     getEnvBool("BOT_PM", false),
-		CapFont:                   getEnv("CAP_FONT", "code"),
+		CapFont:                   getEnv("CAP_FONT", ""),
 		LeechFilenamePrefix:       getEnv("LEECH_FILENAME_PREFIX", ""),
 		LeechFilenameSuffix:       getEnv("LEECH_FILENAME_SUFFIX", ""),
 		LeechFilenameCaption:      getEnv("LEECH_FILENAME_CAPTION", ""),
@@ -627,6 +627,8 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"ENABLE_FFMPEG_CMDS":           strconv.FormatBool(GlobalConfig.EnableFFmpegCmds),
+		"CAP_FONT":                     GlobalConfig.CapFont,
 		"REAL_DEBRID_API":              GlobalConfig.RealDebridAPI,
 		"DEBRID_LINK_API":              GlobalConfig.DebridLinkAPI,
 		"SAFE_MODE":                    strconv.FormatBool(GlobalConfig.SafeMode),

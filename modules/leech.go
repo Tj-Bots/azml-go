@@ -1228,6 +1228,10 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	// Custom FFmpeg commands (-ff)
+	if opt.FFmpegKey != "" && !cfg.EnableFFmpegCmds {
+		m.sendDownloadError(ctx, peer, msg, notifyID, "FFmpeg Cmds (-ff) are disabled on this bot.", modeStr, taskStartTime)
+		return
+	}
 	if opt.FFmpegKey != "" && cfg.EnableFFmpegCmds {
 		uTask.SetStatus(types.StatusFFmpeg, "FFmpeg")
 		rawCmd := opt.FFmpegKey
@@ -1369,8 +1373,12 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 		// File Renaming
 		finalName, caption := ext.FormatFilename(origBase, user, curFile)
-		if user != nil && caption != "" {
-			caption = applyCaptionFont(caption, user.CapFont)
+		if caption != "" {
+			font := cfg.CapFont // CAP_FONT from /bs; the user's own font in /us wins
+			if user != nil && user.CapFont != "" {
+				font = user.CapFont
+			}
+			caption = applyCaptionFont(caption, font)
 		}
 		if opt.CustomName != "" && len(filesToUpload) == 1 {
 			finalName = opt.CustomName

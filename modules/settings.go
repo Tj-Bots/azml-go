@@ -1085,7 +1085,9 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 	case "setfont":
 		if len(parts) > 3 {
 			if parts[3] == "none" {
-				u.CapFont = ""
+				u.CapFont = "" // follow the owner's CAP_FONT
+			} else if parts[3] == "regular" {
+				u.CapFont = "regular"
 			} else if _, ok := captionFonts[parts[3]]; ok {
 				u.CapFont = parts[3]
 			}
@@ -1428,7 +1430,14 @@ func capFontName(f string) string {
 	if n, ok := captionFonts[f]; ok {
 		return n
 	}
-	return "Default"
+	if f == "regular" {
+		return "Regular"
+	}
+	// no choice of his own: the owner's CAP_FONT from /bs
+	if n, ok := captionFonts[config.Get().CapFont]; ok {
+		return "Default (" + n + ")"
+	}
+	return "Default (Regular)"
 }
 
 func onOff(b bool) string {
@@ -1461,10 +1470,10 @@ func (m *SettingsModule) buildCapFontMenu(u *types.UserSettings) (string, *teleg
 		"➲ <b>Description :</b> <i>Font of the caption of your leeched files</i>",
 		capFontName(u.CapFont))
 	btn := telegram.NewButtonMaker()
-	for i, f := range append([]string{"none"}, captionFontOrder...) {
-		label := "Default"
-		if f != "none" {
-			label = captionFonts[f]
+	for i, f := range append([]string{"none", "regular"}, captionFontOrder...) {
+		label := capFontName(f)
+		if f == "none" {
+			label = capFontName("")
 		}
 		if (f == "none" && u.CapFont == "") || f == u.CapFont {
 			btn.IButtonStyled("✓ "+label, fmt.Sprintf("userset %d setfont %s", u.UserID, f), "success")

@@ -57,6 +57,8 @@ type BotApp struct {
 	ytdlCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	selectCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	saveCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	vtCbHandler           func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	vtInput               func(uid int64, key, val string) bool
 	statusHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	statusCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	cancelHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -453,6 +455,11 @@ func (b *BotApp) SetAdminHandlers(blacklist, rmBlacklist, users func(ctx context
 	b.usersHandler = users
 }
 
+// SetVTHandlers: the Video Tools (-vt) menu buttons and its text input (Rename / Trim).
+func (b *BotApp) SetVTHandlers(cb func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64), input func(uid int64, key, val string) bool) {
+	b.vtCbHandler, b.vtInput = cb, input
+}
+
 // SetSaveHandler: the Save Message button.
 func (b *BotApp) SetSaveHandler(h func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
 	b.saveCbHandler = h
@@ -597,7 +604,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 				defer cancel()
 				_ = b.sender.DeleteMessage(delCtx, peer, []int{inMsgID})
 			}()
-			if sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
+			if sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil && !strings.HasPrefix(sess.Key, "vt_") {
 				u := b.userMap.GetOrCreate(senderID)
 				b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, u, sess.Key)
 			}
@@ -946,6 +953,10 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 	case strings.HasPrefix(data, "retry "):
 		if b.retryCbHandler != nil {
 			b.retryCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
+		}
+	case strings.HasPrefix(data, "vtool "):
+		if b.vtCbHandler != nil {
+			b.vtCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
 	case data == "save":
 		if b.saveCbHandler != nil {
@@ -1630,6 +1641,12 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 }
 
 func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerClass, u *types.UserSettings, key, val string, promptMsgID int) {
+	if strings.HasPrefix(key, "vt_") { // text for the -vt menu, not /us
+		if b.vtInput != nil {
+			b.vtInput(u.UserID, key, val)
+		}
+		return
+	}
 	val = strings.TrimSpace(val)
 	if val == "" {
 		return

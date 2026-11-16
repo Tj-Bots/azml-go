@@ -56,6 +56,8 @@ type Config struct {
 	TokenInPM                 bool
 	ScreenshotsMode           bool
 	FsubIDs                   string
+	DisableVT                 bool
+	VtCustomCmds              string
 	BotMaxTasks               int
 	UserMaxTasks              int
 	RealDebridAPI             string
@@ -204,6 +206,8 @@ func LoadConfig(path string) (*Config, error) {
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
 		FsubIDs:                   getEnv("FSUB_IDS", ""),
+		DisableVT:                 getEnvBool("DISABLE_VT", false),
+		VtCustomCmds:              getEnv("VT_CUSTOM_CMDS", ""),
 		BotMaxTasks:               getEnvInt("BOT_MAX_TASKS", 0),
 		UserMaxTasks:              getEnvInt("USER_MAX_TASKS", 0),
 		RealDebridAPI:             getEnv("REAL_DEBRID_API", ""),
@@ -494,6 +498,10 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.DebridLinkAPI = val
 	case "REAL_DEBRID_API":
 		GlobalConfig.RealDebridAPI = val
+	case "VT_CUSTOM_CMDS":
+		GlobalConfig.VtCustomCmds = val
+	case "DISABLE_VT":
+		GlobalConfig.DisableVT = val == "true" || val == "1"
 	case "FSUB_IDS":
 		GlobalConfig.FsubIDs = val
 	case "SCREENSHOTS_MODE":
@@ -637,6 +645,8 @@ func GetConfigMap() map[string]string {
 	defer configLock.RUnlock()
 
 	return map[string]string{
+		"DISABLE_VT":                   strconv.FormatBool(GlobalConfig.DisableVT),
+		"VT_CUSTOM_CMDS":               GlobalConfig.VtCustomCmds,
 		"DISABLE_FF_MODE":              strconv.FormatBool(!GlobalConfig.EnableFFmpegCmds),
 		"CAP_FONT":                     GlobalConfig.CapFont,
 		"REAL_DEBRID_API":              GlobalConfig.RealDebridAPI,

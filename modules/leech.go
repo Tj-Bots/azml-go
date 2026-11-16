@@ -325,6 +325,19 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	cfg := config.Get()
 	user := m.userMap.Get(msg.UserID)
 	isPremium := telegram.IsPremium(msg.UserID, m.userMap)
+
+	// -vt: the tools are chosen before the task starts (like the Python bot)
+	var vtSel *VTSelection
+	if opt.VT && !msg.Internal {
+		if cfg.DisableVT {
+			m.sendDownloadError(ctx, peer, msg, notifyID, "Video Tools (-vt) are disabled on this bot.", "#Leech", time.Now())
+			return
+		}
+		if vtSel = m.videoToolsMenu(ctx, peer, msg); vtSel == nil {
+			m.sendDownloadError(ctx, peer, msg, notifyID, "Video Tools closed, task cancelled.", "#Leech", time.Now())
+			return
+		}
+	}
 	// DELETE_LINKS (like the Python bot): the command and the replied link/file are deleted when
 	// the task starts; a replied Telegram file right after the bot read it.
 	var delOnce sync.Once
@@ -1277,6 +1290,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		downloadedPath = convertMedia(downloadedPath, opt.ConvVideo, opt.ConvAudio)
 	}
 
+	if vtSel != nil && !vtSel.empty() {
+		setStep(uTask, "Video Tools (FFmpeg)")
+		var shots int
+		downloadedPath, shots = runVideoTools(downloadedPath, vtSel)
+		if shots > 0 {
+			opt.Screenshots = shots
+		}
+	}
+
 	if opt.IsZip && !opt.IsExtract {
 		uTask.SetStatus(types.StatusArchiving, "7-Zip")
 		// Compression requested (-z / -zip)
@@ -1917,7 +1939,7 @@ func isLeechFlag(tok string) bool {
 		"-d", "-doc", "-asdoc", "-m", "-sd", "-samedir", "-med", "-media", "-asmedia",
 		"-st", "-streams", "-n", "-name", "-p", "-password",
 		"-pssw", "-ss", "-screenshots", "-ud", "-dump", "-ff", "-i", "-s", "-select",
-		"-t", "-thumb", "-sp", "-h", "-headers", "-u", "-user", "-ea", "-cv", "-ca", "-j", "-join", "-pass":
+		"-t", "-thumb", "-sp", "-h", "-headers", "-u", "-user", "-ea", "-cv", "-ca", "-j", "-join", "-pass", "-vt":
 		return true
 	default:
 		return false
@@ -2048,6 +2070,8 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 			}
 		case "-j", "-join":
 			opt.Join = true
+		case "-vt":
+			opt.VT = true
 		default:
 			if strings.HasPrefix(tok, "-p") && len(tok) > 2 {
 				opt.Password = strings.TrimPrefix(tok, "-p")
@@ -2468,6 +2492,7 @@ func leechHelpText() string {
 		"┠ <code>-ss 6</code> — Screenshots album\n" +
 		"┠ <b>Media Tools :</b>\n" +
 		"┠ <code>-st</code> — Every video, audio and subtitle track as its own file\n" +
+		"┠ <code>-vt</code> — Video Tools menu (rename, merge, extract, trim, convert ...)\n" +
 		"┠ <code>-ea</code> — Only the audio (<code>-ea m4a</code> flac opus ogg wav)\n" +
 		"┠ <code>-cv mp4</code> — Videos to mp4 (no re-encode)  ·  <code>-ca mp3</code> — Audios to mp3\n" +
 		"┠ <b>Direct Links :</b>\n" +

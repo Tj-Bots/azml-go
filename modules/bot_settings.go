@@ -46,6 +46,8 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"DISABLE_VT",
+	"VT_CUSTOM_CMDS",
 	"REAL_DEBRID_API",
 	"DEBRID_LINK_API",
 	"SAFE_MODE",

@@ -129,6 +129,7 @@ type LeechOptions struct {
 	IsMirror    bool
 	MirrorHost  string
 	Ytdl        bool     // download the link with yt-dlp
+	VT          bool     // -vt Video Tools menu
 	SameDir     string   // -m <folder name>
 	SplitSize   int64    // -sp
 	ExtractAud  string   // -ea [format]

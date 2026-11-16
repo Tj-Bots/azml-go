@@ -2,6 +2,8 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"DISABLE_VT":                   "Disable Video Tools (-vt) for all users. Default is False. Bool",
+	"VT_CUSTOM_CMDS":               "Extra tools for the Video Tools menu (-vt), one per line as <code>name: ffmpeg args</code> (the args come after <code>-i video</code>), e.g. <code>No Audio: -map 0 -map -0:a -c copy</code>. Str",
 	"DISABLE_FF_MODE":              "Disable FFmpeg Cmds (-ff) for all users. When True the option is hidden from User Settings. Default is False. Bool",
 	"REAL_DEBRID_API":              "real-debrid.com API token: the same for the hosters Real-Debrid supports (used when DEBRID_LINK_API is not set or fails). Str",
 	"DEBRID_LINK_API":              "debrid-link.com API key: links of 360+ hosters (Mega, 1fichier, Rapidgator, Uptobox ...) are downloaded through debrid-link, fast and without the host's limits. Str",

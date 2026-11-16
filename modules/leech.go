@@ -426,8 +426,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if notifyID > 0 && m.statusMod != nil {
 		if !m.statusMod.HasStatusMessage(msg.ChatID) {
 			m.statusMod.SetStatusMessage(msg.ChatID, notifyID, peer)
-			text, btn := m.taskMgr.BuildStatusMessage(1)
-			_ = m.sender.EditMessageWithButtons(ctx, peer, notifyID, text, btn, 3)
+			go m.statusMod.UpdateAllMessages(ctx, true)
 		} else {
 			go m.statusMod.UpdateAllMessages(ctx, true)
 		}
@@ -1369,10 +1368,6 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		} else {
 			log.Printf("[LEECH -t] could not get the thumbnail from %s", opt.ThumbURL)
 		}
-	}
-	if notifyID > 0 {
-		text, btn := m.taskMgr.BuildStatusMessage(1)
-		_ = m.sender.EditMessageWithButtons(ctx, peer, notifyID, text, btn, 3)
 	}
 	if m.statusMod != nil {
 		go m.statusMod.UpdateAllMessages(context.Background(), true)

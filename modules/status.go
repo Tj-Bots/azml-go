@@ -341,7 +341,7 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 		}
 
 		text, btn := m.taskMgr.BuildStatusMessage(page)
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 3)
+		_ = m.editStatusID(ctx, peer, msgID, text, btn)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Status Refreshed!", false)
 
 	case "page", "nex", "pre":
@@ -382,7 +382,7 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 		}
 
 		text, btn := m.taskMgr.BuildStatusMessage(page)
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 3)
+		_ = m.editStatusID(ctx, peer, msgID, text, btn)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	}
 }
@@ -530,7 +530,7 @@ func (m *StatusModule) UpdateAllMessages(ctx context.Context, force bool) {
 						m.mu.RUnlock()
 						if !alreadyTracked && m.taskMgr.Count() > 0 {
 							newText, newBtn := m.taskMgr.BuildStatusMessage(pg)
-							sentID, sErr := m.sender.SendMessageWithButtons(context.Background(), p, newText, 0, newBtn, 3)
+							sentID, sErr := m.sendStatus(context.Background(), p, newText, 0, newBtn)
 							if sErr == nil && sentID > 0 {
 								m.mu.Lock()
 								m.statusReplies[cID] = &StatusReplyInfo{
@@ -606,4 +606,14 @@ func richStatus(text string) string {
 		return "╰ " + telegram.RichButton("Cancel Task", "status cancel "+gid, "danger") + "</blockquote><hr/>\n"
 	})
 	return telegram.ToRichHTML(text)
+}
+
+// editStatusID edits a status message by id (rich when RICH_MESSAGES is on).
+func (m *StatusModule) editStatusID(ctx context.Context, peer tg.InputPeerClass, msgID int, text string, btn *telegram.ButtonMaker) error {
+	if config.Get().RichMessages {
+		if err := m.sender.EditRich(ctx, peer, msgID, richStatus(text), btn); err == nil {
+			return nil
+		}
+	}
+	return m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 3)
 }

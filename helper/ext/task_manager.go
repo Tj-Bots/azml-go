@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -172,16 +173,15 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 	if totalTasks == 0 {
 		mem := GetMemoryStats()
 		uptime := TimeSinceFormatted(BotStartTime)
-		_, _, diskFree, _ := GetDiskUsage("/")
 		noTaskMsg := fmt.Sprintf("<i>%s</i>\n\n"+
 			"⌬ <b><i>%s</i></b>\n"+
 			"<blockquote>╭ <b>Active Tasks:</b> 0\n"+
 			"┠ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n"+
 			"┠ <b>Uptime:</b> %s\n"+
-			"╰ <b>Disk Free:</b> %s</blockquote>",
+			"╰ <b>Free:</b> %s</blockquote>",
 			telegram.ToSmallCaps("No Active Tasks Running!"),
 			"Bot Stats",
-			mem.OSPercent, GetCPUPercent(), uptime, GetReadableFileSize(int64(diskFree)))
+			mem.OSPercent, GetCPUPercent(), uptime, diskFreeText())
 		btn := telegram.NewButtonMaker()
 		btn.IButtonStyled("⟳ "+telegram.ToSmallCaps("Refresh"), "status ref 1", "primary")
 		btn.Row()
@@ -279,6 +279,7 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 	sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>Active Tasks:</b> %d\n", totalTasks))
 	sb.WriteString(fmt.Sprintf("┠ <b>Ram:</b> %.1f%% | <b>Cpu:</b> %.1f%%\n", mem.OSPercent, GetCPUPercent()))
 	sb.WriteString(fmt.Sprintf("┠ <b>Uptime:</b> %s\n", uptime))
+	sb.WriteString(fmt.Sprintf("┠ <b>Free:</b> %s\n", diskFreeText()))
 	sb.WriteString(fmt.Sprintf("╰ <b>DL:</b> %s/s | <b>Ul:</b> %s/s</blockquote>", GetReadableFileSize(int64(totalDL)), GetReadableFileSize(int64(totalUL))))
 
 	btn := telegram.NewButtonMaker()
@@ -816,4 +817,20 @@ func StartFromQueued() {
 			close(ch)
 		}
 	}
+}
+
+// diskFreeText: free space of the downloads disk, "12.3GB [45.0%]".
+func diskFreeText() string {
+	path := "/"
+	if c := config.Get(); c.DownloadDir != "" {
+		if _, err := os.Stat(c.DownloadDir); err == nil {
+			path = c.DownloadDir
+		}
+	}
+	total, _, free, _ := GetDiskUsage(path)
+	pct := 0.0
+	if total > 0 {
+		pct = float64(free) / float64(total) * 100
+	}
+	return fmt.Sprintf("%s [%.1f%%]", GetReadableFileSize(int64(free)), pct)
 }

@@ -436,7 +436,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if opt.IsMirror {
 			modeStr = "#Mirror | #YtDlp"
 		}
-		uTask.SetEngine("yt-dlp")
+		uTask.SetEngine(ext.EngineName("ytdlp"))
 		if opt.CustomName == "" {
 			uTask.SetName("yt-dlp Media")
 		}
@@ -549,7 +549,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 							fwdMsgID, fwdErr := telegram.ForwardToChannelWithFloodWait(ctx, m.rawAPI, peer, dumpPeer, targetMsgID)
 
 							if fwdErr == nil && fwdMsgID > 0 {
-								uTask.SetStatus(types.StatusDownloading, "Multi-Bot MTProto")
+								uTask.SetStatus(types.StatusDownloading, ext.EngineName("telegram")+" (Multi-Bot)")
 								multiDL := downloader.NewMultiBotDownloader(m.sessPool, cfg.WorkerBotTokens, cfg.TelegramAPI, cfg.TelegramHash)
 								dlErr = multiDL.DownloadToFile(ctx, effectiveDumpChatID, int64(fwdMsgID), doc.Size, destPath, func(curr, total int64, speed float64, eta string) {
 									uTask.SetProgress(curr, total, speed, eta)
@@ -575,7 +575,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					// the premium user session is only for uploads; the bot downloads by itself
 					// Fallback to single-client chunk downloader if multi-bot was not active or failed
 					if !dlSuccess {
-						uTask.SetStatus(types.StatusDownloading, "Telegram MTProto")
+						uTask.SetStatus(types.StatusDownloading, ext.EngineName("telegram"))
 						// the bot's own file location: only the bot account can use it
 						downloadClient := m.rawAPI
 						chunkDL := downloader.NewTelegramChunkDownloader(downloadClient)
@@ -638,7 +638,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					destPath := filepath.Join(taskDir, fileName)
 					_ = os.MkdirAll(filepath.Dir(destPath), 0777)
 					uTask.SetName(fileName)
-					uTask.SetStatus(types.StatusDownloading, "Telegram Photo")
+					uTask.SetStatus(types.StatusDownloading, ext.EngineName("telegram"))
 
 					thumbSize := "m"
 					if len(photo.Sizes) > 0 {
@@ -679,7 +679,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if downloadedPath != "" {
 		// Document downloaded directly via MTProto
 	} else if opt.Ytdl {
-		uTask.SetStatus(types.StatusDownloading, "yt-dlp")
+		uTask.SetStatus(types.StatusDownloading, ext.EngineName("ytdlp"))
 		yt := downloader.NewYtDlpDownloader()
 		var file string
 		file, dlErr = yt.Download(ctx, link, taskDir, opt.YtdlFormat, func(curr, total int64, speed float64, eta string) {
@@ -752,7 +752,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				}
 			}
 
-			uTask.SetStatus(types.StatusDownloading, "Google Drive")
+			uTask.SetStatus(types.StatusDownloading, ext.EngineName("gdrive"))
 			_ = m.sender.EditMessage(ctx, peer, notifyID, fmt.Sprintf("<i>Downloading %d Google Drive files...</i>", len(filesToDownload)), nil)
 			for i, f := range filesToDownload {
 				if f.IsDir {
@@ -777,7 +777,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				fName = opt.CustomName
 			}
 			uTask.SetName(fName)
-			uTask.SetStatus(types.StatusDownloading, "Google Drive")
+			uTask.SetStatus(types.StatusDownloading, ext.EngineName("gdrive"))
 			dlErr = gdrive.DownloadFile(ctx, fileID, taskDir, fName, func(curr, total int64, speed float64) {
 				rem := total - curr
 				eta := "-"
@@ -789,7 +789,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			downloadedPath = filepath.Join(taskDir, fName)
 		}
 	} else if ext.IsMegaLink(link) {
-		uTask.SetStatus(types.StatusDownloading, "Mega")
+		uTask.SetStatus(types.StatusDownloading, ext.EngineName("mega"))
 		var only map[string]bool
 		if opt.Select {
 			// real file list of the folder, chosen on the web page (BASE_URL)
@@ -860,6 +860,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("Torrent Error: %v", err), modeStr, taskStartTime)
 				return
 			}
+			uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
 			task := downloader.NewAria2DownloadTask(gid, opt.CustomName, taskDir, notifyID, msg.ChatID, msg.UserID)
 			downloadedPath, dlErr = task.PollUntilComplete(ctx, func(cur, total int64) {
 				uTask.SetProgress(cur, total, task.Speed(), task.ETA())
@@ -877,6 +878,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				gid, tErr := aria.AddTorrent(torrentDest, taskDir)
 				if tErr == nil {
 					_ = os.Remove(torrentDest)
+					uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
 					task := downloader.NewAria2DownloadTask(gid, opt.CustomName, taskDir, notifyID, msg.ChatID, msg.UserID)
 					downloadedPath, dlErr = task.PollUntilComplete(ctx, func(cur, total int64) {
 						uTask.SetProgress(cur, total, task.Speed(), task.ETA())
@@ -894,6 +896,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 						m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("Download Error: %v", aErr), modeStr, taskStartTime)
 						return
 					}
+					uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
 					task := downloader.NewAria2DownloadTask(gid, opt.CustomName, taskDir, notifyID, msg.ChatID, msg.UserID)
 					downloadedPath, dlErr = task.PollUntilComplete(ctx, func(cur, total int64) {
 						uTask.SetProgress(cur, total, task.Speed(), task.ETA())
@@ -912,6 +915,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("Download Error: %v", aErr), modeStr, taskStartTime)
 					return
 				}
+				uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
 				task := downloader.NewAria2DownloadTask(gid, opt.CustomName, taskDir, notifyID, msg.ChatID, msg.UserID)
 				downloadedPath, dlErr = task.PollUntilComplete(ctx, func(cur, total int64) {
 					uTask.SetProgress(cur, total, task.Speed(), task.ETA())
@@ -968,7 +972,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					if opt.CustomName != "" {
 						dest = filepath.Join(taskDir, opt.CustomName)
 					}
-					uTask.SetStatus(types.StatusDownloading, "Direct HTTP")
+					uTask.SetStatus(types.StatusDownloading, ext.EngineName("direct"))
 					dlErr = directDl.Download(ctx, link, dest, func(cur, total int64, speed float64, eta string) {
 						uTask.SetProgress(cur, total, speed, eta)
 					})
@@ -978,6 +982,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					return
 				}
 			} else {
+				uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
 				task := downloader.NewAria2DownloadTask(gid, opt.CustomName, taskDir, notifyID, msg.ChatID, msg.UserID)
 				downloadedPath, dlErr = task.PollUntilComplete(ctx, func(cur, total int64) {
 					uTask.SetProgress(cur, total, task.Speed(), task.ETA())
@@ -997,7 +1002,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if opt.CustomName != "" {
 			dest = filepath.Join(taskDir, opt.CustomName)
 		}
-		uTask.SetStatus(types.StatusDownloading, "Direct HTTP")
+		uTask.SetStatus(types.StatusDownloading, ext.EngineName("direct"))
 		dlErr = directDl.Download(ctx, link, dest, func(cur, total int64, speed float64, eta string) {
 			uTask.SetProgress(cur, total, speed, eta)
 		})
@@ -1039,6 +1044,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		gid, err := aria.AddTorrent(torrentFile, taskDir)
 		if err == nil {
 			_ = os.Remove(torrentFile)
+			uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
 			task := downloader.NewAria2DownloadTask(gid, opt.CustomName, taskDir, notifyID, msg.ChatID, msg.UserID)
 			downloadedPath, dlErr = task.PollUntilComplete(ctx, func(cur, total int64) {
 				uTask.SetProgress(cur, total, task.Speed(), task.ETA())
@@ -1380,7 +1386,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 		totalSize += itemSize
 
-		uTask.SetStatus(types.StatusUploading, "MTProto")
+		uTask.SetStatus(types.StatusUploading, ext.EngineName("telegram"))
 		uTask.SetSize(itemSize)
 		uTask.SetProgress(0, itemSize, 0, "-")
 
@@ -1442,7 +1448,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if fileButtons != nil {
 			fileButtons.Row()
 		}
-		uTask.SetStatus(types.StatusUploading, "MTProto")
+		uTask.SetStatus(types.StatusUploading, ext.EngineName("telegram"))
 		var groupOpt, lastUpOpt uploader.UploadOptions
 		for idx, part := range splitParts {
 			partCaption := caption

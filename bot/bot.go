@@ -1597,7 +1597,8 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 							_ = ext.DB.SaveUser(u)
 
 							// Always send immediate confirmation to user in current chat
-							if id, _ := b.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved!</b> It will be attached to all your future leeched files.", m.ID, nil); id > 0 {
+							_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // the photo itself goes at once, like the Python bot
+							if id, _ := b.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved!</b> It will be attached to all your future leeched files.", 0, nil); id > 0 {
 								b.sender.AutoDeleteMessage(peer, id, 2) // a short notice
 							}
 
@@ -1673,7 +1674,8 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 						_ = ext.DB.SaveUser(u)
 
 						// Always send immediate confirmation to user in current chat
-						if id, _ := b.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved!</b> It will be attached to all your future leeched files.", m.ID, nil); id > 0 {
+						_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // the photo itself goes at once, like the Python bot
+						if id, _ := b.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved!</b> It will be attached to all your future leeched files.", 0, nil); id > 0 {
 							b.sender.AutoDeleteMessage(peer, id, 2) // a short notice
 						}
 

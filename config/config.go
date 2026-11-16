@@ -171,7 +171,7 @@ func LoadConfig(path string) (*Config, error) {
 		LeechFilenameRemnameRegex: getEnv("LEECH_FILENAME_REMNAME_REGEX", ""),
 		LeechLogID:                getEnvInt64("LEECH_LOG_ID", 0),
 		LinksLogID:                getEnvInt64("LINKS_LOG_ID", 0),
-		TorrentTimeout:            getEnvInt("TORRENT_TIMEOUT", 0),
+		TorrentTimeout:            getEnvInt("TORRENT_TIMEOUT", 600),
 		Aria2Port:                 getEnvInt("ARIA2_PORT", 6810),
 		BaseURL:                   getEnv("BASE_URL", ""),
 		BaseURLPort:               getEnvInt("PORT", getEnvInt("BASE_URL_PORT", 23434)),

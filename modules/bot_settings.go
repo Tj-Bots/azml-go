@@ -46,6 +46,7 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 }
 
 var configVarKeys = []string{
+	"TORRENT_TIMEOUT",
 	"USER_SESSION_STRING",
 	"DUMP_CHAT_ID",
 	"LEECH_LOG_ID",

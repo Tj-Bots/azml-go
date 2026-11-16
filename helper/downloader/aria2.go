@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"archive/tar"
+	"azml-go/config"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -593,6 +594,8 @@ func (t *Aria2DownloadTask) Cancel() error {
 func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress func(cur, total int64)) (string, error) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+	lastActivity := time.Now()
+	var lastBytes int64 = -1
 
 	for {
 		select {
@@ -608,6 +611,18 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 			tot, _ := strconv.ParseInt(res.TotalLength, 10, 64)
 			cur, _ := strconv.ParseInt(res.CompletedLength, 10, 64)
 			spd, _ := strconv.ParseFloat(res.DownloadSpeed, 64)
+
+			// TORRENT_TIMEOUT: a dead torrent (nothing downloaded for that long) is stopped
+			if cur != lastBytes || res.Status == "paused" {
+				lastBytes = cur
+				lastActivity = time.Now()
+			}
+			isTorrent := res.Bittorrent != nil || (len(res.Files) > 0 && strings.HasPrefix(res.Files[0].Path, "[METADATA]"))
+			if limit := config.Get().TorrentTimeout; isTorrent && limit > 0 && res.Status == "active" &&
+				time.Since(lastActivity) > time.Duration(limit)*time.Second {
+				_ = t.Cancel()
+				return "", fmt.Errorf("Dead Torrent! Nothing downloaded for %s (TORRENT_TIMEOUT)", (time.Duration(limit) * time.Second).String())
+			}
 
 			t.mu.Lock()
 			t.size = tot

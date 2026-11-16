@@ -846,7 +846,7 @@ func (m *MessageSender) SendPhotoFromURL(ctx context.Context, peer tg.InputPeerC
 }
 
 // SendLocalPhoto uploads a local photo file and sends it to Telegram as a native photo
-func (m *MessageSender) SendLocalPhoto(ctx context.Context, peer tg.InputPeerClass, filePath, caption string, replyToID int) (int, error) {
+func (m *MessageSender) SendLocalPhoto(ctx context.Context, peer tg.InputPeerClass, filePath, caption string, replyToID int, markup ...tg.ReplyMarkupClass) (int, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return 0, err
@@ -872,6 +872,9 @@ func (m *MessageSender) SendLocalPhoto(ctx context.Context, peer tg.InputPeerCla
 		mediaReq.ReplyTo = &tg.InputReplyToMessage{
 			ReplyToMsgID: replyToID,
 		}
+	}
+	if len(markup) > 0 && markup[0] != nil {
+		mediaReq.ReplyMarkup = markup[0]
 	}
 
 	updates, err := m.rawClient.MessagesSendMedia(ctx, mediaReq)

@@ -97,7 +97,9 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 								u.ThumbData = ext.ThumbBytes(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
-								_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied photo!</b> It will be attached to all your future leeched files.", msg.MessageID, nil)
+								if id, _ := m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied photo!</b> It will be attached to all your future leeched files.", msg.MessageID, nil); id > 0 {
+									m.sender.AutoDeleteMessage(peer, id, 2)
+								}
 								return
 							}
 						}
@@ -115,7 +117,9 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 								u.ThumbData = ext.ThumbBytes(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
-								_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied document!</b> It will be attached to all your future leeched files.", msg.MessageID, nil)
+								if id, _ := m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied document!</b> It will be attached to all your future leeched files.", msg.MessageID, nil); id > 0 {
+									m.sender.AutoDeleteMessage(peer, id, 2)
+								}
 								return
 							}
 						}
@@ -862,7 +866,9 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 			_ = m.sender.AnswerCallback(ctx, queryID, "Thumbnail file not found on disk!", true)
 			return
 		}
-		_, err := m.sender.SendLocalPhoto(ctx, peer, u.CustomThumb, "⌬ <b>Your Custom Thumbnail</b>", 0)
+		closeBtn := telegram.NewButtonMaker()
+		closeBtn.IButtonStyled("Close", fmt.Sprintf("start_close %d", fromUserID), "danger") // deletes only this photo
+		_, err := m.sender.SendLocalPhoto(ctx, peer, u.CustomThumb, "⌬ <b>Your Custom Thumbnail</b>", 0, closeBtn.BuildMenu(1))
 		if err != nil {
 			_ = m.sender.AnswerCallback(ctx, queryID, fmt.Sprintf("Error sending thumbnail: %v", err), true)
 		} else {

@@ -1647,6 +1647,40 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 	case "ycookies":
 		// cookies come as a file (handled with the incoming documents)
 		return
+	case "megalogin":
+		parts := strings.Fields(val)
+		if len(parts) != 2 {
+			ext.SetSettingNote(u.UserID, "× <i>Send the email and the password separated by a space.</i>")
+			break
+		}
+		cctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		err := downloader.MegaLoginCheck(cctx, parts[0], parts[1])
+		cancel()
+		if err != nil {
+			ext.SetSettingNote(u.UserID, "× <i>"+telegram.EscapeHTML(err.Error())+"</i>")
+			break
+		}
+		u.MegaEmail, u.MegaPass = parts[0], parts[1]
+		ext.SetSettingNote(u.UserID, "✓ <i>Logged in to MEGA.</i>")
+		fieldName, val = "Mega Login", parts[0]
+	case "ffcmds":
+		name, args, ok := strings.Cut(val, ":")
+		name = strings.TrimSpace(name)
+		if !ok || name == "" || strings.ContainsAny(name, " \t") {
+			ext.SetSettingNote(u.UserID, "× <i>Format:</i> <code>name: ffmpeg args</code>")
+			break
+		}
+		cmds := map[string]string{}
+		for k, v := range u.FFmpegCommands {
+			cmds[k] = v
+		}
+		if args = strings.TrimSpace(args); args == "" {
+			delete(cmds, name)
+		} else {
+			cmds[name] = args
+		}
+		u.FFmpegCommands = cmds
+		fieldName = "FFmpeg Cmds"
 	case "lexcluded":
 		if strings.EqualFold(val, "clear") || strings.EqualFold(val, "none") {
 			u.ExcludedExts = ""

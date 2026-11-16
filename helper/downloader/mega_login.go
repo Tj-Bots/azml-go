@@ -20,12 +20,7 @@ import (
 // MEGA account login (MEGA_EMAIL / MEGA_PASSWORD): with a session id the transfer quota is the
 // account's, not the server IP's (on Heroku the IP is shared with many apps).
 
-var (
-	megaSessMu   sync.Mutex
-	megaSID      string
-	megaSIDFor   string // email:password the sid belongs to
-	megaLoginErr error
-)
+var megaSessMu sync.Mutex
 
 func megaB64Enc(b []byte) string {
 	return strings.TrimRight(base64.URLEncoding.EncodeToString(b), "=")
@@ -173,32 +168,55 @@ func megaLogin(ctx context.Context, email, password string) (string, error) {
 	return megaB64Enc(m[:43]), nil
 }
 
-// megaSession: the logged-in session id ("" without MEGA_EMAIL/MEGA_PASSWORD or on failure).
+type megaCredsKey struct{}
+
+// WithMegaLogin makes downloads in ctx use this account (the user's Mega Login from /us).
+func WithMegaLogin(ctx context.Context, email, password string) context.Context {
+	if email == "" || password == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, megaCredsKey{}, [2]string{email, password})
+}
+
+var megaSessions = map[string]string{} // email:password -> sid ("" = login failed)
+
+// megaSession: the logged-in session id for the user's or the bot's account
+// ("" without an account or when the login failed).
 func megaSession(ctx context.Context) string {
 	cfg := config.Get()
-	if cfg.MegaEmail == "" || cfg.MegaPassword == "" {
+	email, pass := cfg.MegaEmail, cfg.MegaPassword
+	if c, ok := ctx.Value(megaCredsKey{}).([2]string); ok {
+		email, pass = c[0], c[1]
+	}
+	if email == "" || pass == "" {
 		return ""
 	}
-	key := cfg.MegaEmail + ":" + cfg.MegaPassword
+	key := email + ":" + pass
 	megaSessMu.Lock()
 	defer megaSessMu.Unlock()
-	if megaSIDFor == key && (megaSID != "" || megaLoginErr != nil) {
-		return megaSID
+	if sid, ok := megaSessions[key]; ok {
+		return sid
 	}
-	sid, err := megaLogin(ctx, cfg.MegaEmail, cfg.MegaPassword)
-	megaSIDFor, megaSID, megaLoginErr = key, sid, err
+	sid, err := megaLogin(ctx, email, pass)
+	megaSessions[key] = sid
 	if err != nil {
 		log.Printf("[MEGA] %v, downloading without an account", err)
 		return ""
 	}
-	log.Printf("[MEGA] logged in as %s", cfg.MegaEmail)
+	log.Printf("[MEGA] logged in as %s", email)
 	return sid
+}
+
+// MegaLoginCheck tries the account (for /us), returns the error.
+func MegaLoginCheck(ctx context.Context, email, password string) error {
+	_, err := megaLogin(ctx, email, password)
+	return err
 }
 
 // megaResetSession forgets the session (expired), the next call logs in again.
 func megaResetSession() {
 	megaSessMu.Lock()
-	megaSID, megaSIDFor, megaLoginErr = "", "", nil
+	megaSessions = map[string]string{}
 	megaSessMu.Unlock()
 }
 

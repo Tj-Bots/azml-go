@@ -9,6 +9,8 @@ import (
 )
 
 type UserSettings struct {
+	MegaEmail      string            `json:"mega_email,omitempty" bson:"mega_email,omitempty"`
+	MegaPass       string            `json:"mega_pass,omitempty" bson:"mega_pass,omitempty"`
 	MediaInfoSet   bool              `json:"mediainfo_set,omitempty" bson:"mediainfo_set,omitempty"` // the user chose in /us (else SHOW_MEDIAINFO)
 	YtOpt          string            `json:"yt_opt,omitempty" bson:"yt_opt,omitempty"`               // extra yt-dlp options
 	YtCookies      string            `json:"yt_cookies,omitempty" bson:"yt_cookies,omitempty"`       // the user's cookies.txt

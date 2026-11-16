@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1123,6 +1124,40 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
+	case "megalogin", "ffcmds":
+		text, btn := m.buildExtraMenu(u, action, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "edit_megalogin", "edit_ffcmds":
+		key := strings.TrimPrefix(action, "edit_")
+		ext.SetPendingSettingSession(targetUID, key, 0, msgID, 60*time.Second)
+		prompt := "➲ <i>Send your MEGA email and password separated by a space within 60 seconds:</i>\n<code>email@example.com password</code>\n<i>The message is deleted right away.</i>"
+		if key == "ffcmds" {
+			prompt = "➲ <i>Send a command as</i> <code>name: ffmpeg args</code> <i>within 60 seconds, e.g.</i>\n<code>tomkv: -map 0 -c copy</code>\n<i>Use it with</i> <code>-ff name</code>. <i>Send</i> <code>name:</code> <i>alone to delete one.</i>"
+		}
+		text, _ := m.buildExtraMenu(u, key, "")
+		btn := telegram.NewButtonMaker()
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d %s", u.UserID, key))
+		btn.Row()
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d universal", u.UserID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n"+prompt, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "del_megalogin", "del_ffcmds":
+		key := strings.TrimPrefix(action, "del_")
+		if key == "megalogin" {
+			u.MegaEmail, u.MegaPass = "", ""
+		} else {
+			u.FFmpegCommands = nil
+		}
+		_ = ext.DB.SaveUser(u)
+		text, btn := m.buildExtraMenu(u, key, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Deleted", false)
+
 	case "ytopt", "ycookies":
 		text, btn := m.buildYtdlSettingMenu(u, action, "")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
@@ -1292,6 +1327,8 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 		return
 	}
 	switch key {
+	case "megalogin", "ffcmds":
+		text, btn = m.buildExtraMenu(u, key, ext.TakeSettingNote(u.UserID))
 	case "ytopt", "ycookies":
 		text, btn = m.buildYtdlSettingMenu(u, key, "")
 	case "lexcluded":
@@ -1631,6 +1668,19 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 		btn.IButton("YT-DLP Cookies", fmt.Sprintf("userset %d ycookies", u.UserID))
 	}
 	btn.Row()
+	if u.MegaEmail != "" {
+		btn.IButtonStyled("✓ Mega Login", fmt.Sprintf("userset %d megalogin", u.UserID), "success")
+	} else {
+		btn.IButton("Mega Login", fmt.Sprintf("userset %d megalogin", u.UserID))
+	}
+	if config.Get().EnableFFmpegCmds {
+		if len(u.FFmpegCommands) > 0 {
+			btn.IButtonStyled("✓ FFmpeg Cmds", fmt.Sprintf("userset %d ffcmds", u.UserID), "success")
+		} else {
+			btn.IButton("FFmpeg Cmds", fmt.Sprintf("userset %d ffcmds", u.UserID))
+		}
+	}
+	btn.Row()
 	if u.MediaInfoOn(config.Get().ShowMediaInfo) {
 		btn.IButtonStyled("✓ MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID), "success")
 	} else {
@@ -1677,6 +1727,53 @@ func (m *SettingsModule) buildYtdlSettingMenu(u *types.UserSettings, key, note s
 		btn.IButton(map[bool]string{true: "Change Options", false: "Set Options"}[u.YtOpt != ""], fmt.Sprintf("userset %d edit_ytopt", u.UserID))
 		if u.YtOpt != "" {
 			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ytopt", u.UserID))
+		}
+	}
+	if note != "" {
+		text += "\n\n" + note
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d universal", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+// buildExtraMenu: Mega Login and FFmpeg Cmds pages (Universal Settings).
+func (m *SettingsModule) buildExtraMenu(u *types.UserSettings, key, note string) (string, *telegram.ButtonMaker) {
+	btn := telegram.NewButtonMaker()
+	var text string
+	if key == "megalogin" {
+		val := "Not Exists"
+		if u.MegaEmail != "" {
+			val = "<code>" + telegram.EscapeHTML(u.MegaEmail) + "</code>"
+		}
+		text = "㊂ <b><u>Mega Login :</u></b>\n\n" +
+			"<blockquote>╭ <b>Account :</b> " + val + "\n" +
+			"╰ <b>Description :</b> <i>Your MEGA account for your Mega downloads: the quota is your account's, not the server's (Pro accounts are much bigger). Accounts with 2FA are not supported.</i></blockquote>"
+		btn.IButton(map[bool]string{true: "Change Login", false: "Set Login"}[u.MegaEmail != ""], fmt.Sprintf("userset %d edit_megalogin", u.UserID))
+		if u.MegaEmail != "" {
+			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_megalogin", u.UserID))
+		}
+	} else {
+		var lines []string
+		names := make([]string, 0, len(u.FFmpegCommands))
+		for n := range u.FFmpegCommands {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, n := range names {
+			lines = append(lines, fmt.Sprintf("┠ <code>%s</code>: <code>%s</code>", telegram.EscapeHTML(n), telegram.EscapeHTML(u.FFmpegCommands[n])))
+		}
+		list := "┠ <i>None</i>"
+		if len(lines) > 0 {
+			list = strings.Join(lines, "\n")
+		}
+		text = "㊂ <b><u>FFmpeg Cmds :</u></b>\n\n<blockquote>╭ <b>Saved :</b>\n" + list + "\n" +
+			"╰ <b>Use :</b> <code>/l link -ff name</code></blockquote>"
+		btn.IButton("Add Command", fmt.Sprintf("userset %d edit_ffcmds", u.UserID))
+		if len(names) > 0 {
+			btn.IButton("↻ Delete All", fmt.Sprintf("userset %d del_ffcmds", u.UserID))
 		}
 	}
 	if note != "" {

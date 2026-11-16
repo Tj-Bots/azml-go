@@ -354,7 +354,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 	// Debrid (DEBRID_LINK_API / REAL_DEBRID_API) like the Python bot; Mega only without a MEGA account
 	if ext.IsURL(link) && !opt.Ytdl && (cfg.DebridLinkAPI != "" || cfg.RealDebridAPI != "") &&
-		(!ext.IsMegaLink(link) || cfg.MegaEmail == "") {
+		(!ext.IsMegaLink(link) || (cfg.MegaEmail == "" && (user == nil || user.MegaEmail == ""))) {
 		if d, err := ext.DebridLink(ctx, link); err == nil && d != "" {
 			log.Printf("[LEECH] Debrid link for %s", link)
 			link = d
@@ -821,7 +821,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		var only map[string]bool
 		if opt.Select {
 			// real file list of the folder, chosen on the web page (BASE_URL)
-			nodes, lErr := downloader.MegaList(ctx, link)
+			listCtx := ctx
+			if user != nil {
+				listCtx = downloader.WithMegaLogin(ctx, user.MegaEmail, user.MegaPass)
+			}
+			nodes, lErr := downloader.MegaList(listCtx, link)
 			if lErr != nil {
 				m.sendDownloadError(ctx, peer, msg, notifyID, lErr.Error(), modeStr, taskStartTime)
 				return
@@ -861,7 +865,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				ClearMegaSelectCache(uidStr)
 			}
 		}
-		downloadedPath, dlErr = downloader.MegaDownloadLink(ctx, link, taskDir, only, func(cur, total int64, speed float64, eta string) {
+		megaCtx := ctx
+		if user != nil {
+			megaCtx = downloader.WithMegaLogin(ctx, user.MegaEmail, user.MegaPass) // /us Mega Login first
+		}
+		downloadedPath, dlErr = downloader.MegaDownloadLink(megaCtx, link, taskDir, only, func(cur, total int64, speed float64, eta string) {
 			if speed > maxDLSpeed {
 				maxDLSpeed = speed
 			}

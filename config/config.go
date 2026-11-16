@@ -185,7 +185,7 @@ func LoadConfig(path string) (*Config, error) {
 		ShortenerEnabled:          getEnvBool("SHORTENER_ENABLED", true),
 		TokenInPM:                 getEnvBool("TOKEN_IN_PM", true),
 		ScreenshotsMode:           getEnvBool("SCREENSHOTS_MODE", false),
-		DisableTorrents:           getEnvBool("DISABLE_TORRENTS", false),
+		DisableTorrents:           getEnvBool("DISABLE_TORRENTS", true),
 		ShowMediaInfo:             getEnvBool("SHOW_MEDIAINFO", false),
 		SaveMsg:                   getEnvBool("SAVE_MSG", false),
 		SourceLink:                getEnvBool("SOURCE_LINK", false),

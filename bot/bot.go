@@ -1539,7 +1539,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 			}
 
 			// 1C. Torrent file document
-			if strings.HasSuffix(lowerName, ".torrent") {
+			if strings.HasSuffix(lowerName, ".torrent") && !config.Get().DisableTorrents {
 				cfg := config.Get()
 				_ = os.MkdirAll(cfg.DownloadDir, 0755)
 				torrentPath := filepath.Join(cfg.DownloadDir, fmt.Sprintf("%d_%s.torrent", senderID, ext.RandomHex(4)))

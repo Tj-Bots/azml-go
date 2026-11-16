@@ -346,7 +346,14 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 
 func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMaker) {
 	// like the Python bot: sorted, 10 per page, 2 per row
-	keys := append([]string(nil), configVarKeys...)
+	var keys []string
+	for _, k := range configVarKeys {
+		// with DISABLE_TORRENTS the torrent vars are hidden
+		if config.Get().DisableTorrents && (k == "TORRENT_TIMEOUT" || k == "TORRENT_LIMIT") {
+			continue
+		}
+		keys = append(keys, k)
+	}
 	sort.Strings(keys)
 	limit := 10
 	totalPages := (len(keys) + limit - 1) / limit

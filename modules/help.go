@@ -31,7 +31,11 @@ func NewHelpModule(sender *telegram.MessageSender, userMap *types.SafeUserMap, s
 }
 
 func (m *HelpModule) getStartText() string {
-	return "<i>This bot downloads and leeches direct links, torrents, and Telegram files straight back to Telegram.</i>\n\n" +
+	what := "direct links, torrents, and Telegram files"
+	if config.Get().DisableTorrents {
+		what = "direct links, Mega, and Telegram files"
+	}
+	return "<i>This bot downloads and leeches " + what + " straight back to Telegram.</i>\n\n" +
 		"<i>Type /help to see the available commands.</i>"
 }
 
@@ -48,7 +52,7 @@ func (m *HelpModule) getHelpGuideText() string {
 	sfx := cfg.CmdSuffix
 	return fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
 		"<blockquote>╭ <b>Leech & Mirror:</b>\n"+
-		"┠ <code>/leech%s [link]</code> — Direct, Magnet, Torrent, Mega, TG media\n"+
+		"┠ <code>/leech%s [link]</code> — "+leechSources()+"\n"+
 		"┠ <code>/zipleech%s [link]</code> — Zip contents before uploading\n"+
 		"┠ <code>/unzipleech%s [link]</code> — Extract zip/rar/7z archives\n"+
 		"┠ <code>/mirror%s [link]</code> — Upload to GoFile, VikingFile, PixelDrain, BuzzHeavier, DevUploads or StreamTape (<code>-up gofile</code>)\n"+
@@ -256,4 +260,11 @@ func (m *HelpModule) HandleRestart(ctx context.Context, peer tg.InputPeerClass, 
 	go func() {
 		_ = ext.UpdateAndRestart(context.Background(), onStatus, recordRestartMsg)
 	}()
+}
+
+func leechSources() string {
+	if config.Get().DisableTorrents {
+		return "Direct, Mega, Google Drive, TG media"
+	}
+	return "Direct, Magnet, Torrent, Mega, TG media"
 }

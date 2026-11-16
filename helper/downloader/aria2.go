@@ -255,7 +255,32 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 		"http://tracker.opentrackr.org:1337/announce," +
 		"http://tracker.openbittorrent.com:80/announce"
 
-	cmd := exec.Command(binName,
+	btArgs := []string{
+		"--bt-max-peers=64",
+		"--bt-request-peer-speed-limit=0",
+		"--bt-require-crypto=true",
+		"--bt-min-crypto-level=arc4",
+		"--enable-dht=true",
+		fmt.Sprintf("--dht-listen-port=%d", port+80),
+		"--bt-enable-lpd=true",
+		"--follow-torrent=mem",
+		"--bt-tracker=" + defaultTrackers,
+		"--peer-id-prefix=-qB4520-",
+		"--peer-agent=qBittorrent/4.5.2",
+	}
+	if config.Get().DisableTorrents {
+		// no BitTorrent at all: no DHT, no peer exchange, no local discovery, .torrent links stay files
+		btArgs = []string{
+			"--enable-dht=false",
+			"--enable-dht6=false",
+			"--enable-peer-exchange=false",
+			"--bt-enable-lpd=false",
+			"--follow-torrent=false",
+			"--follow-metalink=false",
+		}
+		log.Printf("[Aria2c] DISABLE_TORRENTS: BitTorrent is off")
+	}
+	args := []string{
 		"--enable-rpc",
 		"--rpc-listen-all=true",
 		fmt.Sprintf("--rpc-listen-port=%d", port),
@@ -268,24 +293,14 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 		"--auto-file-renaming=true",
 		"--summary-interval=1",
 		"--disk-cache=32M",
-		"--bt-max-peers=64",
 		"--max-upload-limit=1K",
-		"--bt-request-peer-speed-limit=0",
 		"--seed-time=0",
 		"--seed-ratio=0.0",
 		"--check-certificate=false",
-		"--bt-require-crypto=true",
-		"--bt-min-crypto-level=arc4",
-		"--enable-dht=true",
-		fmt.Sprintf("--dht-listen-port=%d", port+80),
-		"--bt-enable-lpd=true",
-		"--follow-torrent=mem",
-		"--bt-tracker="+defaultTrackers,
-		"--peer-id-prefix=-qB4520-",
-		"--peer-agent=qBittorrent/4.5.2",
 		"--content-disposition-default-utf8=true",
 		"--daemon=true",
-	)
+	}
+	cmd := exec.Command(binName, append(args, btArgs...)...)
 
 	if err := cmd.Run(); err != nil {
 		log.Printf("[Aria2c] Failed to start daemon (%s): %v", binName, err)

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"azml-go/bot"
 	"azml-go/config"
@@ -118,6 +119,10 @@ func main() {
 			if reloaded, rErr := config.LoadConfig("config.env"); rErr == nil && reloaded != nil {
 				cfg = reloaded
 			}
+		}
+		// TIMEZONE from /bs
+		if loc, lErr := time.LoadLocation(cfg.Timezone); lErr == nil && cfg.Timezone != "" {
+			time.Local = loc
 		}
 		// Ensure default repository and branch are persisted in DB
 		if repo, _ := db.GetBotSetting("UPSTREAM_REPO"); repo == "" {

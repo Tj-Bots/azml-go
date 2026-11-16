@@ -527,9 +527,17 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			targetUploadChatID = fromChatID
 		}
 
+		// The user session uploads over its own pool (14+ connections) – much faster than the bot.
+		if os.Getenv("USER_UPLOAD") != "false" && u.userClient != nil && u.userUp != nil &&
+			transitBinChatID < 0 && telegram.ResolveUserChannelHash(ctx, u.userClient, transitBinChatID) != 0 {
+			clientToUse = u.userClient
+			targetUploadChatID = transitBinChatID
+			log.Printf("[AZML-Go Uploader] User session selected for upload (dump chat %d, %d connections)", targetUploadChatID, len(u.userClients))
+		}
+
 		// Multi-worker bot upload routing:
 		// Only select a worker bot if that bot has confirmed admin posting rights in targetUploadChatID.
-		if u.sessPool != nil && u.sessPool.ActiveSessionCount() > 0 && targetUploadChatID < 0 {
+		if clientToUse == nil && u.sessPool != nil && u.sessPool.ActiveSessionCount() > 0 && targetUploadChatID < 0 {
 			wBot := u.sessPool.FindBotForChat(ctx, targetUploadChatID)
 			if wBot != nil {
 				uploadBotSession = wBot
@@ -738,12 +746,13 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			}
 		}
 		if hash == 0 {
-			hash = telegram.ResolveChannelAccessHash(ctx, clientToUse, targetUploadChatID)
+			if clientToUse == u.userClient {
+				hash = telegram.ResolveUserChannelHash(ctx, clientToUse, targetUploadChatID)
+			} else {
+				hash = telegram.ResolveChannelAccessHash(ctx, clientToUse, targetUploadChatID)
+			}
 		}
-		if hash == 0 && u.botClient != nil && clientToUse != u.botClient {
-			hash = telegram.ResolveChannelAccessHash(ctx, u.botClient, targetUploadChatID)
-		}
-		if hash == 0 {
+		if hash == 0 && clientToUse == u.botClient {
 			hash = telegram.GetChannelAccessHash(chID)
 		}
 		if hash != 0 {
@@ -890,7 +899,9 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 	markupJSON := ""
 	if opt.Buttons != nil {
 		if mk := opt.Buttons.BuildMenu(1); mk != nil {
-			req.ReplyMarkup = mk
+			if clientToUse != u.userClient { // user accounts can't send buttons; the copies get them
+				req.ReplyMarkup = mk
+			}
 			markupJSON = opt.Buttons.BuildBotAPIKeyboard(1)
 		}
 	}
@@ -1000,7 +1011,7 @@ func (u *TelegramUploader) UploadFile(ctx context.Context, peer tg.InputPeerClas
 			}
 
 			if u.userClient != nil {
-				userHash := telegram.ResolveChannelAccessHash(ctx, u.userClient, actualDestChatID)
+				userHash := telegram.ResolveUserChannelHash(ctx, u.userClient, actualDestChatID)
 				if userHash == 0 {
 					userHash = srcHash
 				}

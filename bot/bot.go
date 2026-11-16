@@ -284,6 +284,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 		}
 		b.userClient = nil
 		b.userRawAPI = nil
+		telegram.StopMediaClient()
 		telegram.SetActiveTD(b.client, nil)
 		if b.uploader != nil {
 			b.uploader.SetUserClient(nil)
@@ -356,6 +357,8 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 		b.userClient = newUserClient
 		b.userRawAPI = newUserClient.API()
 		telegram.SetActiveTD(b.client, newUserClient)
+		// downloads like wzgram: a second connection of the session on Telegram's media servers
+		go telegram.StartMediaClient(config.Get().TelegramAPI, config.Get().TelegramHash, sessionStr)
 
 		uname := res.user.Username
 		if uname == "" {
@@ -409,7 +412,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 				return
 			}
 			if currCfg.DumpChatID != 0 {
-				hash := telegram.ResolveChannelAccessHash(preCtx, rawAPI, currCfg.DumpChatID)
+				hash := telegram.ResolveUserChannelHash(preCtx, rawAPI, currCfg.DumpChatID)
 				if hash != 0 {
 					log.Printf("[AZML-Go User Client] Successfully grabbed & cached AccessHash for DUMP_CHAT_ID %d (AccessHash: %d)", currCfg.DumpChatID, hash)
 				} else {
@@ -417,7 +420,7 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 				}
 			}
 			if currCfg.LeechLogID != 0 && currCfg.LeechLogID != currCfg.DumpChatID {
-				lHash := telegram.ResolveChannelAccessHash(preCtx, rawAPI, currCfg.LeechLogID)
+				lHash := telegram.ResolveUserChannelHash(preCtx, rawAPI, currCfg.LeechLogID)
 				if lHash != 0 {
 					log.Printf("[AZML-Go User Client] Successfully grabbed & cached AccessHash for LEECH_LOG_ID %d (AccessHash: %d)", currCfg.LeechLogID, lHash)
 				}
@@ -1033,6 +1036,11 @@ func (b *BotApp) Start(ctx context.Context) error {
 				return
 			}
 			if currCfg.DumpChatID != 0 {
+				// re-check with the bot itself: an older version saved the user session's hash here
+				telegram.ForgetChannelAccessHash(pool.RawChannelID(currCfg.DumpChatID))
+				if currCfg.LeechLogID != 0 {
+					telegram.ForgetChannelAccessHash(pool.RawChannelID(currCfg.LeechLogID))
+				}
 				dHash := telegram.ResolveChannelAccessHash(preCtx, b.rawAPI, currCfg.DumpChatID)
 				if dHash != 0 {
 					log.Printf("[AZML-Go Bot Client] Successfully pre-warmed & cached AccessHash for DUMP_CHAT_ID %d (AccessHash: %d)", currCfg.DumpChatID, dHash)

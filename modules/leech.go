@@ -1385,7 +1385,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 		partResults := make([]uploader.UploadResult, len(splitParts))
 		var fileButtons *telegram.ButtonMaker
-		if user != nil && user.MediaInfo {
+		if cfg.ShowMediaInfo || (user != nil && user.MediaInfo) {
 			setStep(uTask, "MediaInfo")
 			if miLink := mediaInfoLink(curFile, finalName); miLink != "" {
 				fileButtons = telegram.NewButtonMaker()
@@ -1871,47 +1871,8 @@ func channelMessageLink(chatID int64, msgID int) string {
 
 // userChannelPeer finds the dump channel as the user session sees it (its own access hash).
 func userChannelPeer(ctx context.Context, client *tg.Client, chatID int64) (*tg.InputPeerChannel, error) {
-	raw := pool.RawChannelID(chatID)
-	if h := telegram.UserSessionChannelHash(raw); h != 0 {
-		return &tg.InputPeerChannel{ChannelID: raw, AccessHash: h}, nil
-	}
-	p, err := lookupUserChannel(ctx, client, raw, chatID)
-	if err == nil {
-		telegram.CacheUserSessionChannel(raw, p.AccessHash)
-	}
-	return p, err
-}
-
-func lookupUserChannel(ctx context.Context, client *tg.Client, raw, chatID int64) (*tg.InputPeerChannel, error) {
-	if chats, err := client.ChannelsGetChannels(ctx, []tg.InputChannelClass{&tg.InputChannel{ChannelID: raw}}); err == nil {
-		var list []tg.ChatClass
-		switch c := chats.(type) {
-		case *tg.MessagesChats:
-			list = c.Chats
-		case *tg.MessagesChatsSlice:
-			list = c.Chats
-		}
-		for _, ch := range list {
-			if c, ok := ch.(*tg.Channel); ok && c.ID == raw && !c.Min {
-				return &tg.InputPeerChannel{ChannelID: raw, AccessHash: c.AccessHash}, nil
-			}
-		}
-	}
-	dialogs, err := client.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{OffsetPeer: &tg.InputPeerEmpty{}, Limit: 200})
-	if err != nil {
-		return nil, err
-	}
-	var list []tg.ChatClass
-	switch d := dialogs.(type) {
-	case *tg.MessagesDialogs:
-		list = d.Chats
-	case *tg.MessagesDialogsSlice:
-		list = d.Chats
-	}
-	for _, ch := range list {
-		if c, ok := ch.(*tg.Channel); ok && c.ID == raw && !c.Min {
-			return &tg.InputPeerChannel{ChannelID: raw, AccessHash: c.AccessHash}, nil
-		}
+	if h := telegram.ResolveUserChannelHash(ctx, client, chatID); h != 0 {
+		return &tg.InputPeerChannel{ChannelID: pool.RawChannelID(chatID), AccessHash: h}, nil
 	}
 	return nil, fmt.Errorf("the user session is not a member of the dump channel %d", chatID)
 }
@@ -1975,9 +1936,13 @@ func (m *LeechModule) userSessionDownload(ctx context.Context, peer tg.InputPeer
 		}
 	}
 	// fastest: a multi-connection pool opened right on the DC that holds the file
-	if dcClients, closeFn := dcDownloadClients(ctx, telegram.ActiveUserTD(), doc.DCID); len(dcClients) > 0 {
+	dlTD, where := telegram.ActiveMediaTD(), "media servers"
+	if dlTD == nil {
+		dlTD, where = telegram.ActiveUserTD(), "normal servers"
+	}
+	if dcClients, closeFn := dcDownloadClients(ctx, dlTD, doc.DCID); len(dcClients) > 0 {
 		defer closeFn()
-		log.Printf("[LEECH] User session download on DC%d with %d connections", doc.DCID, dcPoolSize)
+		log.Printf("[LEECH] User session download on DC%d (%s) with %d connections", doc.DCID, where, dcPoolSize)
 		dl := downloader.NewTelegramChunkDownloaderPool(dcClients)
 		err := dl.DownloadToFile(ctx, doc.AsInputDocumentFileLocation(""), size, destPath, onProgress, func() ([]byte, error) {
 			d, err := fetchDoc()
@@ -2248,7 +2213,6 @@ func leechHelpText() string {
 		"┠ <code>-st</code> — Every video, audio and subtitle track as its own file\n" +
 		"┠ <code>-ea</code> — Only the audio (<code>-ea m4a</code> flac opus ogg wav)\n" +
 		"┠ <code>-cv mp4</code> — Videos to mp4 (no re-encode)  ·  <code>-ca mp3</code> — Audios to mp3\n" +
-		"┠ <code>-ff key</code> — Saved FFmpeg command\n" +
 		"┠ <b>Direct Links :</b>\n" +
 		"┠ <code>-u user -p pass</code> — Login\n" +
 		"╰ <code>-h Referer: https://site.com</code> — Headers</blockquote>"

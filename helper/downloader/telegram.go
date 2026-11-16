@@ -160,8 +160,9 @@ func (d *TelegramChunkDownloader) DownloadToFile(
 		return fmt.Errorf("invalid file size %d for chunk download", fileSize)
 	}
 
-	// Hyper (our Python bot): 256KB chunks, many in flight. HYPER_CHUNK (KB) changes it.
-	partSize := int64(256 * 1024)
+	// 1MB chunks: Telegram limits the NUMBER of getFile requests, so bigger chunks = fewer
+	// FloodWaits. HYPER_CHUNK (KB, power of 2, 64-1024) changes it.
+	partSize := int64(1024 * 1024)
 	if v, e := strconv.Atoi(os.Getenv("HYPER_CHUNK")); e == nil && v >= 64 && v <= 1024 && v&(v-1) == 0 {
 		partSize = int64(v) * 1024
 	}
@@ -426,7 +427,11 @@ func (d *TelegramChunkDownloader) getPartWithRetry(
 				if d.gate != nil {
 					lim, _ = d.gate.stats()
 				}
-				log.Printf("[TG Chunk DL] FloodWait %v at part %d/%d, parallel limit now %d", waitDur, partIndex+1, totalParts, lim)
+				kind := "FLOOD_WAIT"
+				if rpc, ok := tgerr.As(err); ok {
+					kind = rpc.Type
+				}
+				log.Printf("[TG Chunk DL] %s %v at part %d/%d, parallel limit now %d", kind, waitDur, partIndex+1, totalParts, lim)
 			}
 			// only this request waits (like Hyper), the others keep going
 			select {

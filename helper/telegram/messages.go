@@ -1047,3 +1047,51 @@ func (m *MessageSender) editBotAPIText(ctx context.Context, botToken string, cha
 	}
 	return res.Ok || strings.Contains(res.Description, "message is not modified")
 }
+
+// ResolveUserChannelHash: the dump/log channel as the USER SESSION sees it. User accounts
+// have their own access hashes, so they never share the bot's cache.
+func ResolveUserChannelHash(ctx context.Context, client *tg.Client, chatID int64) int64 {
+	raw := chatID
+	if rs := fmt.Sprintf("%d", chatID); strings.HasPrefix(rs, "-100") {
+		raw, _ = strconv.ParseInt(rs[4:], 10, 64)
+	} else if raw < 0 {
+		raw = -raw
+	}
+	if h := UserSessionChannelHash(raw); h != 0 {
+		return h
+	}
+	if client == nil {
+		return 0
+	}
+	pick := func(list []tg.ChatClass) int64 {
+		for _, c := range list {
+			if ch, ok := c.(*tg.Channel); ok && ch.ID == raw && ch.AccessHash != 0 && !ch.Min {
+				return ch.AccessHash
+			}
+		}
+		return 0
+	}
+	var h int64
+	if chats, err := client.ChannelsGetChannels(ctx, []tg.InputChannelClass{&tg.InputChannel{ChannelID: raw}}); err == nil {
+		switch c := chats.(type) {
+		case *tg.MessagesChats:
+			h = pick(c.Chats)
+		case *tg.MessagesChatsSlice:
+			h = pick(c.Chats)
+		}
+	}
+	if h == 0 {
+		if d, err := client.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{OffsetPeer: &tg.InputPeerEmpty{}, Limit: 200}); err == nil {
+			switch v := d.(type) {
+			case *tg.MessagesDialogs:
+				h = pick(v.Chats)
+			case *tg.MessagesDialogsSlice:
+				h = pick(v.Chats)
+			}
+		}
+	}
+	if h != 0 {
+		CacheUserSessionChannel(raw, h)
+	}
+	return h
+}

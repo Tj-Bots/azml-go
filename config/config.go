@@ -193,7 +193,7 @@ func LoadConfig(path string) (*Config, error) {
 		AuthorURL:                 getEnv("AUTHOR_URL", "https://t.me/TJ_Bots"),
 		BotTheme:                  getEnv("BOT_THEME", "minimal"),
 		ShowExtraCmds:             getEnvBool("SHOW_EXTRA_CMDS", true),
-		Timezone:                  getEnv("TIMEZONE", "Asia/Kolkata"),
+		Timezone:                  getEnv("TIMEZONE", "Asia/Jerusalem"),
 		EnableFFmpegCmds:          getEnvBool("ENABLE_FFMPEG_CMDS", true),
 		FFmpegEncoding:            getEnvBool("FFMPEG_ENCODING", false),
 		TMDBAccessToken:           getEnv("TMDB_ACCESS_TOKEN", ""),

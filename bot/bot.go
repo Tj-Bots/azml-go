@@ -55,6 +55,7 @@ type BotApp struct {
 	leechHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, isZip, isUnzip bool)
 	ytdlHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	ytdlCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	selectCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	statusHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	statusCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	cancelHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -358,9 +359,6 @@ func (b *BotApp) ReloadUserSession(ctx context.Context, sessionStr string) (stri
 		b.userRawAPI = newUserClient.API()
 		telegram.SetActiveTD(b.client, newUserClient)
 		// downloads like wzgram: a second connection of the session on Telegram's media servers
-		if os.Getenv("USER_DOWNLOAD") == "true" {
-			go telegram.StartMediaClient(config.Get().TelegramAPI, config.Get().TelegramHash, sessionStr)
-		}
 
 		uname := res.user.Username
 		if uname == "" {
@@ -452,6 +450,11 @@ func (b *BotApp) SetAdminHandlers(blacklist, rmBlacklist, users func(ctx context
 	b.blacklistHandler = blacklist
 	b.rmBlacklistHandler = rmBlacklist
 	b.usersHandler = users
+}
+
+// SetSelectHandler: buttons of the torrent file selection.
+func (b *BotApp) SetSelectHandler(h func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
+	b.selectCbHandler = h
 }
 
 // SetTaskExtras: /history and the Retry button of failed tasks.
@@ -937,6 +940,10 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 	case strings.HasPrefix(data, "retry "):
 		if b.retryCbHandler != nil {
 			b.retryCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
+		}
+	case strings.HasPrefix(data, "sel "):
+		if b.selectCbHandler != nil {
+			b.selectCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
 	case strings.HasPrefix(data, "ytq "):
 		if b.ytdlCbHandler != nil {

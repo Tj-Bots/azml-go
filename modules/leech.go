@@ -585,28 +585,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 					// User session (premium): the bot copies the file to the dump channel and the
 					// user session downloads it from there (it can't read the bot's own chats).
-					// the bot downloads by itself (USER_DOWNLOAD=true: the premium session first)
-					if !dlSuccess && os.Getenv("USER_DOWNLOAD") == "true" && m.userRawAPI != nil && effectiveDumpChatID != 0 {
-						targetMsgID := msg.ReplyToID
-						if targetMsgID == 0 {
-							targetMsgID = msg.MessageID
-						}
-						uTask.SetStatus(types.StatusDownloading, "User Session MTProto")
-						if uErr := m.userSessionDownload(ctx, peer, targetMsgID, effectiveDumpChatID, doc.Size, destPath, func(curr, total int64, speed float64, eta string) {
-							uTask.SetProgress(curr, total, speed, eta)
-						}); uErr == nil {
-							downloadedPath = destPath
-							uTask.SetProgress(doc.Size, doc.Size, 0, "-")
-							dlSuccess = true
-						} else if ctx.Err() != nil {
-							dlErr = ctx.Err()
-							dlSuccess = true // cancelled: no fallback
-						} else {
-							log.Printf("[LEECH] User session download failed (%v), downloading with the bot", uErr)
-							_ = os.Remove(destPath)
-						}
-					}
-
+					// the premium user session is only for uploads; the bot downloads by itself
 					// Fallback to single-client chunk downloader if multi-bot was not active or failed
 					if !dlSuccess {
 						uTask.SetStatus(types.StatusDownloading, "Telegram MTProto")
@@ -942,7 +921,32 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					ariaLink += "#" + taskUID
 				}
 			}
-			gid, err := aria.AddURI(ariaLink, taskDir, opt.CustomName, taskHeaders(opt.Headers, opt.Username, opt.Password))
+			var selExtra map[string]interface{}
+			isTorrentLink := ext.IsMagnet(link) || strings.HasSuffix(strings.ToLower(cleanLink), ".torrent")
+			if opt.Select && isTorrentLink {
+				selExtra = map[string]interface{}{"pause-metadata": "true"} // paused until Done Selecting
+			}
+			gid, err := aria.AddURIWith(ariaLink, taskDir, opt.CustomName, taskHeaders(opt.Headers, opt.Username, opt.Password), selExtra)
+			if err == nil && selExtra != nil {
+				_ = m.sender.EditMessage(ctx, peer, notifyID, "<i>Getting the torrent file list...</i>", nil)
+				fileGID, wErr := aria.WaitTorrentFiles(ctx, gid)
+				if wErr != nil {
+					_ = aria.Cancel(gid)
+					m.sendDownloadError(ctx, peer, msg, notifyID, wErr.Error(), modeStr, taskStartTime)
+					return
+				}
+				_ = aria.Pause(fileGID) // a plain .torrent has no metadata step
+				if !m.waitSelection(ctx, peer, notifyID, msg.UserID, fileGID, "torrent") {
+					_ = aria.Cancel(fileGID)
+					m.sendDownloadError(ctx, peer, msg, notifyID, "File selection cancelled by user", modeStr, taskStartTime)
+					return
+				}
+				_ = aria.Unpause(fileGID)
+				opt.Select = false
+				if notifyID > 0 && m.statusMod != nil {
+					go m.statusMod.UpdateAllMessages(context.Background(), true)
+				}
+			}
 			if err != nil {
 				// If Aria2c is unreachable or errors on HTTP/HTTPS DDL link, seamlessly fallback to DirectDownloader!
 				if ext.IsURL(link) && (strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://")) {
@@ -962,17 +966,6 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					return
 				}
 			} else {
-				if opt.Select {
-					cfg := config.Get()
-					baseURL := cfg.BaseURL
-					if baseURL == "" {
-						baseURL = fmt.Sprintf("http://localhost:%d", cfg.BaseURLPort)
-					}
-					b := telegram.NewButtonMaker()
-					b.UButtonStyled("◈ "+telegram.ToSmallCaps("Select Files"), fmt.Sprintf("%s/app/files/%s", strings.TrimSuffix(baseURL, "/"), gid), "primary")
-					_ = m.sender.EditMessage(ctx, peer, notifyID, "Your torrent download paused. Choose files from selection web link then press Confirm on web page.", b.BuildMenu(1))
-				}
-
 				task := downloader.NewAria2DownloadTask(gid, opt.CustomName, taskDir, notifyID, msg.ChatID, msg.UserID)
 				downloadedPath, dlErr = task.PollUntilComplete(ctx, func(cur, total int64) {
 					uTask.SetProgress(cur, total, task.Speed(), task.ETA())

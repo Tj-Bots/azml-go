@@ -337,6 +337,11 @@ func (a *Aria2RPCClient) call(req JSONRPCRequest) (*JSONRPCResponse, error) {
 }
 
 func (a *Aria2RPCClient) AddURI(link, downloadDir, filename string, headers []string) (string, error) {
+	return a.AddURIWith(link, downloadDir, filename, headers, nil)
+}
+
+// AddURIWith is AddURI with extra aria2 options (e.g. pause-metadata for file selection).
+func (a *Aria2RPCClient) AddURIWith(link, downloadDir, filename string, headers []string, extra map[string]interface{}) (string, error) {
 	_ = os.MkdirAll(downloadDir, 0755)
 
 	opts := map[string]interface{}{
@@ -360,6 +365,9 @@ func (a *Aria2RPCClient) AddURI(link, downloadDir, filename string, headers []st
 	}
 	if len(headers) > 0 {
 		opts["header"] = headers
+	}
+	for k, v := range extra {
+		opts[k] = v
 	}
 
 	params := []interface{}{
@@ -671,4 +679,40 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 			}
 		}
 	}
+}
+
+func (a *Aria2RPCClient) simple(method, gid string) error {
+	_, err := a.call(JSONRPCRequest{JSONRPC: "2.0", ID: strconv.FormatInt(time.Now().UnixNano(), 10), Method: method, Params: []interface{}{gid}})
+	return err
+}
+
+// Pause / Unpause a download (file selection of torrents).
+func (a *Aria2RPCClient) Pause(gid string) error   { return a.simple("aria2.forcePause", gid) }
+func (a *Aria2RPCClient) Unpause(gid string) error { return a.simple("aria2.unpause", gid) }
+
+// WaitTorrentFiles waits until the torrent's file list is known and returns the GID that holds
+// it (for a magnet that is the GID created after the metadata). With pause-metadata it is paused.
+func (a *Aria2RPCClient) WaitTorrentFiles(ctx context.Context, gid string) (string, error) {
+	for i := 0; i < 600; i++ {
+		st, err := a.TellStatus(gid)
+		if err == nil {
+			if len(st.FollowedBy) > 0 {
+				gid = st.FollowedBy[0]
+				continue
+			}
+			if st.Status == "error" || st.Status == "removed" {
+				return "", fmt.Errorf("torrent failed: %s", st.Status)
+			}
+			isMeta := len(st.Files) == 1 && strings.HasPrefix(st.Files[0].Path, "[METADATA]")
+			if len(st.Files) > 0 && !isMeta && st.Files[0].Path != "" {
+				return gid, nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+	return "", fmt.Errorf("no torrent metadata after 10 minutes")
 }

@@ -201,6 +201,7 @@ func main() {
 
 	app.SetLeechHandler(leechMod.HandleLeech)
 	app.SetTaskExtras(leechMod.HandleHistory, leechMod.HandleRetryCallback)
+	app.SetSelectHandler(leechMod.HandleSelectCallback)
 	app.SetYtdlHandler(ytdlMod.HandleYtdl, ytdlMod.HandleYtdlCallback)
 	app.SetStatusHandlers(statusMod.HandleStatus, statusMod.HandleCallback)
 	app.SetCancelHandlers(cancelMod.HandleCancel, cancelMod.HandleCancelAll, cancelMod.HandleCallback)

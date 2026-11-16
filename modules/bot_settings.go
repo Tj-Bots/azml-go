@@ -129,8 +129,6 @@ var configVarKeys = []string{
 	"QUEUE_ALL",
 	"QUEUE_DOWNLOAD",
 	"QUEUE_UPLOAD",
-	"ARCHIVE_LIMIT",
-	"EXTRACT_LIMIT",
 	"STORAGE_THRESHOLD",
 }
 

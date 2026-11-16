@@ -130,7 +130,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 
 	m.applyMirrorFlag(msg)
 
-	if !m.leech.timeIntervalOK(ctx, peer, msg) || !m.leech.userTasksOK(ctx, peer, msg) {
+	if !m.leech.timeIntervalOK(ctx, peer, msg) || !m.leech.botTasksOK(ctx, peer, msg) || !m.leech.userTasksOK(ctx, peer, msg) {
 		return
 	}
 

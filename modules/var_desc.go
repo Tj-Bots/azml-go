@@ -38,8 +38,8 @@ var varDescriptions = map[string]string{
 	"LEECH_FILENAME_SUFFIX":        "Add custom word suffix to leeched file name. Str",
 	"LEECH_FILENAME_CAPTION":       "Add custom word caption to leeched file/vedios. Str",
 	"BASE_URL":                     "Valid BASE URL where the bot is deployed to use torrent web files selection. Format of URL should be http://myip, where myip is the IP/Domain(public) of your bot or if you have chosen port other than 80 so write it in this format http://myip:port (http and not https). Str",
-	"BOT_MAX_TASKS":                "Maximum tasks the whole bot runs at the same time; more tasks wait in the queue (same as QUEUE_ALL). Int",
-	"USER_MAX_TASKS":               "Maximum tasks one user can run at the same time (0 = no limit). Owner and sudo are not limited. Int",
+	"BOT_MAX_TASKS":                "Maximum number of Task Bot will Run parallel. (Queue Tasks Included). Int",
+	"USER_MAX_TASKS":               "Limit the Maximum task for users of group at a time. use the Int",
 	"LEECH_LIMIT":                  "To limit the Torrent/Direct/ytdlp leech size. the default unit is GB. Int",
 	"TORRENT_LIMIT":                "To limit the size of torrent download. the default unit is GB. Int",
 	"DIRECT_LIMIT":                 "To limit the size of direct link download. the default unit is GB. Int",
@@ -85,7 +85,5 @@ var varDescriptions = map[string]string{
 	"QUEUE_ALL":                    "Number of parallel tasks of downloads and uploads. For example if 20 task added and QUEUE_ALL is 8, then the summation of uploading and downloading tasks are 8 and the rest in queue. Int. NOTE: if you want to fill QUEUE_DOWNLOAD or QUEUE_UPLOAD, then QUEUE_ALL value must be greater than or equal to the greatest one and less than or equal to summation of QUEUE_UPLOAD and QUEUE_DOWNLOAD",
 	"QUEUE_DOWNLOAD":               "Number of all parallel downloading tasks. Int",
 	"QUEUE_UPLOAD":                 "Number of all parallel uploading tasks. Int",
-	"ARCHIVE_LIMIT":                "To limit the size of zip (-z) tasks. the default unit is GB. Int",
-	"EXTRACT_LIMIT":                "To limit the size of extract (-e) tasks. the default unit is GB. Int",
 	"STORAGE_THRESHOLD":            "To leave specific storage free and any download will lead to leave free storage less than this value will be cancelled the default unit is GB. Int",
 }

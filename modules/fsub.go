@@ -145,7 +145,7 @@ func (m *LeechModule) timeIntervalOK(ctx context.Context, peer tg.InputPeerClass
 	if ok && time.Since(last) < limit {
 		userTaskMu.Unlock()
 		left := (limit - time.Since(last)).Round(time.Second)
-		text := fmt.Sprintf("㊂ <b><u>Please Wait :</u></b>\n\n<blockquote>Please wait %s, users have a time interval of %s between tasks.</blockquote>", left, limit)
+		text := fmt.Sprintf("<blockquote>Please Wait %s, Users have time interval Restrictions for %s.</blockquote>", left, limit)
 		id, _ := m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
 		if id > 0 {
 			m.sender.AutoDeleteMessage(peer, id, 10)

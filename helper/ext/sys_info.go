@@ -517,89 +517,38 @@ func RenderRepoStats() string {
 		lastCommit, botVersion, latVersion, changeLog, remarks)
 }
 
-// RenderBotLimits produces the exact Python BOT_LIMITS theme output
+// RenderBotLimits: the BOT_LIMITS page of the Python bot (without the Drive lines).
 func RenderBotLimits() string {
 	cfg := config.Get()
-
-	dl := "∞"
-	if cfg.DirectLimit > 0 {
-		dl = fmt.Sprintf("%d", cfg.DirectLimit)
+	num := func(v int64) string {
+		if v > 0 {
+			return fmt.Sprintf("%d", v)
+		}
+		return "∞"
 	}
-
-	tl := "∞"
-	if cfg.TorrentLimit > 0 {
-		tl = fmt.Sprintf("%d", cfg.TorrentLimit)
+	tl := num(int64(cfg.TorrentLimit)) + " GB"
+	if cfg.DisableTorrents {
+		tl = "Disabled"
 	}
-
-	yl := "∞"
-	if cfg.YtdlpLimit > 0 {
-		yl = fmt.Sprintf("%d", cfg.YtdlpLimit)
-	}
-
-	ml := "∞"
-	if cfg.MegaLimit > 0 {
-		ml = fmt.Sprintf("%d", cfg.MegaLimit)
-	}
-
-	al := "∞"
-	if cfg.ArchiveLimit > 0 {
-		al = fmt.Sprintf("%d", cfg.ArchiveLimit)
-	}
-
-	el := "∞"
-	if cfg.ExtractLimit > 0 {
-		el = fmt.Sprintf("%d", cfg.ExtractLimit)
-	}
-
-	ll := "∞"
-	if cfg.LeechLimit > 0 {
-		ll = fmt.Sprintf("%d", cfg.LeechLimit)
-	} else {
-		maxGB := float64(config.GetMaxSplitSize()) / (1024 * 1024 * 1024)
-		ll = fmt.Sprintf("%.2f", maxGB)
-	}
-
-	st := "1"
-	if cfg.StorageThreshold > 0 {
-		st = fmt.Sprintf("%d", cfg.StorageThreshold)
-	}
-
 	tv := "Disabled"
 	if cfg.TokenTimeout > 0 {
 		tv = GetReadableTime(cfg.TokenTimeout)
 	}
-
-	daily := "∞"
-	if cfg.DailyLeechLimit > 0 {
-		daily = fmt.Sprintf("%d GB", cfg.DailyLeechLimit)
-	}
-
-	ut := "∞"
-	if cfg.QueueDownload > 0 {
-		ut = fmt.Sprintf("%d", cfg.QueueDownload)
-	}
-
-	bt := "∞"
-	if cfg.QueueAll > 0 {
-		bt = fmt.Sprintf("%d", cfg.QueueAll)
-	}
-
-	torrentLine := fmt.Sprintf("┠ <b>Torrent Limit :</b> %s GB\n", tl)
-	if cfg.DisableTorrents {
-		torrentLine = "┠ <b>Torrents :</b> Disabled\n"
+	uti := "Disabled"
+	if cfg.UserTimeInterval > 0 {
+		uti = GetReadableTime(int64(cfg.UserTimeInterval))
 	}
 	return fmt.Sprintf("⌬ <b><i>BOT LIMITATIONS :</i></b>\n"+
 		"<blockquote>╭ <b>Direct Limit :</b> %s GB\n"+
-		"%s"+
+		"┠ <b>Torrent Limit :</b> %s\n"+
 		"┠ <b>YT-DLP Limit :</b> %s GB\n"+
+		"┠ <b>Playlist Limit :</b> %s\n"+
 		"┠ <b>Mega Limit :</b> %s GB\n"+
-		"┠ <b>Archive Limit :</b> %s GB\n"+
-		"┠ <b>Extract Limit :</b> %s GB\n"+
-		"┠ <b>Daily Leech Limit :</b> %s\n"+
-		"┠ <b>Storage Threshold :</b> %s GB\n"+
 		"╰ <b>Leech Limit :</b> %s GB</blockquote>\n\n"+
 		"<blockquote>╭ <b>Token Validity :</b> %s\n"+
+		"┠ <b>User Time Limit :</b> %s / task\n"+
 		"┠ <b>User Parallel Tasks :</b> %s\n"+
 		"╰ <b>Bot Parallel Tasks :</b> %s</blockquote>",
-		dl, torrentLine, yl, ml, al, el, daily, st, ll, tv, ut, bt)
+		num(int64(cfg.DirectLimit)), tl, num(int64(cfg.YtdlpLimit)), num(int64(cfg.PlaylistLimit)), num(int64(cfg.MegaLimit)),
+		num(int64(cfg.LeechLimit)), tv, uti, num(int64(cfg.UserMaxTasks)), num(int64(cfg.BotMaxTasks)))
 }

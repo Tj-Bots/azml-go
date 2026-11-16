@@ -260,7 +260,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	if !msg.Internal && !m.timeIntervalOK(ctx, peer, msg) {
 		return
 	}
-	if !msg.Internal && !m.userTasksOK(ctx, peer, msg) {
+	if !msg.Internal && (!m.botTasksOK(ctx, peer, msg) || !m.userTasksOK(ctx, peer, msg)) {
 		return
 	}
 
@@ -2527,7 +2527,17 @@ func (m *LeechModule) userTasksOK(ctx context.Context, peer tg.InputPeerClass, m
 	if n < limit {
 		return true
 	}
-	m.replyTemp(ctx, peer, msg, fmt.Sprintf("㊂ <b><u>Tasks Limit :</u></b>\n\n<blockquote>Your tasks limit exceeded for %d tasks. Wait until one of them is done.</blockquote>", limit))
+	m.replyTemp(ctx, peer, msg, fmt.Sprintf("<blockquote>Your tasks limit exceeded for %d tasks</blockquote>", limit))
+	return false
+}
+
+// botTasksOK: BOT_MAX_TASKS, tasks the whole bot takes (owner and sudo pass).
+func (m *LeechModule) botTasksOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
+	limit := config.Get().BotMaxTasks
+	if limit <= 0 || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) || m.taskMgr.Count() < limit {
+		return true
+	}
+	m.replyTemp(ctx, peer, msg, fmt.Sprintf("<blockquote>Bot Max Tasks limit exceeded.\nBot max tasks limit is %d.\nPlease wait for the completion of other tasks.</blockquote>", limit))
 	return false
 }
 

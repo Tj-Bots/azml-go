@@ -116,3 +116,33 @@ func TestLocalTorrentArg(t *testing.T) {
 		t.Fatal("must be blocked when torrents are disabled")
 	}
 }
+
+func TestSameDirFlag(t *testing.T) {
+	opt, link := parseLeechArgs("/l -i 3 -m Season 1 -z")
+	if opt.SameDir != "Season 1" || !opt.IsZip || opt.AsMedia || link != "" || opt.Multi != 3 {
+		t.Fatalf("%+v", opt)
+	}
+	if o, _ := parseLeechArgs("/l link -med"); !o.AsMedia {
+		t.Fatal("-med")
+	}
+}
+
+func TestSameDirGroup(t *testing.T) {
+	dir := t.TempDir()
+	key := newSameDir("Show", 2)
+	a := filepath.Join(dir, "a.mkv")
+	_ = os.WriteFile(a, []byte("x"), 0644)
+	if f, err := sameDirAdd(key, a); err != nil || f != "" {
+		t.Fatalf("first: %q %v", f, err)
+	}
+	b := filepath.Join(dir, "a.mkv")
+	_ = os.WriteFile(b, []byte("y"), 0644)
+	f, err := sameDirAdd(key, b)
+	if err != nil || f == "" {
+		t.Fatalf("last: %q %v", f, err)
+	}
+	if n := len(mediaFiles(f)); n != 2 {
+		t.Fatalf("files in folder: %d", n)
+	}
+	_ = os.RemoveAll(filepath.Dir(f))
+}

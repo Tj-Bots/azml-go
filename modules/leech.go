@@ -157,6 +157,9 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		}
 
 		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("⌬ <b>Bulk Leech Initiated:</b> <code>%d links</code>", len(bulkLinks)), msg.MessageID, nil)
+		if opt.SameDir != "" && len(bulkLinks) > 1 {
+			msg.SameDirKey = newSameDir(opt.SameDir, len(bulkLinks))
+		}
 
 		go func() {
 			for _, bLink := range bulkLinks {
@@ -178,6 +181,9 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	}
 
 	// Multi-Message Sequential Leech (-i <count>)
+	if opt.Multi > 1 && msg.IsReply && msg.ReplyToID > 0 && opt.SameDir != "" && msg.SameDirKey == "" {
+		msg.SameDirKey = newSameDir(opt.SameDir, opt.Multi)
+	}
 	if opt.Multi > 1 && msg.IsReply && msg.ReplyToID > 0 {
 		multiCount := opt.Multi
 		baseReplyID := msg.ReplyToID
@@ -204,6 +210,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					LangCode:   msg.LangCode,
 					Username:   msg.Username,
 					Internal:   true, // part of the same -i run
+					SameDirKey: msg.SameDirKey,
 					HasMedia:   targetMsg.Media != nil,
 					RawMedia:   targetMsg.Media,
 					ReplyToID:  targetID,
@@ -475,6 +482,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	if queuedDL {
 		_ = m.sender.EditMessage(ctx, peer, notifyID, "<i>Starting download from queue...</i>", nil)
+	}
+
+	// a local folder (the -m upload task): nothing to download
+	if fi, err := os.Stat(link); err == nil && fi.IsDir() && filepath.IsAbs(link) {
+		downloadedPath, link = link, ""
+		msg.IsReply, msg.HasMedia, msg.RawMedia = false, false, nil
+		modeStr = "#Leech | #Folder"
 	}
 
 	// 1. Download Phase
@@ -1071,6 +1085,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			return
 		}
 		m.sendDownloadError(ctx, peer, msg, notifyID, dlErr.Error(), modeStr, taskStartTime)
+		if msg.SameDirKey != "" {
+			m.sameDirFailed(peer, msg)
+		}
 		return
 	}
 	ext.ReleaseDownload(taskUID)
@@ -1121,6 +1138,25 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	displayName = filepath.Base(downloadedPath)
 	uTask.SetName(displayName)
+
+	// -m: into the shared folder; only the last task of the run goes on to upload it
+	if msg.SameDirKey != "" {
+		folder, sdErr := sameDirAdd(msg.SameDirKey, downloadedPath)
+		if sdErr != nil {
+			m.sendDownloadError(ctx, peer, msg, notifyID, sdErr.Error(), modeStr, taskStartTime)
+			return
+		}
+		if folder == "" {
+			if notifyID > 0 && m.statusMod != nil && notifyID != m.statusMod.GetStatusMessageID(msg.ChatID) {
+				_ = m.sender.DeleteMessage(ctx, peer, []int{notifyID})
+			}
+			return // the last task uploads everything
+		}
+		defer func() { _ = os.RemoveAll(filepath.Dir(folder)) }()
+		downloadedPath = folder
+		displayName = filepath.Base(folder)
+		uTask.SetName(displayName)
+	}
 
 	if opt.Join {
 		setStep(uTask, "Join Parts")
@@ -1826,7 +1862,7 @@ func splitArgsRespectingQuotes(s string) []string {
 func isLeechFlag(tok string) bool {
 	switch tok {
 	case "-b", "-bulk", "-z", "-zip", "-e", "-extract", "-uz", "-unzip",
-		"-d", "-doc", "-asdoc", "-m", "-med", "-media", "-asmedia",
+		"-d", "-doc", "-asdoc", "-m", "-sd", "-samedir", "-med", "-media", "-asmedia",
 		"-st", "-streams", "-n", "-name", "-p", "-password",
 		"-pssw", "-ss", "-screenshots", "-ud", "-dump", "-ff", "-i", "-s", "-select",
 		"-t", "-thumb", "-sp", "-h", "-headers", "-u", "-user", "-ea", "-cv", "-ca", "-j", "-join", "-pass":
@@ -1859,8 +1895,18 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 			opt.IsExtract = true
 		case "-d", "-doc", "-asdoc":
 			opt.AsDoc = true
-		case "-m", "-med", "-media", "-asmedia":
+		case "-med", "-media", "-asmedia":
 			opt.AsMedia = true
+		case "-m", "-sd", "-samedir":
+			var np []string
+			for i+1 < len(tokens) && !isLeechFlag(tokens[i+1]) && !ext.IsURL(tokens[i+1]) && !ext.IsMagnet(tokens[i+1]) {
+				np = append(np, tokens[i+1])
+				i++
+			}
+			opt.SameDir = strings.Join(np, " ")
+			if opt.SameDir == "" {
+				opt.SameDir = "Leech Folder"
+			}
 		case "-st", "-streams":
 			opt.ExtractStrm = true
 		case "-n", "-name":
@@ -2361,6 +2407,7 @@ func leechHelpText() string {
 		"┠ <b>Many Tasks :</b>\n" +
 		"┠ <code>-i 5</code> — Reply to the first: this message and the next 4\n" +
 		"┠ <code>-b</code> — Bulk: reply to a list of links (<code>-b 3:8</code> range)\n" +
+		"┠ <code>-m name</code> — Same folder: all files of <code>-i</code> / <code>-b</code> in one folder (with <code>-z</code>: one zip)\n" +
 		"┠ <b>Upload :</b>\n" +
 		"┠ <code>-t link</code> — Thumbnail for this task (image link or t.me message link)\n" +
 		"┠ <code>-sp 1.5GB</code> — Split size for this task\n" +
@@ -2570,4 +2617,31 @@ func (m *LeechModule) downloadGofile(ctx context.Context, peer tg.InputPeerClass
 		return filepath.Join(taskDir, entries[0].Name()), nil
 	}
 	return taskDir, nil
+}
+
+// sameDirFailed: a task of a -m run failed; when it was the last one, the folder is uploaded
+// by a new task.
+func (m *LeechModule) sameDirFailed(peer tg.InputPeerClass, msg *types.MessageContext) {
+	folder, err := sameDirAdd(msg.SameDirKey, "")
+	if err != nil || folder == "" {
+		return
+	}
+	if entries, _ := os.ReadDir(folder); len(entries) == 0 {
+		_ = os.RemoveAll(filepath.Dir(folder))
+		return
+	}
+	cfg := config.Get()
+	taskDir := filepath.Join(cfg.DownloadDir, fmt.Sprintf("%d_%s", msg.UserID, ext.RandomHex(4)))
+	_ = os.MkdirAll(taskDir, 0777)
+	dest := filepath.Join(taskDir, filepath.Base(folder))
+	if os.Rename(folder, dest) != nil {
+		return
+	}
+	_ = os.RemoveAll(filepath.Dir(folder))
+	up := *msg
+	up.Internal = true
+	up.SameDirKey = ""
+	notifyID, _ := m.sender.SendMessage(context.Background(), peer, "<i>Uploading the folder...</i>", msg.MessageID, nil)
+	opt, _ := parseLeechArgs(msg.Text)
+	go m.processLeechPipeline(peer, &up, opt, dest, taskDir, notifyID)
 }

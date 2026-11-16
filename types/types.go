@@ -129,6 +129,7 @@ type LeechOptions struct {
 	IsMirror    bool
 	MirrorHost  string
 	Ytdl        bool     // download the link with yt-dlp
+	SameDir     string   // -m <folder name>
 	SplitSize   int64    // -sp
 	ExtractAud  string   // -ea [format]
 	ConvVideo   string   // -cv
@@ -139,6 +140,7 @@ type LeechOptions struct {
 }
 
 type MessageContext struct {
+	SameDirKey  string // -m: the shared folder of this -i / -b run
 	Internal    bool   // started by the bot itself (-i run): no time interval check
 	YtdlQuality string // set for /ytdl tasks (used by Retry)
 	IsZip       bool

@@ -130,3 +130,17 @@ func TestAllVarPages(t *testing.T) {
 		t.Error("secret shown in a group")
 	}
 }
+
+func TestBoolVarsHaveButtons(t *testing.T) {
+	for _, k := range configVarKeys {
+		d := strings.TrimRight(strings.TrimSpace(varDescriptions[k]), ".")
+		if strings.HasSuffix(d, "Bool") && !isBoolVar(k) {
+			t.Errorf("%s is Bool but opens a text box", k)
+		}
+	}
+	for _, k := range []string{"AS_DOCUMENT", "MEDIA_STORE", "SAFE_MODE", "DELETE_LINKS", "RICH_MESSAGES", "DISABLE_VT"} {
+		if !isBoolVar(k) {
+			t.Errorf("%s must be True/False buttons", k)
+		}
+	}
+}

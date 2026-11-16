@@ -189,7 +189,13 @@ func configValue(cfgMap map[string]string, key string) string {
 }
 
 func isBoolVar(key string) bool {
+	// every var whose description ends with "Bool" is a True / False choice
+	if d := strings.TrimRight(strings.TrimSpace(varDescriptions[key]), "."); strings.HasSuffix(d, "Bool") {
+		return true
+	}
 	switch key {
+	case "MEDIA_STORE", "INCOMPLETE_TASK_NOTIFIER", "DISABLE_VT", "SAFE_MODE", "PM_ACCESS", "SET_COMMANDS", "FFMPEG_ENCODING":
+		return true
 	case "WEB_PINCODE", "DELETE_LINKS", "RICH_MESSAGES", "CLEAN_LOG_MSG", "DISABLE_TORRENTS", "AS_DOCUMENT", "AUTO_THUMBNAIL", "EQUAL_SPLITS", "MEDIA_GROUP", "SHORTENER_ENABLED",
 		"BOT_PM", "TOKEN_IN_PM", "SCREENSHOTS_MODE", "SHOW_MEDIAINFO", "SAVE_MSG", "SOURCE_LINK",
 		"SHOW_EXTRA_CMDS", "DISABLE_FF_MODE", "UPDATE_ON_STARTUP":

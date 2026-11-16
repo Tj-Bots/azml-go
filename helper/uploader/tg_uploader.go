@@ -1348,3 +1348,30 @@ func CopyMessage(toChatID, fromChatID int64, msgID int, markupJSON string) bool 
 	}
 	return copyMessageViaBotAPI(token, toChatID, fromChatID, msgID, markupJSON)
 }
+
+// CopyMessageID copies a message with the Bot API and returns the new message id (0 on failure).
+func CopyMessageID(toChatID, fromChatID int64, msgID int) int {
+	token := config.Get().BotToken
+	if token == "" {
+		token = os.Getenv("BOT_TOKEN")
+	}
+	if token == "" || toChatID == 0 || fromChatID == 0 || msgID <= 0 {
+		return 0
+	}
+	body, _ := json.Marshal(map[string]interface{}{"chat_id": toChatID, "from_chat_id": fromChatID, "message_id": msgID, "disable_notification": true})
+	resp, err := botAPICopyClient.Post(fmt.Sprintf("https://api.telegram.org/bot%s/copyMessage", token), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var r struct {
+		Ok     bool `json:"ok"`
+		Result struct {
+			MessageID int `json:"message_id"`
+		} `json:"result"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&r) != nil || !r.Ok {
+		return 0
+	}
+	return r.Result.MessageID
+}

@@ -542,6 +542,36 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 		}
 
+		// where the file is read from (the copy in the dump channel when the original is deleted)
+		srcPeer, srcMsgID := peer, msg.ReplyToID
+		if srcMsgID == 0 {
+			srcMsgID = msg.MessageID
+		}
+		if mediaSource != nil && cfg.DeleteLinks && !msg.Internal {
+			// DELETE_LINKS: copy the file to the dump channel, delete the originals right away,
+			// download from the copy (also the Source Link points to it)
+			dump := m.dumpChatID
+			if dump == 0 {
+				dump = cfg.DumpChatID
+			}
+			if dump == 0 {
+				dump = cfg.LeechLogID
+			}
+			if dump != 0 {
+				if newID := uploader.CopyMessageID(dump, msg.ChatID, srcMsgID); newID > 0 {
+					if h := telegram.ResolveChannelAccessHash(ctx, m.rawAPI, dump); h != 0 {
+						dumpPeer := &tg.InputPeerChannel{ChannelID: pool.RawChannelID(dump), AccessHash: h}
+						if cm, err := telegram.FetchMessage(ctx, m.rawAPI, dumpPeer, newID); err == nil && cm != nil && cm.Media != nil {
+							mediaSource, msg.RawMedia = cm.Media, cm.Media
+							srcPeer, srcMsgID = dumpPeer, newID
+							sourceURL = channelMessageLink(dump, newID)
+						}
+					}
+				}
+			}
+			deleteLinks()
+		}
+
 		if mediaSource != nil {
 			link = ""
 			// Case 1A: Document Media (Videos, Audio, Archives, Files)
@@ -593,10 +623,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 					// Check if Multi-Bot Download is enabled and sessions are active
 					if m.sessPool != nil && m.sessPool.ActiveSessionCount() > 0 && effectiveDumpChatID != 0 {
-						targetMsgID := msg.ReplyToID
-						if targetMsgID == 0 {
-							targetMsgID = msg.MessageID
-						}
+						targetMsgID := srcMsgID
 
 						rawDumpID := pool.RawChannelID(effectiveDumpChatID)
 						dumpHash := telegram.ResolveChannelAccessHash(ctx, m.rawAPI, effectiveDumpChatID)
@@ -610,7 +637,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 								AccessHash: dumpHash,
 							}
 							log.Printf("[LEECH Multi-Bot] Forwarding message %d to dump channel %d for multi-client download...", targetMsgID, effectiveDumpChatID)
-							fwdMsgID, fwdErr := telegram.ForwardToChannelWithFloodWait(ctx, m.rawAPI, peer, dumpPeer, targetMsgID)
+							fwdMsgID, fwdErr := telegram.ForwardToChannelWithFloodWait(ctx, m.rawAPI, srcPeer, dumpPeer, targetMsgID)
 
 							if fwdErr == nil && fwdMsgID > 0 {
 								uTask.SetStatus(types.StatusDownloading, ext.EngineName("telegram")+" (Multi-Bot)")
@@ -657,8 +684,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 						loc := doc.AsInputDocumentFileLocation("")
 						if loc != nil {
 							refreshRef := func() ([]byte, error) {
-								if msg.IsReply && msg.ReplyToID > 0 {
-									rMsg, err := telegram.FetchMessage(ctx, m.rawAPI, peer, msg.ReplyToID)
+								if srcMsgID > 0 {
+									rMsg, err := telegram.FetchMessage(ctx, m.rawAPI, srcPeer, srcMsgID)
 									if err == nil && rMsg != nil {
 										if dMedia, ok := rMsg.Media.(*tg.MessageMediaDocument); ok {
 											if dDoc, ok := dMedia.Document.(*tg.Document); ok {

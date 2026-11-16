@@ -105,3 +105,14 @@ func TestIsTorrentInput(t *testing.T) {
 		t.Error("torrent file")
 	}
 }
+
+func TestLocalTorrentArg(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "a.torrent")
+	_ = os.WriteFile(p, []byte("d4:infod4:name1:aee"), 0644)
+	if _, link := parseLeechArgs("/leech " + p); link != p {
+		t.Fatalf("local torrent not taken: %q", link)
+	}
+	if !isTorrentInput(p, nil) {
+		t.Fatal("must be blocked when torrents are disabled")
+	}
+}

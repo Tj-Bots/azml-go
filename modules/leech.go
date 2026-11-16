@@ -240,7 +240,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		return
 	}
 
-	if link != "" && !ext.IsURL(link) && !ext.IsMagnet(link) && !ext.IsMegaLink(link) && !strings.HasPrefix(link, "tg://") {
+	if link != "" && !ext.IsURL(link) && !ext.IsMagnet(link) && !ext.IsMegaLink(link) && !strings.HasPrefix(link, "tg://") && !isLocalTorrent(link) {
 		m.sendDownloadError(ctx, peer, msg, 0, "Invalid link or resource not found! Please check the URL.", "#Leech", time.Now())
 		return
 	}
@@ -317,7 +317,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 
 	if cfg.DisableTorrents && isTorrentInput(link, msg) {
-		m.sendDownloadError(ctx, peer, msg, notifyID, "Torrents and magnet links are disabled on this bot (DISABLE_TORRENTS).", "#Leech | #Torrent", time.Now())
+		m.sendDownloadError(ctx, peer, msg, notifyID, torrentsDisabledMsg, "#Leech | #Torrent", time.Now())
 		return
 	}
 
@@ -847,7 +847,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 		isRemoteTorrent := ext.IsURL(link) && strings.HasSuffix(strings.ToLower(cleanLink), ".torrent")
 		if cfg.DisableTorrents && (isLocalTorrent || isRemoteTorrent || ext.IsMagnet(link)) {
-			m.sendDownloadError(ctx, peer, msg, notifyID, "Torrents and magnet links are disabled on this bot (DISABLE_TORRENTS).", modeStr, taskStartTime)
+			m.sendDownloadError(ctx, peer, msg, notifyID, torrentsDisabledMsg, modeStr, taskStartTime)
 			return
 		}
 
@@ -1028,7 +1028,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 	// Critical safeguard: If downloadedPath is a .torrent file, automatically extract and download its real payload!
 	if strings.HasSuffix(strings.ToLower(downloadedPath), ".torrent") && cfg.DisableTorrents {
-		m.sendDownloadError(ctx, peer, msg, notifyID, "Torrents and magnet links are disabled on this bot (DISABLE_TORRENTS).", modeStr, taskStartTime)
+		m.sendDownloadError(ctx, peer, msg, notifyID, torrentsDisabledMsg, modeStr, taskStartTime)
 		return
 	}
 	if strings.HasSuffix(strings.ToLower(downloadedPath), ".torrent") {
@@ -1852,7 +1852,7 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 					opt.Password = tokens[i+1]
 					i++
 				}
-			} else if ext.IsURL(tok) || ext.IsMagnet(tok) || ext.IsMegaLink(tok) || strings.HasPrefix(tok, "tg://") {
+			} else if ext.IsURL(tok) || ext.IsMagnet(tok) || ext.IsMegaLink(tok) || strings.HasPrefix(tok, "tg://") || isLocalTorrent(tok) {
 				link = tok
 			}
 		}
@@ -2283,4 +2283,16 @@ func isTorrentInput(link string, msg *types.MessageContext) bool {
 		}
 	}
 	return false
+}
+
+// torrentsDisabledMsg: the reason shown when DISABLE_TORRENTS is on (like the limit errors).
+const torrentsDisabledMsg = "Torrents are disabled on this bot. Magnet links and .torrent files are not supported right now."
+
+// isLocalTorrent: a .torrent file the bot saved from a sent document.
+func isLocalTorrent(p string) bool {
+	if !strings.HasSuffix(strings.ToLower(p), ".torrent") || !filepath.IsAbs(p) {
+		return false
+	}
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
 }

@@ -1539,7 +1539,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 			}
 
 			// 1C. Torrent file document
-			if strings.HasSuffix(lowerName, ".torrent") && !config.Get().DisableTorrents {
+			if strings.HasSuffix(lowerName, ".torrent") {
 				cfg := config.Get()
 				_ = os.MkdirAll(cfg.DownloadDir, 0755)
 				torrentPath := filepath.Join(cfg.DownloadDir, fmt.Sprintf("%d_%s.torrent", senderID, ext.RandomHex(4)))
@@ -1552,7 +1552,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 							ChatID:     chatID,
 							MessageID:  m.ID,
 							UserID:     senderID,
-							SenderName: "User",
+							SenderName: torrentSenderName(b.userMap, senderID),
 							Text:       fmt.Sprintf("/leech %s", torrentPath),
 						}
 						b.leechHandler(ctx, peer, msgCtx, false, false)
@@ -1753,4 +1753,11 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 		confirmText := fmt.Sprintf("✓ <b>%s</b> updated to: <code>%s</code>", fieldName, val)
 		_, _ = b.sender.SendMessage(ctx, peer, confirmText, 0, nil)
 	}
+}
+
+func torrentSenderName(um *types.SafeUserMap, id int64) string {
+	if u := um.Get(id); u != nil && u.Name != "" {
+		return u.Name
+	}
+	return "User"
 }

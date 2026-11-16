@@ -109,8 +109,8 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 	}
 	if link == "" {
 		helpMsg := "㊂ <b><u>YT-DLP Command Usage :</u></b>\n\n" +
-			"<b>Usage:</b> <code>/ytdl [link] [quality]</code> or reply to a link\n\n" +
-			"<blockquote>╭ <code>/ytdl link</code> — Choose the quality from buttons\n" +
+			"<b>Usage:</b> <code>/ytdl" + config.Get().CmdSuffix + " [link] [quality]</code> or reply to a link\n\n" +
+			"<blockquote>╭ <code>/ytdl" + config.Get().CmdSuffix + " link</code> — Choose the quality from buttons\n" +
 			"┠ <code>720p</code> — Direct quality (144p - 2160p)\n" +
 			"┠ <code>best</code> — Best video + audio\n" +
 			"┠ <code>audio</code> / <code>mp3</code> — Audio only\n" +

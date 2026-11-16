@@ -222,7 +222,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			hosts = append(hosts, h.Name)
 		}
 		helpMsg := fmt.Sprintf("㊂ <b><u>Mirror Command Usage :</u></b>\n\n"+
-			"<b>Usage:</b> <code>/mirror [link]</code> or reply to a link / file\n\n"+
+			"<b>Usage:</b> <code>/mirror"+config.Get().CmdSuffix+" [link]</code> or reply to a link / file\n\n"+
 			"<blockquote>╭ <b>Upload To :</b> %s\n"+
 			"┠ <code>-up gofile</code> — Choose the host directly\n"+
 			"┠ <code>-n name</code> — Custom File Name\n"+
@@ -2235,7 +2235,7 @@ func multiFollowText(text string) string {
 // leechHelpText: every flag, like the help of our Python bot.
 func leechHelpText() string {
 	return "㊂ <b><u>Leech Command Usage :</u></b>\n\n" +
-		"<b>Usage:</b> <code>/leech [link] [flags]</code> or reply to a link / file\n\n" +
+		"<b>Usage:</b> <code>/leech" + config.Get().CmdSuffix + " [link] [flags]</code> or reply to a link / file\n\n" +
 		"<blockquote expandable>╭ <b>Name & Archive :</b>\n" +
 		"┠ <code>-n name</code> — New file name\n" +
 		"┠ <code>-z</code> — Zip  ·  <code>-e</code> — Extract\n" +

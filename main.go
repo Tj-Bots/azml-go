@@ -110,9 +110,15 @@ func main() {
 		log.Printf("[DB] Loaded %d saved peers", len(peers))
 		if dbSettings, err := db.LoadAllBotSettings(); err == nil && len(dbSettings) > 0 {
 			for k, v := range dbSettings {
-				if v != "" {
-					_ = config.UpdateConfigVar(k, v)
+				// an empty value is a Reset in /bs: it wins over the Heroku variable too
+				// (not for the variables the bot can't start without)
+				switch k {
+				case "BOT_TOKEN", "OWNER_ID", "TELEGRAM_API", "TELEGRAM_HASH", "DATABASE_URL", "DATABASE_NAME", "USER_SESSION_STRING":
+					if v == "" {
+						continue
+					}
 				}
+				_ = config.UpdateConfigVar(k, v)
 			}
 			log.Printf("[DB] Restored %d persistent setting(s) from database", len(dbSettings))
 			// rebuild the config so the vars edited in /bs that are read only at start apply too

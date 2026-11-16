@@ -168,15 +168,19 @@ func syncLogDump() {
 	GlobalConfig.DumpChatID = GlobalConfig.LeechLogID
 }
 
-func LoadConfig(path string) (*Config, error) {
-	configLock.Lock()
-	defer configLock.Unlock()
+// noEnv: buildConfig ignores the environment and gives the defaults (for Reset in /bs).
+var noEnv bool
 
-	_ = godotenv.Load(path)
-	_ = godotenv.Load(".env")
-	_ = godotenv.Load("config.env")
+func lookupEnv(key string) string {
+	if noEnv {
+		return ""
+	}
+	return os.Getenv(key)
+}
 
-	GlobalConfig = Config{
+// buildConfig reads every variable (or its default).
+func buildConfig() Config {
+	return Config{
 		BotToken:                  getEnv("BOT_TOKEN", ""),
 		OwnerID:                   getEnvInt64("OWNER_ID", 0),
 		OwnerUsername:             strings.TrimPrefix(getEnv("OWNER_USERNAME", ""), "@"),
@@ -284,6 +288,17 @@ func LoadConfig(path string) (*Config, error) {
 		StreamTapeAPI:             getEnv("STREAMTAPE_API", ""),
 		VikingFileUser:            getEnv("VIKINGFILE_USER", ""),
 	}
+}
+
+func LoadConfig(path string) (*Config, error) {
+	configLock.Lock()
+	defer configLock.Unlock()
+
+	_ = godotenv.Load(path)
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load("config.env")
+
+	GlobalConfig = buildConfig()
 
 	// Resolve main bot token
 	mainToken := strings.Trim(strings.TrimSpace(getEnv("BOT_TOKEN", getEnv("MAIN_BOT_TOKEN", ""))), `"'`)
@@ -352,14 +367,14 @@ func Get() *Config {
 }
 
 func getEnv(key, defaultVal string) string {
-	if val := os.Getenv(key); val != "" {
+	if val := lookupEnv(key); val != "" {
 		return strings.TrimSpace(val)
 	}
 	return defaultVal
 }
 
 func getEnvInt(key string, defaultVal int) int {
-	val := os.Getenv(key)
+	val := lookupEnv(key)
 	if val == "" {
 		return defaultVal
 	}
@@ -388,7 +403,7 @@ func parseTokenString(raw string) []string {
 }
 
 func getEnvInt64(key string, defaultVal int64) int64 {
-	val := os.Getenv(key)
+	val := lookupEnv(key)
 	if val == "" {
 		return defaultVal
 	}
@@ -404,7 +419,7 @@ func getEnvInt64(key string, defaultVal int64) int64 {
 }
 
 func getEnvBool(key string, defaultVal bool) bool {
-	val := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	val := strings.ToLower(strings.TrimSpace(lookupEnv(key)))
 	if val == "" {
 		return defaultVal
 	}
@@ -434,6 +449,7 @@ func UpdateConfigVar(key, val string) error {
 	defer configLock.Unlock()
 
 	key = strings.ToUpper(strings.TrimSpace(key))
+	handled := true
 	switch key {
 	case "OWNER_USERNAME":
 		GlobalConfig.OwnerUsername = strings.TrimPrefix(strings.TrimSpace(val), "@")
@@ -618,9 +634,18 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.StreamTapeAPI = strings.TrimSpace(val)
 	case "VIKINGFILE_USER":
 		GlobalConfig.VikingFileUser = strings.TrimSpace(val)
+	default:
+		handled = false
 	}
 
 	_ = os.Setenv(key, val)
+	if !handled {
+		// a variable read only at start: rebuild from the environment so it applies now
+		keep := GlobalConfig
+		GlobalConfig = buildConfig()
+		GlobalConfig.BotToken, GlobalConfig.WorkerBotTokens, GlobalConfig.DownloadDir = keep.BotToken, keep.WorkerBotTokens, keep.DownloadDir
+		syncLogDump()
+	}
 	_ = saveVarToFile("config.env", key, val)
 	if _, err := os.Stat(".env"); err == nil {
 		_ = saveVarToFile(".env", key, val)
@@ -685,7 +710,10 @@ func saveVarToFile(filename, key, val string) error {
 func GetConfigMap() map[string]string {
 	configLock.RLock()
 	defer configLock.RUnlock()
+	return configMapLocked()
+}
 
+func configMapLocked() map[string]string {
 	return map[string]string{
 		"TIMEZONE":                     GlobalConfig.Timezone,
 		"MIRROR_LOG_ID":                strconv.FormatInt(GlobalConfig.MirrorLogID, 10),
@@ -764,6 +792,10 @@ func GetConfigMap() map[string]string {
 func StartupValues() map[string]string {
 	configLock.RLock()
 	defer configLock.RUnlock()
+	return startupValuesLocked()
+}
+
+func startupValuesLocked() map[string]string {
 	c := GlobalConfig
 	ids := func(l []int64) string {
 		var out []string
@@ -805,4 +837,23 @@ func StartupValues() map[string]string {
 		"EXTRACT_LIMIT":                strconv.FormatInt(c.ExtractLimit, 10),
 		"STORAGE_THRESHOLD":            strconv.FormatInt(c.StorageThreshold, 10),
 	}
+}
+
+// DefaultValue is the value a variable has when nothing sets it (the code default), for Reset.
+func DefaultValue(key string) (string, bool) {
+	configLock.Lock()
+	defer configLock.Unlock()
+	saved := GlobalConfig
+	noEnv = true
+	GlobalConfig = buildConfig()
+	noEnv = false
+	m := configMapLocked()
+	for k, v := range startupValuesLocked() {
+		if _, ok := m[k]; !ok {
+			m[k] = v
+		}
+	}
+	GlobalConfig = saved
+	v, ok := m[key]
+	return v, ok
 }

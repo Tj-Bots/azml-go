@@ -192,6 +192,18 @@ func configValue(cfgMap map[string]string, key string) string {
 	return os.Getenv(key)
 }
 
+// restartOnlyVar: the few variables used only while the bot starts (connections, commands, ports).
+// Every other one applies as soon as it is changed.
+func restartOnlyVar(key string) bool {
+	switch key {
+	case "BOT_TOKEN", "BOT_TOKENS", "OWNER_ID", "TELEGRAM_API", "TELEGRAM_HASH", "DATABASE_URL", "DATABASE_NAME",
+		"CMD_SUFFIX", "DOWNLOAD_DIR", "ARIA2_PORT", "BASE_URL_PORT", "SET_COMMANDS", "AUTHORIZED_CHATS", "SUDO_USERS",
+		"BLACKLIST_USERS", "UPSTREAM_REPO", "UPSTREAM_BRANCH":
+		return true
+	}
+	return false
+}
+
 func isBoolVar(key string) bool {
 	// every var whose description ends with "Bool" is a True / False choice
 	if d := strings.TrimRight(strings.TrimSpace(varDescriptions[key]), "."); strings.HasSuffix(d, "Bool") {
@@ -451,7 +463,7 @@ func varPageText(key, value string, private bool, live bool) string {
 
 func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing, private bool) (string, *telegram.ButtonMaker) {
 	cfgMap := config.GetConfigMap()
-	_, live := cfgMap[key]
+	live := !restartOnlyVar(key)
 	text := varPageText(key, configValue(cfgMap, key), private, live)
 	btn := telegram.NewButtonMaker()
 
@@ -725,14 +737,22 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 			if len(parts) >= 4 {
 				page, _ = strconv.Atoi(parts[3])
 			}
-			defVal := defaultVarValues[key]
+			// the code default of the variable (what it is when nothing sets it)
+			defVal, ok := config.DefaultValue(key)
+			if !ok {
+				defVal = defaultVarValues[key]
+			}
 			if key == "USER_SESSION_STRING" && m.userSessionReloader != nil {
 				_, _, _, _ = m.userSessionReloader(ctx, "")
 			} else {
 				_ = config.UpdateConfigVar(key, defVal)
 			}
 			text, btn := m.buildVarDetailMenu(key, page, false, isPrivatePeer(peer))
-			text += fmt.Sprintf("\n\n• <i>%s reset to default: %s</i>", key, defVal)
+			shown := defVal
+			if shown == "" {
+				shown = "None"
+			}
+			text += fmt.Sprintf("\n\n• <i>%s reset to default: %s</i>", key, telegram.EscapeHTML(shown))
 			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 			_ = m.sender.AnswerCallback(ctx, queryID, fmt.Sprintf("%s reset to default", key), false)
 		}

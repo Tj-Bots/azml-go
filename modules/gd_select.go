@@ -57,8 +57,10 @@ func BuildGDriveSelectionButtons(uid string) tg.ReplyMarkupClass {
 	if cfg.WebPincode {
 		b.IButtonStyled("◈ "+telegram.ToSmallCaps("Pincode"), fmt.Sprintf("gdsel pin %s %s", uid, pinCode), "primary")
 	}
+	b.Row()
 	b.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), fmt.Sprintf("gdsel cancel %s", uid), "danger")
 	b.IButtonStyled("✓ "+telegram.ToSmallCaps("Done Selecting"), fmt.Sprintf("gdsel done %s", uid), "success")
+	b.Row()
 	return b.BuildMenu(2)
 }
 

@@ -106,3 +106,51 @@ func (m *MessageSender) EditRich(ctx context.Context, peer tg.InputPeerClass, ms
 	}
 	return err
 }
+
+// RichKeyboardHTML puts the buttons inside the rich message (an edit of a rich message keeps them,
+// a reply_markup on it was dropped).
+func RichKeyboardHTML(btn *ButtonMaker) string {
+	if btn == nil {
+		return ""
+	}
+	var sb strings.Builder
+	for _, row := range btn.Rows(3) {
+		if len(row) == 0 {
+			continue
+		}
+		sb.WriteString(`<tg-button-row align="center">`)
+		for _, b := range row {
+			style := ""
+			if b.Style != "" {
+				style = fmt.Sprintf(` style="%s"`, b.Style)
+			}
+			if b.URL != "" {
+				sb.WriteString(fmt.Sprintf(`<tg-button type="url"%s url="%s">%s</tg-button>`, style, EscapeHTML(b.URL), EscapeHTML(b.Text)))
+			} else {
+				sb.WriteString(fmt.Sprintf(`<tg-button type="callback_data"%s data="%s">%s</tg-button>`, style, EscapeHTML(b.Data), EscapeHTML(b.Text)))
+			}
+		}
+		sb.WriteString(`</tg-button-row>`)
+	}
+	return sb.String()
+}
+
+// SendEphemeral answers a button press with a message only the presser sees (also in groups).
+func (m *MessageSender) SendEphemeral(ctx context.Context, peer tg.InputPeerClass, queryID int64, text string, btn *ButtonMaker) (int, error) {
+	p := map[string]interface{}{
+		"chat_id":                      PeerToChatID(peer),
+		"text":                         text,
+		"parse_mode":                   "HTML",
+		"ephemeral_message_parameters": map[string]interface{}{"callback_query_id": fmt.Sprint(queryID)},
+	}
+	if btn != nil {
+		if kb := btn.BuildBotAPIKeyboard(2); kb != "" {
+			p["reply_markup"] = json.RawMessage(kb)
+		}
+	}
+	r, err := botAPICall(ctx, "sendMessage", p)
+	if err != nil {
+		return 0, err
+	}
+	return r.Result.MessageID, nil
+}

@@ -391,10 +391,13 @@ const pageHTML = `<!DOCTYPE html>
         <!-- File List / Selector -->
         <section class="glass-card rounded-2xl p-3 sm:p-6 shadow-2xl relative">
             <form action="{form_url}" onsubmit="return s_validate()" method="POST" class="flex flex-col gap-3 sm:gap-6">
+                <button type="button" id="select_all" onclick="toggleAll()" class="self-end bg-zinc-800 hover:bg-zinc-700 text-white text-xs sm:text-sm font-semibold py-2 px-4 rounded-lg transition-all">
+                    Select All
+                </button>
                 <div class="flex flex-col gap-1 rounded-xl bg-black/40 border border-zinc-800 p-2 sm:p-4 max-h-[65vh] overflow-y-auto overflow-x-hidden">
                     {My_content}
                 </div>
-                <button type="submit" class="self-center w-full sm:w-1/2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 sm:py-3.5 rounded-xl transition-all shadow-[0_0_20px_rgba(168,85,247,0.2)] text-sm sm:text-base">
+                <button type="submit" id="confirm_btn" disabled class="self-center w-full sm:w-1/2 bg-purple-600 hover:bg-purple-700 disabled:bg-zinc-700 disabled:text-zinc-400 disabled:cursor-not-allowed disabled:shadow-none text-white font-bold py-3 sm:py-3.5 rounded-xl transition-all shadow-[0_0_20px_rgba(168,85,247,0.2)] text-sm sm:text-base">
                     Confirm Selection
                 </button>
             </form>
@@ -438,8 +441,34 @@ const pageHTML = `<!DOCTYPE html>
                 }
                 checkingfiles();
                 checked_size();
+                updateButtons();
             });
+            savedState = currentState();
+            updateButtons();
         });
+
+        // the saved selection: Confirm stays disabled until something changes
+        var savedState = "";
+        function currentState() {
+            return $("input[type='checkbox'][name^='filenode_']").map(function () {
+                return $(this).prop('checked') ? '1' : '0';
+            }).get().join('');
+        }
+        function updateButtons() {
+            var all = $("input[type='checkbox'][name^='filenode_']");
+            var on = all.filter(':checked').length;
+            $("#select_all").text(all.length > 0 && on === all.length ? "Unselect All" : "Select All");
+            $("#confirm_btn").prop('disabled', currentState() === savedState);
+        }
+        function toggleAll() {
+            var all = $("input[type='checkbox']");
+            var files = $("input[type='checkbox'][name^='filenode_']");
+            var check = files.filter(':checked').length !== files.length;
+            all.prop('checked', check);
+            checkingfiles();
+            checked_size();
+            updateButtons();
+        }
 
         function docready() {
             checked_size();

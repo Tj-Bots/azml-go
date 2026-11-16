@@ -57,8 +57,10 @@ func BuildMegaSelectionButtons(uid string) tg.ReplyMarkupClass {
 	if cfg.WebPincode {
 		b.IButtonStyled("◈ "+telegram.ToSmallCaps("Pincode"), fmt.Sprintf("megasel pin %s %s", uid, pinCode), "primary")
 	}
+	b.Row()
 	b.IButtonStyled("× "+telegram.ToSmallCaps("Cancel"), fmt.Sprintf("megasel cancel %s", uid), "danger")
 	b.IButtonStyled("✓ "+telegram.ToSmallCaps("Done Selecting"), fmt.Sprintf("megasel done %s", uid), "success")
+	b.Row()
 	return b.BuildMenu(2)
 }
 

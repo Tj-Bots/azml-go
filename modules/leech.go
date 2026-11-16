@@ -303,7 +303,11 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 			_ = m.sender.DeleteMessage(ctx, peer, []int{notifyID})
 		}
 	}
-	_, _ = m.sender.SendMessage(ctx, peer, errMsg, msg.MessageID, retryMarkup(msg))
+	var markup tg.ReplyMarkupClass
+	if !noRetry(errStr) {
+		markup = retryMarkup(msg)
+	}
+	_, _ = m.sender.SendMessage(ctx, peer, errMsg, msg.MessageID, markup)
 
 	if m.statusMod != nil {
 		if m.taskMgr.Count() == 0 {
@@ -2734,4 +2738,15 @@ func (m *LeechModule) sameDirFailed(peer tg.InputPeerClass, msg *types.MessageCo
 	notifyID, _ := m.sender.SendMessage(context.Background(), peer, "<i>Uploading the folder...</i>", msg.MessageID, nil)
 	opt, _ := parseLeechArgs(msg.Text)
 	go m.processLeechPipeline(peer, &up, opt, dest, taskDir, notifyID)
+}
+
+// noRetry: Retry makes no sense when the user stopped the task himself or the bot refuses it.
+func noRetry(reason string) bool {
+	r := strings.ToLower(reason)
+	for _, k := range []string{"cancel", "disabled", "limit", "not supported", "closed"} {
+		if strings.Contains(r, k) {
+			return true
+		}
+	}
+	return false
 }

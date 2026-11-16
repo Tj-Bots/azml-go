@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"regexp"
 	"strconv"
@@ -289,6 +290,37 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 					_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 					return
 				}
+				// ask first: a message only the presser sees (ephemeral), else a normal one
+				q := telegram.NewButtonMaker()
+				q.IButtonStyled("✓ Yes, Cancel", "status ycancel "+gid, "danger")
+				q.IButtonStyled("✘ No", "status ncancel", "primary")
+				q.Row()
+				text := fmt.Sprintf("<b>Cancel this task?</b>\n<code>%s</code>", telegram.EscapeHTML(task.Name()))
+				if _, err := m.sender.SendEphemeral(ctx, peer, queryID, text, q); err != nil {
+					_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, 0, q, 2)
+				}
+				_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+				return
+			}
+			_ = m.sender.AnswerCallback(ctx, queryID, "Task already finished or not found!", true)
+			return
+		}
+
+	case "ncancel":
+		_ = m.sender.AnswerCallback(ctx, queryID, "The task goes on.", false)
+		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+		return
+
+	case "ycancel":
+		if len(parts) >= 3 {
+			gid := parts[2]
+			task := m.taskMgr.GetTask(gid)
+			if task != nil {
+				if fromUID != 0 && task.UserID() != 0 && task.UserID() != fromUID && !telegram.IsOwner(fromUID) {
+					_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+					return
+				}
+				_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 				_ = task.Cancel()
 				m.taskMgr.RemoveTask(gid)
 				_ = m.sender.AnswerCallback(ctx, queryID, "× Task Cancelled!", false)
@@ -559,7 +591,7 @@ func (m *StatusModule) UpdateAllMessages(ctx context.Context, force bool) {
 // sendStatus sends a status message (rich when RICH_MESSAGES is on, plain if that fails).
 func (m *StatusModule) sendStatus(ctx context.Context, peer tg.InputPeerClass, text string, replyTo int, btn *telegram.ButtonMaker) (int, error) {
 	if config.Get().RichMessages {
-		if id, err := m.sender.SendRich(ctx, peer, richStatus(text), replyTo, btn); err == nil {
+		if id, err := m.sender.SendRich(ctx, peer, richStatus(text)+telegram.RichKeyboardHTML(btn), replyTo, nil); err == nil {
 			return id, nil
 		} else {
 			log.Printf("[Status] rich message failed (%v), sending plain text", err)
@@ -573,7 +605,7 @@ func (m *StatusModule) editStatus(ctx context.Context, r *StatusReplyInfo, text 
 	if !config.Get().RichMessages {
 		return m.sender.EditMessageWithButtons(ctx, r.Peer, r.MessageID, text, btn, 3)
 	}
-	err := m.sender.EditRich(ctx, r.Peer, r.MessageID, richStatus(text), btn)
+	err := m.sender.EditRich(ctx, r.Peer, r.MessageID, richStatus(text)+telegram.RichKeyboardHTML(btn), nil)
 	if err == nil {
 		m.mu.Lock()
 		r.LastEdit = time.Now()
@@ -583,7 +615,7 @@ func (m *StatusModule) editStatus(ctx context.Context, r *StatusReplyInfo, text 
 	if strings.Contains(strings.ToLower(err.Error()), "too many requests") {
 		return err
 	}
-	newID, sErr := m.sender.SendRich(ctx, r.Peer, richStatus(text), 0, btn)
+	newID, sErr := m.sender.SendRich(ctx, r.Peer, richStatus(text)+telegram.RichKeyboardHTML(btn), 0, nil)
 	if sErr != nil {
 		log.Printf("[Status] rich status failed (%v), using plain text", sErr)
 		return m.sender.EditMessageWithButtons(ctx, r.Peer, r.MessageID, text, btn, 3)
@@ -611,7 +643,7 @@ func richStatus(text string) string {
 // editStatusID edits a status message by id (rich when RICH_MESSAGES is on).
 func (m *StatusModule) editStatusID(ctx context.Context, peer tg.InputPeerClass, msgID int, text string, btn *telegram.ButtonMaker) error {
 	if config.Get().RichMessages {
-		if err := m.sender.EditRich(ctx, peer, msgID, richStatus(text), btn); err == nil {
+		if err := m.sender.EditRich(ctx, peer, msgID, richStatus(text)+telegram.RichKeyboardHTML(btn), nil); err == nil {
 			return nil
 		}
 	}

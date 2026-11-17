@@ -174,6 +174,7 @@ func (m *YtdlModule) showQualities(peer tg.InputPeerClass, msg *types.MessageCon
 		} else {
 			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		}
+		m.leech.deleteCommandLinks(peer, msg)
 		return
 	}
 

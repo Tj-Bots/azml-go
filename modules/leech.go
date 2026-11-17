@@ -281,6 +281,25 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	go m.processLeechPipeline(peer, msg, opt, link, taskDir, notifyID)
 }
 
+// deleteCommandLinks: DELETE_LINKS like the Python bot (delete_links): the command and the message
+// it answers go also when the task is refused or fails before it starts.
+func (m *LeechModule) deleteCommandLinks(peer tg.InputPeerClass, msg *types.MessageContext) {
+	if !config.Get().DeleteLinks || msg == nil || msg.Internal {
+		return
+	}
+	ids := []int{msg.MessageID}
+	if msg.IsReply && msg.ReplyToID > 0 {
+		ids = append(ids, msg.ReplyToID)
+	}
+	go func() {
+		for _, id := range ids {
+			dctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			_ = m.sender.DeleteMessage(dctx, peer, []int{id})
+			cancel()
+		}
+	}()
+}
+
 func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, notifyID int, errStr string, mode string, startTime time.Time) {
 	tag := fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, telegram.EscapeHTML(msg.SenderName))
 	if msg.Username != "" {
@@ -292,6 +311,7 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 	if stopped {
 		ctx = context.Background() // the task's context is done: the message must still go out
 	}
+	m.deleteCommandLinks(peer, msg) // like the Python bot: also when the task fails or is refused
 	if low := strings.ToLower(errStr); strings.Contains(low, "context canceled") || stopped {
 		if strings.HasPrefix(low, "upload") || strings.Contains(low, " upload failed") {
 			errStr = "Your upload has been stopped!"
@@ -2769,6 +2789,7 @@ func (m *LeechModule) userTasksOK(ctx context.Context, peer tg.InputPeerClass, m
 		return true
 	}
 	m.replyTemp(ctx, peer, msg, fmt.Sprintf("<blockquote>Your tasks limit exceeded for %d tasks</blockquote>", limit))
+	m.deleteCommandLinks(peer, msg)
 	return false
 }
 
@@ -2779,6 +2800,7 @@ func (m *LeechModule) botTasksOK(ctx context.Context, peer tg.InputPeerClass, ms
 		return true
 	}
 	m.replyTemp(ctx, peer, msg, fmt.Sprintf("<blockquote>Bot Max Tasks limit exceeded.\nBot max tasks limit is %d.\nPlease wait for the completion of other tasks.</blockquote>", limit))
+	m.deleteCommandLinks(peer, msg)
 	return false
 }
 

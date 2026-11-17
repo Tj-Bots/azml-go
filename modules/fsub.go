@@ -174,6 +174,7 @@ func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, ms
 		return false
 	}
 	go m.gateFollow(peer, msg.UserID, id, tag, g)
+	m.deleteCommandLinks(peer, msg)
 	return false
 }
 
@@ -230,6 +231,7 @@ func (m *LeechModule) timeIntervalOK(ctx context.Context, peer tg.InputPeerClass
 		if id > 0 {
 			m.sender.AutoDeleteMessage(peer, id, 10)
 		}
+		m.deleteCommandLinks(peer, msg)
 		return false
 	}
 	userLastTask[msg.UserID] = time.Now()

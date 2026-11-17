@@ -358,11 +358,11 @@ func (m *BotSettingsModule) buildSessionMenu() (string, *telegram.ButtonMaker) {
 	}
 
 	text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-		"<blockquote>╭ <b>Status:</b> %s\n"+
+		"<blockquote><b>╭</b> <b>Status:</b> %s\n"+
 		"┠ <b>Max Split Size:</b> <code>%s</code>\n"+
 		"┠ <b>Dump Channel:</b> %s\n"+
 		"┠ <b>Session String:</b> <code>%s</code>\n"+
-		"╰ <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code></blockquote>\n\n"+
+		"<b>╰</b> <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code></blockquote>\n\n"+
 		"<i>Supported session string formats: Pyrogram (v1, v2), Pyrofork, Telethon, gotd</i>\n\n"+
 		"<i>Click <b>Set Session String</b> to save/update your user session for 4GB uploads:</i>",
 		"User Session Settings",
@@ -528,7 +528,7 @@ func (m *BotSettingsModule) HandleSessionValue(ctx context.Context, peer tg.Inpu
 				return
 			}
 
-			successMsg := fmt.Sprintf("\n\n✓ <b>User Session connected!</b>\n<blockquote>╭ <b>User:</b> @%s (ID: %d)\n┠ <b>Premium:</b> %v\n┠ <b>Max Split:</b> %s\n╰ <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code></blockquote>",
+			successMsg := fmt.Sprintf("\n\n✓ <b>User Session connected!</b>\n<blockquote><b>╭</b> <b>User:</b> @%s (ID: %d)\n┠ <b>Premium:</b> %v\n┠ <b>Max Split:</b> %s\n<b>╰</b> <b>Upload Flow:</b> <code>User String ➔ Dump Channel ➔ User DM</code></blockquote>",
 				uname, uid, isPrem, ext.GetReadableFileSize(config.GetMaxSplitSize()))
 
 			if page == -2 {
@@ -621,12 +621,12 @@ func (m *BotSettingsModule) HandleSessionCancelled(ctx context.Context, peer tg.
 
 func (m *BotSettingsModule) buildAriaMenu() (string, *telegram.ButtonMaker) {
 	text := "㊂ <b><u>Aria2c Settings :</u></b>\n\n" +
-		"<blockquote>╭ <b>max-connection-per-server:</b> <code>16</code> (Max)\n" +
+		"<blockquote><b>╭</b> <b>max-connection-per-server:</b> <code>16</code> (Max)\n" +
 		"┠ <b>split:</b> <code>16</code> (Max)\n" +
 		"┠ <b>min-split-size:</b> <code>1M</code>\n" +
 		"┠ <b>bt-max-peers:</b> <code>128</code>\n" +
 		"┠ <b>disk-cache:</b> <code>64M</code>\n" +
-		"╰ <b>allow-overwrite:</b> <code>true</code></blockquote>\n\n" +
+		"<b>╰</b> <b>allow-overwrite:</b> <code>true</code></blockquote>\n\n" +
 		"<i>Optimized for peak network throughput on free tier VPS servers.</i>"
 
 	btn := telegram.NewButtonMaker()
@@ -639,11 +639,11 @@ func (m *BotSettingsModule) buildAriaMenu() (string, *telegram.ButtonMaker) {
 func (m *BotSettingsModule) buildPrivateMenu() (string, *telegram.ButtonMaker) {
 	text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 		"<i>Send any of these private files as a document directly to the bot:</i>\n\n"+
-		"<blockquote>╭ <code>token.pickle</code> — Google Drive OAuth token (automatically loaded)\n"+
+		"<blockquote><b>╭</b> <code>token.pickle</code> — Google Drive OAuth token (automatically loaded)\n"+
 		"┠ <code>config.env</code> — Bot environment variables (auto reloaded)\n"+
 		"┠ <code>cookies.txt</code> — Netscape cookies for yt-dlp & aria2c\n"+
 		"┠ <code>shorteners.txt</code> — Multi-shortener routing file (auto reloaded)\n"+
-		"╰ <code>accounts.zip</code> — Service accounts archive</blockquote>\n\n"+
+		"<b>╰</b> <code>accounts.zip</code> — Service accounts archive</blockquote>\n\n"+
 		"<b>Automatic Processing:</b>\n"+
 		"When you share <code>token.pickle</code> or <code>shorteners.txt</code> to the bot, they are automatically saved and reloaded immediately.",
 		"Private Files")
@@ -921,10 +921,10 @@ func (m *BotSettingsModule) buildShortenerMenu() (string, *telegram.ButtonMaker)
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
-		"<blockquote>╭ <b>Shortener Access :</b> <code>%s</code>\n"+
+		"<blockquote><b>╭</b> <b>Shortener Access :</b> <code>%s</code>\n"+
 		"┠ <b>Token Validity :</b> <code>%s</code>\n"+
 		"┠ <b>Default Domain :</b> <code>%s</code>\n"+
-		"╰ <b>Default API Key :</b> <code>%s</code></blockquote>\n\n",
+		"<b>╰</b> <b>Default API Key :</b> <code>%s</code></blockquote>\n\n",
 		"Shortener Settings", stEmoji, valStr, shDomain, shAPI))
 
 	if shrtsCount > 0 {

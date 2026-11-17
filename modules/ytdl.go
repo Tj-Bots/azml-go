@@ -113,7 +113,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 	if link == "" {
 		helpMsg := "㊂ <b><u>YT-DLP Command Usage :</u></b>\n\n" +
 			"<b>Usage:</b> <code>/ytdl" + config.Get().CmdSuffix + " [link] [quality]</code> or reply to a link\n\n" +
-			"<blockquote>╭ <code>/ytdl" + config.Get().CmdSuffix + " link</code> — Choose the quality from buttons\n" +
+			"<blockquote><b>╭</b> <code>/ytdl" + config.Get().CmdSuffix + " link</code> — Choose the quality from buttons\n" +
 			"┠ <code>720p</code> — Direct quality (144p - 2160p)\n" +
 			"┠ <code>best</code> — Best video + audio\n" +
 			"┠ <code>audio</code> / <code>mp3</code> — Audio only\n" +
@@ -121,7 +121,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 			"┠ <code>-n name</code> — Custom File Name\n" +
 			"┠ <code>-z</code> — Compress as Zip\n" +
 			"┠ <code>-d</code> / <code>-m</code> — Upload as Document / Media\n" +
-			"╰ <code>-up gofile</code> — Mirror to a host</blockquote>\n\n" +
+			"<b>╰</b> <code>-up gofile</code> — Mirror to a host</blockquote>\n\n" +
 			"➲ <b>Supported :</b> YouTube, Instagram, TikTok, X, Facebook and more\n" +
 			"➲ <b>Cookies :</b> <code>cookies.txt</code> in the bot folder is used when present"
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
@@ -272,13 +272,13 @@ func (p *ytdlPending) header(title string) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("㊂ <b><u>" + title + " :</u></b>\n\n<blockquote>")
-	sb.WriteString(fmt.Sprintf("╭ <b>Title :</b> %s\n", telegram.EscapeHTML(name)))
+	sb.WriteString(fmt.Sprintf("<b>╭</b> <b>Title :</b> %s\n", telegram.EscapeHTML(name)))
 	if p.info != nil && p.info.IsPlaylist {
 		sb.WriteString(fmt.Sprintf("┠ <b>Playlist :</b> %d items\n", p.info.Count))
 	} else if p.info != nil && p.info.Duration > 0 {
 		sb.WriteString(fmt.Sprintf("┠ <b>Duration :</b> %s\n", ext.GetReadableTime(int64(p.info.Duration))))
 	}
-	sb.WriteString(fmt.Sprintf("╰ <b>Timeout :</b> %s</blockquote>", ext.GetReadableTime(int64(left.Seconds()))))
+	sb.WriteString(fmt.Sprintf("<b>╰</b> <b>Timeout :</b> %s</blockquote>", ext.GetReadableTime(int64(left.Seconds()))))
 	return sb.String()
 }
 

@@ -688,13 +688,13 @@ func richUnsupported(err error) bool {
 	return true
 }
 
-var cancelLineRe = regexp.MustCompile(`╰ /cancel[^_\s]*_(\S+?)</blockquote>\n*`)
+var cancelLineRe = regexp.MustCompile(`<b>╰</b> /cancel[^_\s]*_(\S+?)</blockquote>\n*`)
 
 // richStatus: the plain status with a Cancel button inside every task and a line between tasks.
 func richStatus(text string) string {
 	text = cancelLineRe.ReplaceAllStringFunc(text, func(line string) string {
 		gid := cancelLineRe.FindStringSubmatch(line)[1]
-		return "╰ " + telegram.RichButton("Cancel Task", "status cancel "+gid, "danger") + "</blockquote><hr/>\n"
+		return "<b>╰</b> " + telegram.RichButton("Cancel Task", "status cancel "+gid, "danger") + "</blockquote><hr/>\n"
 	})
 	// a line only between tasks: none after the last one (above Bot Stats)
 	if i := strings.LastIndex(text, "<hr/>"); i >= 0 {

@@ -288,15 +288,15 @@ func (st *vtState) menu() (string, *telegram.ButtonMaker) {
 		b.IButtonStyled("❌", fmt.Sprintf("vtool %d close", st.user), "danger")
 	}
 	b.Row()
-	lines := "╭ <b>Selected:</b> None"
+	lines := "<b>╭</b> <b>Selected:</b> None"
 	if len(chosen) > 0 {
-		lines = "╭ <b>Selected:</b>\n┠ " + strings.Join(chosen, "\n┠ ")
+		lines = "<b>╭</b> <b>Selected:</b>\n┠ " + strings.Join(chosen, "\n┠ ")
 	}
 	left := int((vtTimeout - time.Since(st.start)).Seconds())
 	if left < 0 {
 		left = 0
 	}
-	text := fmt.Sprintf("㊂ <b><u>Video Tools</u></b>\n\n<blockquote>%s\n╰ <b>Closes in:</b> %ds</blockquote>\n\n<i>Pick one tool, Rename can be added to it. Nothing is re-encoded.</i>", lines, left)
+	text := fmt.Sprintf("㊂ <b><u>Video Tools</u></b>\n\n<blockquote>%s\n<b>╰</b> <b>Closes in:</b> %ds</blockquote>\n\n<i>Pick one tool, Rename can be added to it. Nothing is re-encoded.</i>", lines, left)
 	return text, b
 }
 

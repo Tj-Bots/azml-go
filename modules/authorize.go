@@ -330,16 +330,16 @@ func (m *AuthorizeModule) HandleUsers(ctx context.Context, peer tg.InputPeerClas
 			shown = shown[:30]
 		}
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("<blockquote>╭ <b>%s :</b> %d", title, len(ids)))
+		sb.WriteString(fmt.Sprintf("<blockquote><b>╭</b> <b>%s :</b> %d", title, len(ids)))
 		for i, id := range shown {
 			mark := "┠"
 			if i == len(shown)-1 && more == 0 {
-				mark = "╰"
+				mark = "<b>╰</b>"
 			}
 			sb.WriteString(fmt.Sprintf("\n%s %s", mark, id))
 		}
 		if more > 0 {
-			sb.WriteString(fmt.Sprintf("\n╰ <i>...and %d more</i>", more))
+			sb.WriteString(fmt.Sprintf("\n<b>╰</b> <i>...and %d more</i>", more))
 		}
 		sb.WriteString("</blockquote>")
 		return sb.String()
@@ -358,11 +358,11 @@ func (m *AuthorizeModule) HandleUsers(ctx context.Context, peer tg.InputPeerClas
 		text = "㊂ <b><u>Blacklisted :</u></b>\n\n" + list("Blacklisted", black)
 	default:
 		text = fmt.Sprintf("㊂ <b><u>Users :</u></b>\n\n"+
-			"<blockquote>╭ <b>Saved users / chats :</b> %d\n"+
+			"<blockquote><b>╭</b> <b>Saved users / chats :</b> %d\n"+
 			"┠ <b>Authorized :</b> %d\n"+
 			"┠ <b>Sudo :</b> %d\n"+
 			"┠ <b>Premium :</b> %d\n"+
-			"╰ <b>Blacklisted :</b> %d</blockquote>\n\n"+
+			"<b>╰</b> <b>Blacklisted :</b> %d</blockquote>\n\n"+
 			"➲ <i>Lists:</i> /authlist /sudolist /blacklisted",
 			len(all), len(auth), len(sudo), len(prem), len(black))
 	}

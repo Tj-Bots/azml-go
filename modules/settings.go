@@ -310,8 +310,8 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 		name = fmt.Sprintf("%d", u.UserID)
 	}
 	text := fmt.Sprintf("㊂ <b><u>User Settings :</u></b>\n\n"+
-		"<blockquote>╭ <b>Name :</b> <a href=\"tg://user?id=%d\">%s</a>\n"+
-		"╰ <b>User ID :</b> <code>%d</code></blockquote>",
+		"<blockquote><b>╭</b> <b>Name :</b> <a href=\"tg://user?id=%d\">%s</a>\n"+
+		"<b>╰</b> <b>User ID :</b> <code>%d</code></blockquote>",
 		u.UserID, telegram.EscapeHTML(name), u.UserID)
 
 	btn := telegram.NewButtonMaker()
@@ -439,7 +439,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 
 	// Exact AZML text format with small caps header
 	text := fmt.Sprintf("㊂ <b><u>%s for %s</u></b>\n\n"+
-		"<blockquote>╭ <b>Daily Leech :</b> <code>%s</code> per day\n"+
+		"<blockquote><b>╭</b> <b>Daily Leech :</b> <code>%s</code> per day\n"+
 		"┠ <b>Leech Type :</b> <i>%s</i>\n"+
 		"┠ <b>Custom Thumbnail :</b> <i>%s</i>\n"+
 		"┠ <b>Leech Split Size :</b> <code>%s</code>\n"+
@@ -458,7 +458,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		"┠ <b>Caption Font :</b> <i>%s</i>\n"+
 		"┠ <b>Excluded Ext :</b> <code>%s</code>\n"+
 		"┠ <b>Screenshots :</b> <i>%s</i>\n"+
-		"╰ <b>Sample Video :</b> <i>%s</i></blockquote>",
+		"<b>╰</b> <b>Sample Video :</b> <i>%s</i></blockquote>",
 		"Leech Settings",
 		nameTag, dlStr, ltype, thumbStatus, splitSize, equalSplits, mediaGroup,
 		caption, prefix, suffix, dumps, remnameAuto, remnameRegex, renameMethod,
@@ -1446,8 +1446,8 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		ready = append(ready, h.Name)
 	}
 	text := fmt.Sprintf("㊂ <b><u>Mirror Settings for <a href=\"tg://user?id=%d\">%s</a></u></b>\n\n"+
-		"<blockquote>╭ <b>Upload To :</b> <i>%s</i>\n"+
-		"╰ <b>DDL Server(s) :</b> <i>%s</i></blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b>Upload To :</b> <i>%s</i>\n"+
+		"<b>╰</b> <b>DDL Server(s) :</b> <i>%s</i></blockquote>\n\n"+
 		"➲ <b>Description :</b> <i>Tap a server to make it your default for /mirror or to add your own API key. 🔑 = your key is set.</i>",
 		u.UserID, telegram.EscapeHTML(name), mirrorHostText(u.MirrorHost), strings.Join(ready, ", "))
 	btn := telegram.NewButtonMaker()
@@ -1672,11 +1672,11 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 	}
 	tasks, dailyBytes := ext.GetUserDailyStats(u.UserID)
 	text := fmt.Sprintf("㊂ <b><u>Universal Settings : <a href=\"tg://user?id=%d\">%s</a></u></b>\n\n"+
-		"<blockquote>╭ <b>Daily Tasks :</b> <code>%d</code> today\n"+
+		"<blockquote><b>╭</b> <b>Daily Tasks :</b> <code>%d</code> today\n"+
 		"┠ <b>Daily Leech :</b> <code>%s</code> today\n"+
 		"┠ <b>YT-DLP Options :</b> <i>%s</i>\n"+
 		"┠ <b>YT-DLP Cookies :</b> <i>%s</i>\n"+
-		"╰ <b>MediaInfo Mode :</b> <i>%s</i></blockquote>",
+		"<b>╰</b> <b>MediaInfo Mode :</b> <i>%s</i></blockquote>",
 		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), existsText(u.YtOpt != ""), existsText(u.YtCookies != ""), onOff(u.MediaInfoOn(config.Get().ShowMediaInfo)))
 	btn := telegram.NewButtonMaker()
 	if u.YtOpt != "" {
@@ -1732,8 +1732,8 @@ func (m *SettingsModule) buildYtdlSettingMenu(u *types.UserSettings, key, note s
 			val = fmt.Sprintf("Exists (%d lines)", strings.Count(u.YtCookies, "\n")+1)
 		}
 		text = "㊂ <b><u>YT-DLP Cookies :</u></b>\n\n" +
-			"<blockquote>╭ <b>Cookies :</b> <i>" + val + "</i>\n" +
-			"╰ <b>Description :</b> <i>Your own cookies.txt for /ytdl (YouTube sign-in, age limits, private videos). Without it the bot's cookies.txt is used.</i></blockquote>"
+			"<blockquote><b>╭</b> <b>Cookies :</b> <i>" + val + "</i>\n" +
+			"<b>╰</b> <b>Description :</b> <i>Your own cookies.txt for /ytdl (YouTube sign-in, age limits, private videos). Without it the bot's cookies.txt is used.</i></blockquote>"
 		btn.IButton(map[bool]string{true: "Change Cookies", false: "Set Cookies"}[u.YtCookies != ""], fmt.Sprintf("userset %d edit_ycookies", u.UserID))
 		if u.YtCookies != "" {
 			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ycookies", u.UserID))
@@ -1744,8 +1744,8 @@ func (m *SettingsModule) buildYtdlSettingMenu(u *types.UserSettings, key, note s
 			val = "<code>" + telegram.EscapeHTML(u.YtOpt) + "</code>"
 		}
 		text = "㊂ <b><u>YT-DLP Options :</u></b>\n\n" +
-			"<blockquote>╭ <b>Options :</b> " + val + "\n" +
-			"╰ <b>Description :</b> <i>Extra yt-dlp options added to every /ytdl task.</i></blockquote>"
+			"<blockquote><b>╭</b> <b>Options :</b> " + val + "\n" +
+			"<b>╰</b> <b>Description :</b> <i>Extra yt-dlp options added to every /ytdl task.</i></blockquote>"
 		btn.IButton(map[bool]string{true: "Change Options", false: "Set Options"}[u.YtOpt != ""], fmt.Sprintf("userset %d edit_ytopt", u.UserID))
 		if u.YtOpt != "" {
 			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_ytopt", u.UserID))
@@ -1771,8 +1771,8 @@ func (m *SettingsModule) buildExtraMenu(u *types.UserSettings, key, note string)
 			val = "<code>" + telegram.EscapeHTML(u.MegaEmail) + "</code>"
 		}
 		text = "㊂ <b><u>Mega Login :</u></b>\n\n" +
-			"<blockquote>╭ <b>Account :</b> " + val + "\n" +
-			"╰ <b>Description :</b> <i>Your MEGA account for your Mega downloads: the quota is your account's, not the server's (Pro accounts are much bigger). Accounts with 2FA are not supported.</i></blockquote>"
+			"<blockquote><b>╭</b> <b>Account :</b> " + val + "\n" +
+			"<b>╰</b> <b>Description :</b> <i>Your MEGA account for your Mega downloads: the quota is your account's, not the server's (Pro accounts are much bigger). Accounts with 2FA are not supported.</i></blockquote>"
 		btn.IButton(map[bool]string{true: "Change Login", false: "Set Login"}[u.MegaEmail != ""], fmt.Sprintf("userset %d edit_megalogin", u.UserID))
 		if u.MegaEmail != "" {
 			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_megalogin", u.UserID))
@@ -1791,8 +1791,8 @@ func (m *SettingsModule) buildExtraMenu(u *types.UserSettings, key, note string)
 		if len(lines) > 0 {
 			list = strings.Join(lines, "\n")
 		}
-		text = "㊂ <b><u>FFmpeg Cmds :</u></b>\n\n<blockquote>╭ <b>Saved :</b>\n" + list + "\n" +
-			"╰ <b>Use :</b> <code>/l link -ff name</code></blockquote>"
+		text = "㊂ <b><u>FFmpeg Cmds :</u></b>\n\n<blockquote><b>╭</b> <b>Saved :</b>\n" + list + "\n" +
+			"<b>╰</b> <b>Use :</b> <code>/l link -ff name</code></blockquote>"
 		btn.IButton("Add Command", fmt.Sprintf("userset %d edit_ffcmds", u.UserID))
 		if len(names) > 0 {
 			btn.IButton("↻ Delete All", fmt.Sprintf("userset %d del_ffcmds", u.UserID))

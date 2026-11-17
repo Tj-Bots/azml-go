@@ -54,26 +54,26 @@ func (m *HelpModule) getHelpGuideText() string {
 	cfg := config.Get()
 	sfx := cfg.CmdSuffix
 	return fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
-		"<blockquote>╭ <b>Leech & Mirror:</b>\n"+
+		"<blockquote><b>╭</b> <b>Leech & Mirror:</b>\n"+
 		"┠ <code>/leech%s [link]</code> — "+leechSources()+"\n"+
 		"┠ <code>/zipleech%s [link]</code> — Zip contents before uploading\n"+
 		"┠ <code>/unzipleech%s [link]</code> — Extract zip/rar/7z archives\n"+
 		"┠ <code>/mirror%s [link]</code> — Upload to GoFile, VikingFile, PixelDrain, BuzzHeavier, DevUploads or StreamTape (<code>-up gofile</code>)\n"+
-		"╰ <code>/ytdl%s [link]</code> — Download video/audio via yt-dlp</blockquote>\n\n"+
-		"<blockquote>╭ <b>User Configuration:</b>\n"+
+		"<b>╰</b> <code>/ytdl%s [link]</code> — Download video/audio via yt-dlp</blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b>User Configuration:</b>\n"+
 		"┠ <code>/us%s</code> — User settings (Prefix, Suffix, Caption, AutoRename)\n"+
 		"┠ <code>/ar%s [template]</code> — Quick AutoRename template set/clear\n"+
 		"┠ <code>/setthumb%s</code> (reply) — Set custom leech thumbnail\n"+
 		"┠ <code>/status%s</code> — Live download & upload speed and progress\n"+
-		"╰ <code>/history</code> — Your last 10 finished tasks</blockquote>\n\n"+
-		"<blockquote>╭ <b>Admin & Control:</b>\n"+
+		"<b>╰</b> <code>/history</code> — Your last 10 finished tasks</blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b>Admin & Control:</b>\n"+
 		"┠ <code>/bs%s</code> — Bot Settings (Config vars, Aria2c, Private files)\n"+
 		"┠ <code>/cancel%s [GID]</code> — Cancel specific task\n"+
 		"┠ <code>/a</code> <code>/ua</code> — Authorize / unauthorize a user or this chat (reply or ID)\n"+
 		"┠ <code>/addsudo</code> <code>/rmsudo</code> — Add / remove a Sudo user (owner)\n"+
 		"┠ <code>/bl</code> <code>/rbl</code> — Blacklist / unblacklist a user\n"+
 		"┠ <code>/users</code> <code>/authlist</code> <code>/sudolist</code> — Lists of users\n"+
-		"╰ <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>",
+		"<b>╰</b> <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>",
 		telegram.ToSmallCaps("Commands Guide"),
 		sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx)
 }

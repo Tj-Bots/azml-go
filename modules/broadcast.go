@@ -87,10 +87,10 @@ func (m *BroadcastModule) HandleBroadcast(ctx context.Context, peer tg.InputPeer
 		}
 
 		resultText := fmt.Sprintf("⌬ <b><i>Broadcast Complete:</i></b>\n"+
-			"<blockquote>╭ <b>Total Users:</b> <code>%d</code>\n"+
+			"<blockquote><b>╭</b> <b>Total Users:</b> <code>%d</code>\n"+
 			"┠ <b>Success:</b> <code>%d</code>\n"+
 			"┠ <b>Failed:</b> <code>%d</code>\n"+
-			"╰ <b>Elapsed:</b> <code>%s</code></blockquote>",
+			"<b>╰</b> <b>Elapsed:</b> <code>%s</code></blockquote>",
 			total, success, failed, ext.GetReadableTime(int64(time.Since(start).Seconds())))
 		if quiet {
 			resultText += "\n<i>Sent quietly (-q)</i>"

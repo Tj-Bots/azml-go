@@ -89,7 +89,7 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	btn.IButtonStyled("Cancel", fmt.Sprintf("mirror %d cancel", msgCtx.UserID), "danger")
 	btn.Row()
 
-	prompt := "⌬ <b><u>Mirror</u></b>\n\n<blockquote>╭ <b>Choose where to upload</b>\n╰ <i>Or use</i> <code>-up gofile</code></blockquote>"
+	prompt := "⌬ <b><u>Mirror</u></b>\n\n<blockquote><b>╭</b> <b>Choose where to upload</b>\n<b>╰</b> <i>Or use</i> <code>-up gofile</code></blockquote>"
 	promptID, err := b.sender.SendMessageWithButtons(ctx, peer, prompt, msgCtx.MessageID, btn, 2)
 	if err != nil || promptID == 0 {
 		// no buttons possible: fall back to the first host

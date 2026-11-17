@@ -221,18 +221,18 @@ func RenderBotStats(startTime time.Time) string {
 
 	return fmt.Sprintf("⌬ <b><i>BOT STATISTICS :</i></b>\n"+
 		"<blockquote>◈ <b>Bot Uptime :</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b><i>RAM ( MEMORY ) :</i></b>\n"+
+		"<blockquote><b>╭</b> <b><i>RAM ( MEMORY ) :</i></b>\n"+
 		"┠ %s %.1f%%\n"+
 		"┠ <b>App RAM :</b> <code>%.1f MB</code>\n"+
-		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b><i>SWAP MEMORY :</i></b>\n"+
+		"<b>╰</b> <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b><i>SWAP MEMORY :</i></b>\n"+
 		"┠ %s %.1f%%\n"+
-		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b><i>DISK :</i></b>\n"+
+		"<b>╰</b> <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b><i>DISK :</i></b>\n"+
 		"┠ %s %.1f%%\n"+
 		"┠ <b>Total Disk Read :</b> %s\n"+
 		"┠ <b>Total Disk Write :</b> %s\n"+
-		"╰ <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>",
+		"<b>╰</b> <b>U :</b> %s | <b>F :</b> %s | <b>T :</b> %s</blockquote>",
 		botUptime,
 		ramBar, ramPercent,
 		appRAM,
@@ -461,22 +461,22 @@ func RenderSysStats() string {
 	vCores := totalCores - pCores
 
 	return fmt.Sprintf("⌬ <b><i>OS SYSTEM :</i></b>\n"+
-		"<blockquote>╭ <b>OS Uptime :</b> %s\n"+
+		"<blockquote><b>╭</b> <b>OS Uptime :</b> %s\n"+
 		"┠ <b>OS Version :</b> %s\n"+
-		"╰ <b>OS Arch :</b> %s</blockquote>\n\n"+
+		"<b>╰</b> <b>OS Arch :</b> %s</blockquote>\n\n"+
 		"⌬ <b><i>NETWORK STATS :</i></b>\n"+
-		"<blockquote>╭ <b>Upload Data:</b> %s\n"+
+		"<blockquote><b>╭</b> <b>Upload Data:</b> %s\n"+
 		"┠ <b>Download Data:</b> %s\n"+
 		"┠ <b>Pkts Sent:</b> %sk\n"+
 		"┠ <b>Pkts Received:</b> %sk\n"+
-		"╰ <b>Total I/O Data:</b> %s</blockquote>\n\n"+
-		"<blockquote>╭ <b>CPU :</b>\n"+
+		"<b>╰</b> <b>Total I/O Data:</b> %s</blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b>CPU :</b>\n"+
 		"┠ %s %.1f%%\n"+
 		"┠ <b>CPU Frequency :</b> %s\n"+
 		"┠ <b>System Avg Load :</b> %s\n"+
 		"┠ <b>P-Core(s) :</b> %d | <b>V-Core(s) :</b> %d\n"+
 		"┠ <b>Total Core(s) :</b> %d\n"+
-		"╰ <b>Usable CPU(s) :</b> %d</blockquote>",
+		"<b>╰</b> <b>Usable CPU(s) :</b> %d</blockquote>",
 		osUptime, osVersion, osArch,
 		upData, dlData, pktSent, pktRecv, tlData,
 		cpuBar, cpuUsage,
@@ -512,10 +512,10 @@ func RenderRepoStats() string {
 	}
 
 	return fmt.Sprintf("⌬ <b><i>REPO STATISTICS :</i></b>\n"+
-		"<blockquote>╭ <b>Bot Updated :</b> %s\n"+
+		"<blockquote><b>╭</b> <b>Bot Updated :</b> %s\n"+
 		"┠ <b>Current Version :</b> %s\n"+
 		"┠ <b>Latest Version :</b> %s\n"+
-		"╰ <b>Last ChangeLog :</b> %s</blockquote>\n\n"+
+		"<b>╰</b> <b>Last ChangeLog :</b> %s</blockquote>\n\n"+
 		"⌬ <b>REMARKS :</b> <code>%s</code>",
 		lastCommit, botVersion, latVersion, changeLog, remarks)
 }
@@ -542,16 +542,16 @@ func RenderBotLimits() string {
 		uti = GetReadableTime(int64(cfg.UserTimeInterval))
 	}
 	return fmt.Sprintf("⌬ <b><i>BOT LIMITATIONS :</i></b>\n"+
-		"<blockquote>╭ <b>Direct Limit :</b> %s GB\n"+
+		"<blockquote><b>╭</b> <b>Direct Limit :</b> %s GB\n"+
 		"┠ <b>Torrent Limit :</b> %s\n"+
 		"┠ <b>YT-DLP Limit :</b> %s GB\n"+
 		"┠ <b>Playlist Limit :</b> %s\n"+
 		"┠ <b>Mega Limit :</b> %s GB\n"+
-		"╰ <b>Leech Limit :</b> %s GB</blockquote>\n\n"+
-		"<blockquote>╭ <b>Token Validity :</b> %s\n"+
+		"<b>╰</b> <b>Leech Limit :</b> %s GB</blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b>Token Validity :</b> %s\n"+
 		"┠ <b>User Time Limit :</b> %s / task\n"+
 		"┠ <b>User Parallel Tasks :</b> %s\n"+
-		"╰ <b>Bot Parallel Tasks :</b> %s</blockquote>",
+		"<b>╰</b> <b>Bot Parallel Tasks :</b> %s</blockquote>",
 		num(int64(cfg.DirectLimit)), tl, num(int64(cfg.YtdlpLimit)), num(int64(cfg.PlaylistLimit)), num(int64(cfg.MegaLimit)),
 		num(int64(cfg.LeechLimit)), tv, uti, num(int64(cfg.UserMaxTasks)), num(int64(cfg.BotMaxTasks)))
 }

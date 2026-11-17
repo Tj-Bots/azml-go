@@ -15,7 +15,7 @@ func TestBuildStatusMessageUsesLeechStatusLayout(t *testing.T) {
 
 	message, buttons := taskManager.BuildStatusMessage(1)
 	for _, expected := range []string{
-		"╭ <b>Name:</b> <code>Resident.Evil",
+		"<b>╭</b> <b>Name:</b> <code>Resident.Evil",
 		"[⬤⬤⬤◔○○○○○○○○]",
 		"Status:</b> <i>Downloading</i>",
 		"Processed:</b> 3.00 GB of 10.00 GB",
@@ -25,7 +25,7 @@ func TestBuildStatusMessageUsesLeechStatusLayout(t *testing.T) {
 		"Mode:</b> #leech",
 		"Out:</b> telegram",
 		"/cancel_8861026839_ccb0ca",
-		"⌬ <b><i>Bot Stats</i></b>\n<blockquote>╭ <b>Active Tasks:</b> 1",
+		"⌬ <b><i>Bot Stats</i></b>\n<blockquote><b>╭</b> <b>Active Tasks:</b> 1",
 		"<b>Ram:</b>",
 		"<b>Cpu:</b>",
 		"<b>Uptime:</b>",

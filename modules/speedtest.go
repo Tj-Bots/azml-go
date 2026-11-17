@@ -101,26 +101,26 @@ func (m *SpeedtestModule) HandleSpeedtest(ctx context.Context, peer tg.InputPeer
 		}
 
 		caption := fmt.Sprintf("➲ <b><i>SPEEDTEST INFO</i></b>\n"+
-			"<blockquote>╭ <b>Upload:</b> <code>%s/s</code>\n"+
+			"<blockquote><b>╭</b> <b>Upload:</b> <code>%s/s</code>\n"+
 			"┠ <b>Download:</b>  <code>%s/s</code>\n"+
 			"┠ <b>Ping:</b> <code>%.2f ms</code>\n"+
 			"┠ <b>Time:</b> <code>%s</code>\n"+
 			"┠ <b>Data Sent:</b> <code>%s</code>\n"+
-			"╰ <b>Data Received:</b> <code>%s</code></blockquote>\n\n"+
+			"<b>╰</b> <b>Data Received:</b> <code>%s</code></blockquote>\n\n"+
 			"➲ <b><i>SPEEDTEST SERVER</i></b>\n"+
-			"<blockquote>╭ <b>Name:</b> <code>%s</code>\n"+
+			"<blockquote><b>╭</b> <b>Name:</b> <code>%s</code>\n"+
 			"┠ <b>Country:</b> <code>%s, %s</code>\n"+
 			"┠ <b>Sponsor:</b> <code>%s</code>\n"+
 			"┠ <b>Latency:</b> <code>%.2f</code>\n"+
 			"┠ <b>Latitude:</b> <code>%s</code>\n"+
-			"╰ <b>Longitude:</b> <code>%s</code></blockquote>\n\n"+
+			"<b>╰</b> <b>Longitude:</b> <code>%s</code></blockquote>\n\n"+
 			"➲ <b><i>CLIENT DETAILS</i></b>\n"+
-			"<blockquote>╭ <b>IP Address:</b> <code>%s</code>\n"+
+			"<blockquote><b>╭</b> <b>IP Address:</b> <code>%s</code>\n"+
 			"┠ <b>Latitude:</b> <code>%s</code>\n"+
 			"┠ <b>Longitude:</b> <code>%s</code>\n"+
 			"┠ <b>Country:</b> <code>%s</code>\n"+
 			"┠ <b>ISP:</b> <code>%s</code>\n"+
-			"╰ <b>ISP Rating:</b> <code>%s</code></blockquote>",
+			"<b>╰</b> <b>ISP Rating:</b> <code>%s</code></blockquote>",
 			ext.GetReadableFileSize(int64(res.Upload/8)),
 			ext.GetReadableFileSize(int64(res.Download/8)),
 			res.Ping,

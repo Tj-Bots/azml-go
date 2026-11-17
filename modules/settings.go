@@ -917,16 +917,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "Reset to default limit", false)
 
 	case "edit_split":
-		ext.SetPendingSettingSession(targetUID, "split_size", 0, msgID, 60*time.Second)
-		prompt := fmt.Sprintf("㊂ <b><u>Leech Splits Settings :</u></b>\n\n"+
-			"Send Leech split size in any comfortable size, like <code>2GB</code>, <code>500MB</code> or <code>1.46GB</code>.\n"+
-			"<b>Max:</b> <code>%s</code> (4GB needs a premium user session)\n<b>Timeout:</b> 60 sec",
-			ext.GetReadableFileSize(config.GetMaxSplitSize()))
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d split_size", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send new split size...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_split")
 
 	// 5. Caption Submenu
 	case "lcaption":
@@ -935,15 +926,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "edit_lcaption":
-		ext.SetPendingSettingSession(targetUID, "lcaption", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Custom Leech Caption</u></b>\n\n" +
-			"Send new caption template within <b>60 seconds</b>.\n\n" +
-			"<b>Tags:</b> <code>{filename}</code>, <code>{size}</code>, <code>{duration}</code>, <code>{quality}</code>, <code>{languages}</code>"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d lcaption", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send new caption template...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_lcaption")
 
 	case "del_lcaption":
 		u.Caption = ""
@@ -959,14 +942,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "edit_lprefix":
-		ext.SetPendingSettingSession(targetUID, "lprefix", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Leech Prefix</u></b>\n\n" +
-			"Send prefix text to prepend to filenames within <b>60 seconds</b> (e.g. <code>[AZML] </code>):"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d lprefix", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send new prefix...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_lprefix")
 
 	case "del_lprefix":
 		u.Prefix = ""
@@ -982,14 +958,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "edit_lsuffix":
-		ext.SetPendingSettingSession(targetUID, "lsuffix", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Leech Suffix</u></b>\n\n" +
-			"Send suffix text to append before file extension within <b>60 seconds</b> (e.g. <code> @MyChannel</code>):"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d lsuffix", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send new suffix...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_lsuffix")
 
 	case "del_lsuffix":
 		u.Suffix = ""
@@ -1005,16 +974,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "edit_lremname_auto":
-		ext.SetPendingSettingSession(targetUID, "lremname_auto", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set AutoRename Template</u></b>\n\n" +
-			"Send rename template within <b>60 seconds</b>.\n\n" +
-			"<b>Tags:</b> <code>{title}</code>, <code>{season}</code>, <code>{episode}</code>, <code>{quality}</code>\n" +
-			"<b>Example:</b> <code>{title} - S{season}E{episode} [{quality}]</code>"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d lremname_auto", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send new autorename template...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_lremname_auto")
 
 	case "del_lremname_auto":
 		u.RemnameAuto = ""
@@ -1030,16 +990,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "edit_lremname_regex":
-		ext.SetPendingSettingSession(targetUID, "lremname_regex", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Regex Remname</u></b>\n\n" +
-			"Send regex pattern and replacement separated by colon within <b>60 seconds</b>.\n\n" +
-			"<b>Format:</b> <code>search_pattern:replacement</code>\n" +
-			"<b>Example:</b> <code>\\[TG\\]:</code>"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d lremname_regex", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send new regex rule...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_lremname_regex")
 
 	case "del_lremname_regex":
 		u.RemnameRegex = ""
@@ -1055,15 +1006,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "edit_ldump":
-		ext.SetPendingSettingSession(targetUID, "ldump", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Leech Dump Channel ID</u></b>\n\n" +
-			"Send your Channel ID within <b>60 seconds</b> (e.g. <code>-1001234567890</code>).\n\n" +
-			"<i>Make sure the bot has Admin rights with Post Messages permission!</i>"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d ldump", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send Dump Channel ID...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_ldump")
 
 	case "del_ldump":
 		u.DumpChatID = 0
@@ -1292,14 +1235,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "edit_lexcluded":
-		ext.SetPendingSettingSession(targetUID, "lexcluded", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Excluded Extensions</u></b>\n\n" +
-			"Send the extensions separated by space within <b>60 seconds</b> (e.g. <code>.txt .nfo .jpg</code>):"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d lexcluded", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send the extensions...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_lexcluded")
 
 	case "del_lexcluded":
 		u.ExcludedExts = ""
@@ -1309,14 +1245,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "Excluded extensions deleted", false)
 
 	case "edit_lmeta":
-		ext.SetPendingSettingSession(targetUID, "lmeta", 0, msgID, 60*time.Second)
-		prompt := "㊂ <b><u>Set Video Leech Metadata</u></b>\n\n" +
-			"Send metadata text within <b>60 seconds</b> (e.g. <code>Encoded by MyChannel</code>):"
-		btn := telegram.NewButtonMaker()
-		btn.IButton("Stop Change", fmt.Sprintf("userset %d lmeta", u.UserID))
-		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send metadata text...", false)
+		m.showEditPrompt(ctx, peer, queryID, msgID, u, "edit_lmeta")
 
 	case "del_lmeta":
 		if u.Metadata != nil {
@@ -1561,6 +1490,74 @@ func (m *SettingsModule) buildExcludedMenu(u *types.UserSettings) (string, *tele
 
 // stdMenuButtons adds the buttons of a setting page like the Python bot:
 // Set / Change, ↻ Delete when set, then ◀️ and ❌.
+// editPrompt: what Change / Set of a Leech setting asks for (like the Python bot the page stays,
+// the request and the timeout come under it).
+type editPrompt struct {
+	key, page, del string
+	ask            string
+}
+
+var leechEditPrompts = map[string]editPrompt{
+	"edit_split":          {"split_size", "split_size", "split_default", "Send Leech split size in any comfortable size, like <code>2GB</code>, <code>500MB</code> or <code>1.46GB</code>."},
+	"edit_lcaption":       {"lcaption", "lcaption", "del_lcaption", "Send Leech Caption. You can add HTML tags and <code>{filename}</code> <code>{size}</code> <code>{duration}</code> <code>{quality}</code> <code>{languages}</code>."},
+	"edit_lprefix":        {"lprefix", "lprefix", "del_lprefix", "Send Leech Filename Prefix, e.g. <code>[MyChannel] </code>"},
+	"edit_lsuffix":        {"lsuffix", "lsuffix", "del_lsuffix", "Send Leech Filename Suffix, e.g. <code> @MyChannel</code>"},
+	"edit_lremname_auto":  {"lremname_auto", "lremname_auto", "del_lremname_auto", "Send the AutoRename template, e.g. <code>{title} S{season}E{episode} [{quality}]</code>"},
+	"edit_lremname_regex": {"lremname_regex", "lremname_regex", "del_lremname_regex", "Send Leech Filename Remname as <code>pattern:replacement</code>, e.g. <code>\\[TG\\]:</code>"},
+	"edit_ldump":          {"ldump", "ldump", "del_ldump", "Send Leech Dump Channel ID, e.g. <code>-1001234567890</code>\n<b>NOTE:</b> Make the bot admin in the channel, else it will not accept."},
+	"edit_lexcluded":      {"lexcluded", "lexcluded", "del_lexcluded", "Send the extensions separated by space, e.g. <code>.txt .nfo .jpg</code>"},
+	"edit_lmeta":          {"lmeta", "lmeta", "del_lmeta", "Send Leech Metadata, e.g. <code>Encoded by MyChannel</code>"},
+}
+
+// showEditPrompt shows the page of the setting with the request under it and waits for the value.
+func (m *SettingsModule) showEditPrompt(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, u *types.UserSettings, action string) {
+	p := leechEditPrompts[action]
+	ext.SetPendingSettingSession(u.UserID, p.key, 0, msgID, 60*time.Second)
+	var text string
+	var isSet bool
+	switch p.key {
+	case "split_size":
+		text, _ = m.buildSplitSizeMenu(u)
+		isSet = u.SplitSize > 0
+		p.ask += fmt.Sprintf("\n<b>Max:</b> <code>%s</code>", ext.GetReadableFileSize(config.GetMaxSplitSize()))
+	case "lcaption":
+		text, _ = m.buildCaptionMenu(u)
+		isSet = u.Caption != ""
+	case "lprefix":
+		text, _ = m.buildPrefixMenu(u)
+		isSet = u.Prefix != ""
+	case "lsuffix":
+		text, _ = m.buildSuffixMenu(u)
+		isSet = u.Suffix != ""
+	case "lremname_auto":
+		text, _ = m.buildAutoRenameMenu(u)
+		isSet = u.RemnameAuto != ""
+	case "lremname_regex":
+		text, _ = m.buildRegexMenu(u)
+		isSet = u.RemnameRegex != ""
+	case "ldump":
+		text, _ = m.buildDumpMenu(u)
+		isSet = u.DumpChatID != 0
+	case "lexcluded":
+		text, _ = m.buildExcludedMenu(u)
+		isSet = u.ExcludedExts != ""
+	case "lmeta":
+		text, _ = m.buildMetadataMenu(u)
+		isSet = u.Metadata != nil && u.Metadata["all"] != ""
+	}
+	btn := telegram.NewButtonMaker()
+	btn.IButton("Stop Change", fmt.Sprintf("userset %d %s", u.UserID, p.page))
+	if isSet {
+		btn.IButton("↻ Delete", fmt.Sprintf("userset %d %s", u.UserID, p.del))
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n"+p.ask+"\n<b>Timeout:</b> 60 sec", btn, 2)
+	_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+}
+
 func stdMenuButtons(btn *telegram.ButtonMaker, uid int64, name, editAction, delAction string, isSet bool) {
 	label := "Set " + name
 	if isSet {

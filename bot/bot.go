@@ -1152,7 +1152,10 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 	now := time.Now()
 	dateStr := now.Format("02/01/06")
 	timeStr := now.Format("03:04:05 PM")
-	timz := "Asia/Kolkata"
+	timz := cfg.Timezone
+	if timz == "" {
+		timz = "Asia/Kolkata"
+	}
 
 	// 1. Check if .restartmsg exists
 	restartData, err := os.ReadFile(".restartmsg")
@@ -1200,18 +1203,11 @@ func (b *BotApp) sendStartupNotification(ctx context.Context) {
 		}
 	}
 
+	// groups hear from the bot only when their tasks were stopped by the restart (like the Python
+	// bot, INCOMPLETE_TASK_NOTIFIER); "Bot Started" goes to the owner's PM only
 	b.notifyIncompleteTasks(ctx)
-	log.Printf("[AZML-Go Bot Client] Triggering startup notification...")
-	sentToAny := false
-	for _, chatID := range cfg.AuthorizedChats {
-		if chatID != 0 {
-			log.Printf("[AZML-Go Bot Client] Sending startup notification to Authorized Group/Chat: %d", chatID)
-			sendNotification(chatID)
-			sentToAny = true
-		}
-	}
-	if !sentToAny && cfg.OwnerID != 0 {
-		log.Printf("[AZML-Go Bot Client] No authorized chats configured; sending startup notification to Owner: %d", cfg.OwnerID)
+	if cfg.OwnerID != 0 {
+		log.Printf("[AZML-Go Bot Client] Sending startup notification to the owner: %d", cfg.OwnerID)
 		sendNotification(cfg.OwnerID)
 	}
 }

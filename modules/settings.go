@@ -705,6 +705,15 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 	action := parts[2]
 	u := m.userMap.GetOrCreate(targetUID)
 
+	// like the Python bot (handler_dict[user_id] = False): any other button ends the waiting for
+	// a value (◀️, ❌, Stop Change, Delete...), only the button that asks for one starts it
+	if !strings.HasPrefix(action, "edit_") && action != "cthumb" {
+		if s, ok := ext.GetPendingSettingSession(targetUID); ok && s != nil && !strings.HasPrefix(s.Key, "vt_") {
+			ext.ClearPendingSettingSession(targetUID)
+		}
+		ext.ClearPendingThumbSession(targetUID)
+	}
+
 	switch action {
 	// 1. Navigation
 	case "main", "back":
@@ -846,16 +855,25 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "cthumb":
-		chatID := telegram.PeerToChatID(peer)
-		ext.SetPendingThumbSession(targetUID, chatID, msgID, 120*time.Second)
-		prompt := "㊂ <b><u>Send Custom Thumbnail</u></b>\n\n" +
-			"Please send a <b>photo</b> or image document within the next <b>2 minutes</b>.\n\n" +
-			"<i>Once received, it will be automatically saved as your custom thumbnail and this menu will update.</i>"
+		// the page stays, the request comes under it (like the other settings and the Python bot)
+		ext.SetPendingThumbSession(targetUID, telegram.PeerToChatID(peer), msgID, 60*time.Second)
+		text, _ := m.buildThumbnailMenu(u)
+		exists := u.CustomThumb != ""
 		btn := telegram.NewButtonMaker()
+		if exists {
+			btn.IButton("View Thumbnail", fmt.Sprintf("userset %d vthumb", u.UserID))
+			btn.Row()
+		}
 		btn.IButton("Stop Change", fmt.Sprintf("userset %d thumb", u.UserID))
+		if exists {
+			btn.IButton("↻ Delete", fmt.Sprintf("userset %d dthumb", u.UserID))
+		}
+		btn.Row()
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d leech", u.UserID), "primary")
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, prompt, btn, 1)
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send your photo...", false)
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\nSend a photo to save it as custom thumbnail.\n<b>Timeout:</b> 60 sec", btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "vthumb":
 		if u.CustomThumb == "" {

@@ -162,7 +162,16 @@ func GetMaxSplitSize() int64 {
 
 // syncLogDump: one channel like the Python bot. LEECH_LOG_ID gets the files; an old DUMP_CHAT_ID
 // is used when LEECH_LOG_ID is empty, and the code that still says "dump" means the same channel.
+// OnHeroku: Heroku sets DYNO in every dyno. Heroku does not allow torrents, so there they are
+// always off (DISABLE_TORRENTS can't be turned off).
+func OnHeroku() bool {
+	return os.Getenv("DYNO") != ""
+}
+
 func syncLogDump() {
+	if OnHeroku() {
+		GlobalConfig.DisableTorrents = true
+	}
 	if GlobalConfig.LeechLogID == 0 {
 		GlobalConfig.LeechLogID = GlobalConfig.DumpChatID
 	}
@@ -554,7 +563,7 @@ func UpdateConfigVar(key, val string) error {
 	case "SCREENSHOTS_MODE":
 		GlobalConfig.ScreenshotsMode = val == "true" || val == "1"
 	case "DISABLE_TORRENTS":
-		GlobalConfig.DisableTorrents = val == "true" || val == "1"
+		GlobalConfig.DisableTorrents = val == "true" || val == "1" || OnHeroku()
 	case "DISABLE_FF_MODE": // name of our Python bot: True = -ff blocked
 		GlobalConfig.EnableFFmpegCmds = !(val == "true" || val == "1")
 	case "ENABLE_FFMPEG_CMDS":

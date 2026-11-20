@@ -95,6 +95,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 			markup = btn.BuildMenu(1)
 		}
 		_, _ = m.sender.SendMessage(ctx, peer, msgText, msg.MessageID, markup)
+		m.leech.deleteCommandLinks(peer, msg)
 		return
 	}
 
@@ -124,7 +125,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 			"<b>╰</b> <code>-up gofile</code> — Mirror to a host</blockquote>\n\n" +
 			"➲ <b>Supported :</b> YouTube, Instagram, TikTok, X, Facebook and more\n" +
 			"➲ <b>Cookies :</b> <code>cookies.txt</code> in the bot folder is used when present"
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
+		m.leech.replyTemp(ctx, peer, msg, helpMsg)
 		return
 	}
 
@@ -172,9 +173,10 @@ func (m *YtdlModule) showQualities(peer tg.InputPeerClass, msg *types.MessageCon
 		if waitID > 0 {
 			_ = m.sender.EditMessage(ctx, peer, waitID, text, telegram.CloseMarkup(msg.UserID))
 		} else {
-			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
+			waitID, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		}
 		m.leech.deleteCommandLinks(peer, msg)
+		autoDeletePair(m.sender, peer, waitID, msg.MessageID) // a short error: it goes too
 		return
 	}
 

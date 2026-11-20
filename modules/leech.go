@@ -80,6 +80,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			markup = btn.BuildMenu(1)
 		}
 		_, _ = m.sender.SendMessage(ctx, peer, msgText, msg.MessageID, markup)
+		m.deleteCommandLinks(peer, msg) // like the Python bot: the refused command goes too
 		return
 	}
 	if !m.forceSubOK(ctx, peer, msg) {
@@ -245,7 +246,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 			"<b>╰</b> <code>-p pass</code> — Extraction Password</blockquote>\n\n"+
 			"➲ <b>Default host :</b> /us → Mirror Settings",
 			strings.Join(hosts, ", "))
-		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
+		m.replyTemp(ctx, peer, msg, helpMsg)
 		return
 	}
 	if link == "" && !msg.HasMedia && !msg.IsReply {
@@ -2460,7 +2461,8 @@ func addHistory(u *types.UserSettings, e types.HistoryEntry) {
 func (m *LeechModule) HandleHistory(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	u := m.userMap.Get(msg.UserID)
 	if u == nil || len(u.History) == 0 {
-		_, _ = m.sender.SendMessage(ctx, peer, "㊂ <b><u>History :</u></b>\n\n<blockquote>◈ <i>No finished tasks yet.</i></blockquote>", msg.MessageID, telegram.CloseMarkup(msg.UserID))
+		id, _ := m.sender.SendMessage(ctx, peer, "㊂ <b><u>History :</u></b>\n\n<blockquote>◈ <i>No finished tasks yet.</i></blockquote>", msg.MessageID, telegram.CloseMarkup(msg.UserID))
+		autoDeletePair(m.sender, peer, id, msg.MessageID)
 		return
 	}
 	var sb strings.Builder

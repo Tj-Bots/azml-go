@@ -97,12 +97,13 @@ func (m *StatusModule) HandleStatus(ctx context.Context, peer tg.InputPeerClass,
 	}
 	m.mu.Unlock()
 
-	// If no active tasks exist, show a temporary stats message and auto-delete it after 12s
+	// no active tasks: a short stats message, deleted with the command after
+	// AUTO_DELETE_MESSAGE_DURATION (like the Python bot)
 	if m.taskMgr.Count() == 0 {
 		text, _ := m.taskMgr.BuildStatusMessage(1)
 		sentID, err := m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
 		if err == nil && sentID > 0 {
-			m.sender.AutoDeleteMessage(peer, sentID, 12)
+			autoDeletePair(m.sender, peer, sentID, msg.MessageID)
 		}
 		return
 	}

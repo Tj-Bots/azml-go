@@ -122,7 +122,8 @@ func (m *CancelModule) HandleCancelAll(ctx context.Context, peer tg.InputPeerCla
 	btn.IButtonStyled("× "+telegram.ToSmallCaps("All Tasks"), "canall all", "danger")
 	btn.IButtonStyled("❌", "canall close", "danger")
 
-	_, _ = m.sender.SendMessageWithButtons(ctx, peer, "<b>Choose tasks to cancel:</b>", msg.MessageID, btn, 2)
+	id, _ := m.sender.SendMessageWithButtons(ctx, peer, "<b>Choose tasks to cancel:</b>", msg.MessageID, btn, 2)
+	autoDeletePair(m.sender, peer, id, msg.MessageID) // like the Python bot (cancel_all menu)
 }
 
 func (m *CancelModule) HandleCallback(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64) {

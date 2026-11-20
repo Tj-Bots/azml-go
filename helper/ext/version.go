@@ -31,17 +31,16 @@ var verRe = regexp.MustCompile(`ver(Major|Minor|Patch)\s*=\s*(\d+)`)
 // LatestVersion reads this file on UPSTREAM_REPO / UPSTREAM_BRANCH ("" if unknown).
 func LatestVersion() string {
 	cfg := config.Get()
-	m := regexp.MustCompile(`github\.com[/:]([^/]+)/([^/\s]+?)(?:\.git)?/?$`).FindStringSubmatch(strings.TrimSpace(cfg.UpstreamRepo))
-	if m == nil {
+	owner, name, ok := githubRepo(cfg.UpstreamRepo)
+	if !ok {
 		return ""
 	}
-	owner := m[1][strings.LastIndex(m[1], "@")+1:]
 	branch := cfg.UpstreamBranch
 	if branch == "" {
 		branch = DefaultUpstreamBranch
 	}
 	c := &http.Client{Timeout: 15 * time.Second}
-	resp, err := c.Get(fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/helper/ext/version.go", owner, m[2], branch))
+	resp, err := c.Get(fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/helper/ext/version.go", owner, name, branch))
 	if err != nil {
 		return ""
 	}

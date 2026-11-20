@@ -1,0 +1,46 @@
+# Builds the bot on every push and puts the binary on the release "bin-<branch>".
+# /restart and every start of the bot download it from there (helper/ext/updater.go):
+# compiling on a small Heroku dyno runs out of memory.
+name: Build binary
+
+on:
+  push:
+    branches: [new, main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o azml-go .
+          gzip -9 -c azml-go > azml-go-linux-amd64.gz
+          echo "${GITHUB_SHA}" > commit.txt
+
+      - name: Publish to release bin-${{ github.ref_name }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: bin-${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --prerelease --title "Binary ($GITHUB_REF_NAME)" \
+              --notes "Built automatically for every push to $GITHUB_REF_NAME. Used by /restart." \
+              --target "$GITHUB_SHA"
+          # the binary first, commit.txt last: the bot takes the binary only when commit.txt
+          # names its commit
+          gh release upload "$TAG" azml-go-linux-amd64.gz --clobber
+          gh release upload "$TAG" commit.txt --clobber

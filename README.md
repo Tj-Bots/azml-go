@@ -79,9 +79,11 @@ git push heroku new:main -f
 heroku logs --tail -a APP_NAME
 ```
 > [!IMPORTANT]
-> Like the Python bot (`update.py`), every start pulls `UPSTREAM_REPO` / `UPSTREAM_BRANCH`
-> (default branch `new`) and runs its latest code, so `/restart` and the daily dyno restart
-> keep the new code. Changes to the `Dockerfile` still need a `git push`.
+> Like the Python bot (`update.py`), every start and `/restart` pull `UPSTREAM_REPO` /
+> `UPSTREAM_BRANCH` (default branch `new`) and run its latest code. The binary is not compiled
+> on the dyno (512MB is not enough): GitHub Actions builds every push and puts it on the
+> release `bin-new`, the bot downloads it from there. On a fork, enable Actions.
+> Changes to the `Dockerfile` still need a `git push`.
 > A database from an older version may hold `UPSTREAM_BRANCH=main`: set it to `new` in `/bs`.
 
 ---

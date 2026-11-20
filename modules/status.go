@@ -134,6 +134,12 @@ func (m *StatusModule) HandleStatus(ctx context.Context, peer tg.InputPeerClass,
 	m.chatPages[msg.ChatID] = page
 	m.chatPeers[msg.ChatID] = peer
 	m.mu.Unlock()
+	// like the Python bot (mirror_status): the /status command goes, only the status stays
+	go func() {
+		dctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = m.sender.DeleteMessage(dctx, peer, []int{msg.MessageID})
+	}()
 }
 
 func (m *StatusModule) HasStatusMessage(chatID int64) bool {

@@ -332,6 +332,9 @@ func (m *BotSettingsModule) buildMainMenu() (string, *telegram.ButtonMaker) {
 	btn.Row()
 	btn.IButton("Shortener Settings", "botset shortener")
 	btn.Row()
+	btn.IButton("📤 Export Settings", "botset export")
+	btn.IButton("📥 Import Settings", "botset import")
+	btn.Row()
 	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
 	return text, btn
@@ -679,6 +682,21 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		ext.ClearPendingBotSettingSession(fromUID)
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
 		m.sender.DeleteWithCommand(ctx, peer, msgID)
+
+	case "export":
+		// the file holds API keys and channel IDs: only in PM
+		if !isPrivatePeer(peer) {
+			_ = m.sender.AnswerCallback(ctx, queryID, "Export works only in the bot PM: open /bs there.", true)
+			return
+		}
+		if err := m.sendExport(ctx, peer, msgID, ext.BotVersion()); err != nil {
+			_ = m.sender.AnswerCallback(ctx, queryID, "Export failed: "+err.Error(), true)
+			return
+		}
+		_ = m.sender.AnswerCallback(ctx, queryID, "Exported", false)
+
+	case "import":
+		_ = m.sender.AnswerCallback(ctx, queryID, "Send the file "+SettingsFileName+" (from Export) to the bot PM. Deploy variables (token, API, database) are never changed.", true)
 
 	case "back":
 		ext.ClearPendingBotSettingSession(fromUID)

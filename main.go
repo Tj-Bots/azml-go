@@ -259,6 +259,7 @@ func main() {
 	app.SetAutoRenameHandler(settingsMod.HandleAutoRename)
 	app.SetBotSettingsHandlers(botSetMod.HandleBotSettings, botSetMod.HandleCallback)
 	app.SetBotSettingsInputHandlers(botSetMod.HandleSessionValue, botSetMod.HandleSessionCancelled)
+	app.SetSettingsImporter(botSetMod.ImportSettings)
 	app.SetAuthorizeHandlers(
 		authMod.HandleAuthorize,
 		authMod.HandleUnauthorize,

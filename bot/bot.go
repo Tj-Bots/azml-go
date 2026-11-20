@@ -68,6 +68,7 @@ type BotApp struct {
 	settingsHandler       func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	autoRenameHandler     func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	settingsCbHandler     func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	settingsImporter      func(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte)
 	settingsUpdateHandler func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, u *types.UserSettings, key string)
 	bsettingHandler       func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	bsettingCbHandler     func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
@@ -275,6 +276,11 @@ func (b *BotApp) SetBotSettingsHandlers(h func(ctx context.Context, peer tg.Inpu
 func (b *BotApp) SetBotSettingsInputHandlers(val func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key, val string, page int), cancel func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key string, page int)) {
 	b.bsettingInputHandler = val
 	b.bsettingCancelHandler = cancel
+}
+
+// SetSettingsImporter: the azml_settings.json of /bs Export, sent back to the bot.
+func (b *BotApp) SetSettingsImporter(fn func(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte)) {
+	b.settingsImporter = fn
 }
 
 func (b *BotApp) SetUserRawAPIUpdater(fn func(userRawAPI *tg.Client)) {
@@ -1529,6 +1535,22 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				}
 				_, _ = config.LoadConfig("config.env")
 				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>config.env</b> received and saved! Configurations reloaded.", m.ID, nil)
+				return true
+
+			case "azml_settings.json":
+				if !telegram.IsOwner(senderID) && !telegram.IsSudo(senderID, b.userMap) {
+					_, _ = b.sender.SendMessage(ctx, peer, "Only Owner/Sudo can import bot settings!", m.ID, nil)
+					return true
+				}
+				if b.settingsImporter == nil || doc.Size > 1<<20 {
+					return false
+				}
+				var buf bytes.Buffer
+				if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
+					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading <b>%s</b>: %v", fileName, err), m.ID, nil)
+					return true
+				}
+				b.settingsImporter(ctx, peer, m.ID, buf.Bytes())
 				return true
 
 			case "cookies.txt":

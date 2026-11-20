@@ -38,7 +38,7 @@ ENV GOFLAGS="-p=2"
 RUN B="$(command -v dlurl || command -v studymaterial || command -v aria2c)" && \
     if [ "$B" != "/usr/local/bin/dlurl" ]; then mv "$B" /usr/local/bin/dlurl; fi && \
     chmod a+rx /usr/local/bin/dlurl && \
-    dlurl --version | head -1
+    dlurl --version >/dev/null
 
 RUN mkdir -p /usr/src/app/downloads /usr/src/app/Thumbnails
 

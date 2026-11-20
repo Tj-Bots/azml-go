@@ -58,7 +58,7 @@ var varDescriptions = map[string]string{
 	"SHORTENER_ENABLED":            "Enable the shortener token system for users. Bool",
 	"TOKEN_TIMEOUT":                "Token timeout for each group member in sec. Int",
 	"UPSTREAM_REPO":                "Your github repository link, used by /restart to update the code. If your repo is private use https://username:{githubtoken}@github.com/{username}/{reponame} format. Default is Tj-Bots/azml-go.",
-	"UPSTREAM_BRANCH":              "Upstream branch for update. Default is main.",
+	"UPSTREAM_BRANCH":              "Upstream branch for update. Default is new.",
 	"GOFILE_TOKEN":                 "GoFile account token for /mirror uploads. Without it uploads are made as guest. Get it on https://gofile.io/myProfile",
 	"PIXELDRAIN_KEY":               "PixelDrain API key for /mirror uploads. Get it on https://pixeldrain.com/user/api_keys",
 	"BUZZHEAVIER_TOKEN":            "BuzzHeavier Account ID (API token) for /mirror uploads.",

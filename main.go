@@ -172,7 +172,7 @@ func main() {
 			_ = db.SaveBotSetting("UPSTREAM_REPO", "https://github.com/Tj-Bots/azml-go")
 		}
 		if branch, _ := db.GetBotSetting("UPSTREAM_BRANCH"); branch == "" {
-			_ = db.SaveBotSetting("UPSTREAM_BRANCH", "main")
+			_ = db.SaveBotSetting("UPSTREAM_BRANCH", ext.DefaultUpstreamBranch)
 		}
 	}
 	// Initialize commands with CMD_SUFFIX (after the settings from the database)
@@ -194,6 +194,10 @@ func main() {
 
 	// Start Base URL Web Selector Server
 	web.StartWebServer()
+
+	// Like update.py of the Python bot: pull UPSTREAM_REPO and run its latest code on every
+	// start. After the web server (Heroku wants $PORT within 60s) and before the bot takes tasks.
+	ext.BootUpdate()
 
 	// Create Bot Application with gotd MTProto client
 	app := bot.NewBotApp()

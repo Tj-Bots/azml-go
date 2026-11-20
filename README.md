@@ -45,7 +45,7 @@ Heroku builds the `Dockerfile` itself (container stack), nothing is built on you
 
 **1. Get the code**
 ```bash
-git clone https://github.com/Tj-Bots/azml-go.git
+git clone -b new --single-branch https://github.com/Tj-Bots/azml-go.git
 cd azml-go
 ```
 
@@ -74,12 +74,15 @@ heroku config:set -a APP_NAME \
 
 **4. Deploy / update**
 ```bash
-git pull
-git push heroku main -f
+git pull origin new
+git push heroku new:main -f
 heroku logs --tail -a APP_NAME
 ```
 > [!IMPORTANT]
-> Always update with `git push`. `/restart` does not rebuild on Heroku.
+> Like the Python bot (`update.py`), every start pulls `UPSTREAM_REPO` / `UPSTREAM_BRANCH`
+> (default branch `new`) and runs its latest code, so `/restart` and the daily dyno restart
+> keep the new code. Changes to the `Dockerfile` still need a `git push`.
+> A database from an older version may hold `UPSTREAM_BRANCH=main`: set it to `new` in `/bs`.
 
 ---
 
@@ -95,7 +98,7 @@ heroku logs --tail -a APP_NAME
    heroku apps:create APP_NAME_2 --stack=container
    heroku git:remote -a APP_NAME_2 -r heroku2
    heroku config:set -a APP_NAME_2 BOT_TOKEN="NEW:TOKEN" CMD_SUFFIX="2" ...
-   git push heroku2 main -f
+   git push heroku2 new:main -f
    ```
 
 > [!TIP]
@@ -187,6 +190,10 @@ Every variable has its description in `/bs`.
 
 ## VPS (Docker)
 ```bash
+git clone -b new --single-branch https://github.com/Tj-Bots/azml-go.git
+cd azml-go
 # config.env with the variables above (one KEY=value per line), then:
 docker compose up -d --build
 ```
+Every start of the container (and `/restart`) pulls the latest code of `UPSTREAM_BRANCH` (`new`),
+like `start.sh` → `update.py` of the Python bot. `NO_BOOT_UPDATE=true` turns this off.

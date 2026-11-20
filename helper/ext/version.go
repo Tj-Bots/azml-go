@@ -38,7 +38,7 @@ func LatestVersion() string {
 	owner := m[1][strings.LastIndex(m[1], "@")+1:]
 	branch := cfg.UpstreamBranch
 	if branch == "" {
-		branch = "main"
+		branch = DefaultUpstreamBranch
 	}
 	c := &http.Client{Timeout: 15 * time.Second}
 	resp, err := c.Get(fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/helper/ext/version.go", owner, m[2], branch))

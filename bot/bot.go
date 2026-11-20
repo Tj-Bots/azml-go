@@ -68,6 +68,7 @@ type BotApp struct {
 	settingsHandler       func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	autoRenameHandler     func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	settingsCbHandler     func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	cmdHelpCbHandler      func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	userSettingsImporter  func(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, data []byte)
 	settingsImporter      func(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte)
 	settingsUpdateHandler func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, u *types.UserSettings, key string)
@@ -277,6 +278,11 @@ func (b *BotApp) SetBotSettingsHandlers(h func(ctx context.Context, peer tg.Inpu
 func (b *BotApp) SetBotSettingsInputHandlers(val func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key, val string, page int), cancel func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key string, page int)) {
 	b.bsettingInputHandler = val
 	b.bsettingCancelHandler = cancel
+}
+
+// SetCmdHelpHandler: the buttons of the /leech /mirror /ytdl usage menu.
+func (b *BotApp) SetCmdHelpHandler(h func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
+	b.cmdHelpCbHandler = h
 }
 
 // SetUserSettingsImporter: the azml_user_settings.json of /us Export (sent after /us → Import).
@@ -1047,6 +1053,10 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 	case data == "save":
 		if b.saveCbHandler != nil {
 			b.saveCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
+		}
+	case strings.HasPrefix(data, "chelp "):
+		if b.cmdHelpCbHandler != nil {
+			b.cmdHelpCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
 	case strings.HasPrefix(data, "sel "):
 		if b.selectCbHandler != nil {

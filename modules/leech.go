@@ -228,29 +228,11 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	}
 
 	if link == "" && !msg.HasMedia && !msg.IsReply && opt.IsMirror {
-		var hosts []string
-		var userKeys map[string]string
-		if u := m.userMap.Get(msg.UserID); u != nil {
-			userKeys = u.DDLKeys
-		}
-		for _, h := range ext.AvailableMirrorHostsFor(userKeys) {
-			hosts = append(hosts, h.Name)
-		}
-		helpMsg := fmt.Sprintf("㊂ <b><u>Mirror Command Usage :</u></b>\n\n"+
-			"<b>Usage:</b> <code>/mirror"+config.Get().CmdSuffix+" [link]</code> or reply to a link / file\n\n"+
-			"<blockquote><b>╭</b> <b>Upload To :</b> %s\n"+
-			"┠ <code>-up gofile</code> — Choose the host directly\n"+
-			"┠ <code>-n name</code> — Custom File Name\n"+
-			"┠ <code>-z</code> — Compress as Zip\n"+
-			"┠ <code>-e</code> — Extract Archive\n"+
-			"<b>╰</b> <code>-p pass</code> — Extraction Password</blockquote>\n\n"+
-			"➲ <b>Default host :</b> /us → Mirror Settings",
-			strings.Join(hosts, ", "))
-		m.replyTemp(ctx, peer, msg, helpMsg)
+		m.sendCmdHelp(ctx, peer, msg, "mirror")
 		return
 	}
 	if link == "" && !msg.HasMedia && !msg.IsReply {
-		m.replyTemp(ctx, peer, msg, leechHelpText())
+		m.sendCmdHelp(ctx, peer, msg, "leech")
 		return
 	}
 
@@ -2602,58 +2584,6 @@ func multiFollowText(text string) string {
 }
 
 // leechHelpText: every flag, like the help of our Python bot.
-func leechHelpText() string {
-	return "㊂ <b><u>Leech Command Usage :</u></b>\n\n" +
-		"<b>Usage:</b> <code>/leech" + config.Get().CmdSuffix + " [link] [flags]</code> or reply to a link / file\n\n" +
-		helpSection("Name & Archive",
-			"<code>-n name</code> — New file name",
-			"<code>-z</code> — Zip  ·  <code>-e</code> — Extract",
-			"<code>-p pass</code> — Archive password",
-			"<code>-j</code> — Join split parts (.001 .002 ...)") +
-		helpSection("Many Tasks",
-			"<code>-i 5</code> — Reply to the first: this message and the next 4",
-			"<code>-b</code> — Bulk: reply to a list of links (<code>-b 3:8</code> range)",
-			"<code>-m name</code> — All files of <code>-i</code> / <code>-b</code> in one folder (with <code>-z</code>: one zip)") +
-		helpSection("Upload",
-			"<code>-t link</code> — Thumbnail for this task (image or t.me link)",
-			"<code>-sp 1.5GB</code> — Split size for this task",
-			"<code>-d</code> / <code>-med</code> — As document / as media",
-			"<code>-ud chat_id</code> — Dump chat for this task",
-			"<code>-ss 6</code> — Screenshots album") +
-		helpSection("Media Tools",
-			"<code>-st</code> — Every video, audio and subtitle track as its own file",
-			"<code>-vt</code> — Video Tools menu (rename, merge, extract, trim, convert ...)",
-			"<code>-ea</code> — Only the audio (<code>-ea m4a</code> flac opus ogg wav)",
-			"<code>-cv mp4</code> — Videos to mp4  ·  <code>-ca mp3</code> — Audios to mp3") +
-		helpSection("Direct Links",
-			"<code>-u user -p pass</code> — Login",
-			"<code>-h Referer: https://site.com</code> — Headers")
-}
-
-// helpSection: a bold title and its own short frame (╭ ┠ ╰), one block per category.
-func helpSection(title string, lines ...string) string {
-	var sb strings.Builder
-	sb.WriteString("<b>" + title + " :</b>\n<blockquote>")
-	for i, l := range lines {
-		switch {
-		case len(lines) == 1:
-			sb.WriteString("<b>╰</b> ")
-		case i == 0:
-			sb.WriteString("<b>╭</b> ")
-		case i == len(lines)-1:
-			sb.WriteString("<b>╰</b> ")
-		default:
-			sb.WriteString("┠ ")
-		}
-		sb.WriteString(l)
-		if i < len(lines)-1 {
-			sb.WriteString("\n")
-		}
-	}
-	sb.WriteString("</blockquote>\n")
-	return sb.String()
-}
-
 // isTorrentInput: a magnet, a .torrent link or a replied .torrent file.
 func isTorrentInput(link string, msg *types.MessageContext) bool {
 	l := strings.ToLower(strings.Split(strings.TrimSpace(link), "?")[0])

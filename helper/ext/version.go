@@ -17,7 +17,7 @@ import (
 const (
 	verMajor = 2
 	verMinor = 2
-	verPatch = 0
+	verPatch = 1
 	verState = "go"
 )
 

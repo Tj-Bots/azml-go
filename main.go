@@ -141,6 +141,13 @@ func main() {
 					_ = db.DeleteBotSetting(k)
 				}
 			}
+			// UPSTREAM_* stay in the database, but a new deploy value replaces the old one there:
+			// else the next start (after BootUpdate) restores the old branch over the deploy one
+			for _, k := range []string{"UPSTREAM_REPO", "UPSTREAM_BRANCH"} {
+				if v := deployEnv[k]; v != "" {
+					_ = db.SaveBotSetting(k, v)
+				}
+			}
 		} else if dbSettings, err := db.LoadAllBotSettings(); err == nil && len(dbSettings) > 0 {
 			if oldSnapshot == "" {
 				_ = db.SaveBotSetting("_DEPLOY_CONFIG", snapshot)

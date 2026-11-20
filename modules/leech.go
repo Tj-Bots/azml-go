@@ -2605,29 +2605,53 @@ func multiFollowText(text string) string {
 func leechHelpText() string {
 	return "㊂ <b><u>Leech Command Usage :</u></b>\n\n" +
 		"<b>Usage:</b> <code>/leech" + config.Get().CmdSuffix + " [link] [flags]</code> or reply to a link / file\n\n" +
-		"<blockquote expandable><b>╭</b> <b>Name & Archive :</b>\n" +
-		"┠ <code>-n name</code> — New file name\n" +
-		"┠ <code>-z</code> — Zip  ·  <code>-e</code> — Extract\n" +
-		"┠ <code>-p pass</code> — Archive password\n" +
-		"┠ <code>-j</code> — Join split parts (.001 .002 ...)\n" +
-		"┠ <b>Many Tasks :</b>\n" +
-		"┠ <code>-i 5</code> — Reply to the first: this message and the next 4\n" +
-		"┠ <code>-b</code> — Bulk: reply to a list of links (<code>-b 3:8</code> range)\n" +
-		"┠ <code>-m name</code> — Same folder: all files of <code>-i</code> / <code>-b</code> in one folder (with <code>-z</code>: one zip)\n" +
-		"┠ <b>Upload :</b>\n" +
-		"┠ <code>-t link</code> — Thumbnail for this task (image link or t.me message link)\n" +
-		"┠ <code>-sp 1.5GB</code> — Split size for this task\n" +
-		"┠ <code>-d</code> / <code>-med</code> — As document / as media\n" +
-		"┠ <code>-ud chat_id</code> — Dump chat for this task\n" +
-		"┠ <code>-ss 6</code> — Screenshots album\n" +
-		"┠ <b>Media Tools :</b>\n" +
-		"┠ <code>-st</code> — Every video, audio and subtitle track as its own file\n" +
-		"┠ <code>-vt</code> — Video Tools menu (rename, merge, extract, trim, convert ...)\n" +
-		"┠ <code>-ea</code> — Only the audio (<code>-ea m4a</code> flac opus ogg wav)\n" +
-		"┠ <code>-cv mp4</code> — Videos to mp4 (no re-encode)  ·  <code>-ca mp3</code> — Audios to mp3\n" +
-		"┠ <b>Direct Links :</b>\n" +
-		"┠ <code>-u user -p pass</code> — Login\n" +
-		"<b>╰</b> <code>-h Referer: https://site.com</code> — Headers</blockquote>"
+		helpSection("Name & Archive",
+			"<code>-n name</code> — New file name",
+			"<code>-z</code> — Zip  ·  <code>-e</code> — Extract",
+			"<code>-p pass</code> — Archive password",
+			"<code>-j</code> — Join split parts (.001 .002 ...)") +
+		helpSection("Many Tasks",
+			"<code>-i 5</code> — Reply to the first: this message and the next 4",
+			"<code>-b</code> — Bulk: reply to a list of links (<code>-b 3:8</code> range)",
+			"<code>-m name</code> — All files of <code>-i</code> / <code>-b</code> in one folder (with <code>-z</code>: one zip)") +
+		helpSection("Upload",
+			"<code>-t link</code> — Thumbnail for this task (image or t.me link)",
+			"<code>-sp 1.5GB</code> — Split size for this task",
+			"<code>-d</code> / <code>-med</code> — As document / as media",
+			"<code>-ud chat_id</code> — Dump chat for this task",
+			"<code>-ss 6</code> — Screenshots album") +
+		helpSection("Media Tools",
+			"<code>-st</code> — Every video, audio and subtitle track as its own file",
+			"<code>-vt</code> — Video Tools menu (rename, merge, extract, trim, convert ...)",
+			"<code>-ea</code> — Only the audio (<code>-ea m4a</code> flac opus ogg wav)",
+			"<code>-cv mp4</code> — Videos to mp4  ·  <code>-ca mp3</code> — Audios to mp3") +
+		helpSection("Direct Links",
+			"<code>-u user -p pass</code> — Login",
+			"<code>-h Referer: https://site.com</code> — Headers")
+}
+
+// helpSection: a bold title and its own short frame (╭ ┠ ╰), one block per category.
+func helpSection(title string, lines ...string) string {
+	var sb strings.Builder
+	sb.WriteString("<b>" + title + " :</b>\n<blockquote>")
+	for i, l := range lines {
+		switch {
+		case len(lines) == 1:
+			sb.WriteString("<b>╰</b> ")
+		case i == 0:
+			sb.WriteString("<b>╭</b> ")
+		case i == len(lines)-1:
+			sb.WriteString("<b>╰</b> ")
+		default:
+			sb.WriteString("┠ ")
+		}
+		sb.WriteString(l)
+		if i < len(lines)-1 {
+			sb.WriteString("\n")
+		}
+	}
+	sb.WriteString("</blockquote>\n")
+	return sb.String()
 }
 
 // isTorrentInput: a magnet, a .torrent link or a replied .torrent file.

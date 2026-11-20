@@ -260,6 +260,7 @@ func main() {
 	app.SetBotSettingsHandlers(botSetMod.HandleBotSettings, botSetMod.HandleCallback)
 	app.SetBotSettingsInputHandlers(botSetMod.HandleSessionValue, botSetMod.HandleSessionCancelled)
 	app.SetSettingsImporter(botSetMod.ImportSettings)
+	app.SetUserSettingsImporter(settingsMod.ImportUserSettings)
 	app.SetAuthorizeHandlers(
 		authMod.HandleAuthorize,
 		authMod.HandleUnauthorize,

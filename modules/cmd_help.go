@@ -51,8 +51,10 @@ var ytdlHelpArgs = []helpArg{
 	{"Quality", "<b>Quality</b>\n\n<blockquote>Without a quality the bot shows buttons.\n<code>720p</code> — a direct quality (144p - 2160p)\n<code>best</code> — best video + audio\n<code>audio</code> / <code>mp3</code> — audio only</blockquote>", "/cmd link 1080p"},
 	{"Format", "<b>Custom Format</b>\n\n<blockquote><code>-q format</code> — a yt-dlp format string.</blockquote>", "/cmd link -q bv*+ba/b"},
 	{"Name", "<b>New Name</b>\n\n<blockquote><code>-n name</code> — the new name of the file.</blockquote>", "/cmd link -n Clip.mp4"},
-	{"Zip", "<b>Zip</b>\n\n<blockquote><code>-z</code> — zip before upload.</blockquote>", "/cmd link -z"},
-	{"Doc / Media", "<b>Document / Media</b>\n\n<blockquote><code>-d</code> — upload as document\n<code>-m</code> — upload as media</blockquote>", "/cmd link -d"},
+	{"Zip", "<b>Zip</b>\n\n<blockquote><code>-z</code> — zip before upload. (yt-dlp gives videos, not archives: there is nothing to extract.)</blockquote>", "/cmd link -z"},
+	{"Doc / Media", "<b>Document / Media</b>\n\n<blockquote><code>-d</code> — upload as document\n<code>-med</code> — upload as media</blockquote>", "/cmd link -d"},
+	{"Thumbnail", "<b>Thumbnail</b>\n\n<blockquote><code>-t link</code> — a thumbnail for this task only: an image link or a t.me link of a photo.</blockquote>", "/cmd link -t https://t.me/c/123/45"},
+	{"Screenshots", "<b>Screenshots</b>\n\n<blockquote><code>-ss 6</code> — an album of 6 screenshots of the video.</blockquote>", "/cmd link -ss 6"},
 	{"Mirror", "<b>Mirror</b>\n\n<blockquote><code>-up gofile</code> — upload to a host instead of Telegram.</blockquote>", "/cmd link -up gofile"},
 	{"Cookies", "<b>Cookies</b>\n\n<blockquote>Your own cookies.txt: /us → Universal → YT-DLP Cookies. Without it the bot's cookies.txt is used.</blockquote>", ""},
 }

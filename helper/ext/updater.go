@@ -79,10 +79,17 @@ func pullAndBuild(ctx context.Context, onStatus func(status string)) (exePath st
 			_, _ = runCmd(ctx, workDir, "git", "init", "-q")
 			_, _ = runCmd(ctx, workDir, "git", "config", "user.email", "bot@azml.local")
 			_, _ = runCmd(ctx, workDir, "git", "config", "user.name", "AZML-Go")
+			// the Dockerfile runs chmod -R 777: modes are not a change
+			_, _ = runCmd(ctx, workDir, "git", "config", "core.fileMode", "false")
 			_, _ = runCmd(ctx, workDir, "git", "remote", "add", "origin", repo)
 			if _, fErr := runCmd(ctx, workDir, "git", "fetch", "-q", "origin", branch); fErr != nil {
 				log.Printf("[Updater] git fetch error: %v", fErr)
 				onStatus(fmt.Sprintf("⚠️ <i>Fetch warning: %v</i>", fErr))
+			} else if _, mErr := runCmd(ctx, workDir, "git", "reset", "-q", "--mixed", "FETCH_HEAD"); mErr == nil &&
+				gitTreeClean(ctx, workDir) {
+				// the code baked into the image is already the latest commit: nothing to compile
+				_, _ = runCmd(ctx, workDir, "git", "checkout", "-q", "-B", branch)
+				onStatus("• <i>Codebase is already up to date with latest commit.</i>")
 			} else if _, rErr := runCmd(ctx, workDir, "git", "reset", "-q", "--hard", "FETCH_HEAD"); rErr == nil {
 				_, _ = runCmd(ctx, workDir, "git", "checkout", "-q", "-B", branch)
 				updated = true
@@ -150,6 +157,13 @@ func pullAndBuild(ctx context.Context, onStatus func(status string)) (exePath st
 	}
 	onStatus("✅ <b>Compilation successful!</b> <i>Restarting process with updated code...</i>")
 	return exePath, true, nil
+}
+
+// gitTreeClean: the tracked files on disk are the same as the index (HEAD after reset --mixed).
+func gitTreeClean(ctx context.Context, dir string) bool {
+	cmd := exec.CommandContext(ctx, "git", "diff", "--quiet")
+	cmd.Dir = dir
+	return cmd.Run() == nil
 }
 
 // UpdateAndRestart: /restart. Pulls and compiles the latest code (pullAndBuild), writes

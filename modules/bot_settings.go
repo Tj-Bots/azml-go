@@ -496,7 +496,14 @@ func (m *BotSettingsModule) buildVarDetailMenu(key string, page int, editing, pr
 	}
 
 	btn.IButtonStyled("Edit Value", fmt.Sprintf("botset editvar_prompt %s %d", key, page), "success")
-	btn.IButtonStyled("Reset", fmt.Sprintf("botset resetvar %s %d", key, page), "danger")
+	// Reset only when there is something to reset (the value is not the default)
+	defVal, ok := config.DefaultValue(key)
+	if !ok {
+		defVal = defaultVarValues[key]
+	}
+	if strings.TrimSpace(configValue(cfgMap, key)) != strings.TrimSpace(defVal) {
+		btn.IButtonStyled("Reset", fmt.Sprintf("botset resetvar %s %d", key, page), "danger")
+	}
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("botset var %d", page), "primary")
 	btn.IButtonStyled("❌", "botset close", "danger")

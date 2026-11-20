@@ -1965,7 +1965,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			finishBtn.Row()
 		}
 	} else {
-		if botUser != "" {
+		if botUser != "" && msg.ChatID != msg.UserID { // in PM the files are already here
 			finishBtn.UButtonStyled("📥 View in Bot PM", fmt.Sprintf("https://t.me/%s", botUser), "primary")
 			finishBtn.Row() // one button per row
 		}

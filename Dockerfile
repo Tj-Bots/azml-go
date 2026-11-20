@@ -32,7 +32,9 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 COPY --from=builder /go/pkg/mod /go/pkg/mod
 COPY --from=builder /root/.cache/go-build /root/.cache/go-build
 ENV GOPATH="/go"
-ENV GOFLAGS="-p=2"
+# same settings as the builder stage, or the cache does not match and everything is compiled again
+ENV CGO_ENABLED=0
+ENV GOFLAGS="-p=1"
 
 # aria2c of the base image (named studymaterial there) runs as dlurl
 RUN B="$(command -v dlurl || command -v studymaterial || command -v aria2c)" && \

@@ -179,7 +179,13 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		return
 	}
-	if data == "start_botpm" { // 📥 View in Bot PM: opens the bot without the "open this link?" question
+	if data == "start_botpm" || strings.HasPrefix(data, "start_botpm ") {
+		// 📥 View in Bot PM: opens the bot without the "open this link?" question; only for the
+		// user of the task (his files are in his PM), like the Python bot
+		if owner := strings.TrimSpace(strings.TrimPrefix(data, "start_botpm")); owner != "" && owner != fmt.Sprintf("%d", fromUID) {
+			_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+			return
+		}
 		_ = m.sender.AnswerCallbackURL(ctx, queryID, fmt.Sprintf("https://t.me/%s?start=pm", telegram.CurrentBotUsername))
 		return
 	}

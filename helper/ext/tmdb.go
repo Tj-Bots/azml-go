@@ -148,6 +148,65 @@ type tmdbImagesResult struct {
 
 // GetTMDBPosterLink queries TMDB API to find poster or landscape backdrop URL
 func GetTMDBPosterLink(ctx context.Context, title, year string, asDoc bool, lang string) (string, error) {
+	return tmdbImageLink(ctx, title, year, asDoc, lang, []string{"en-US"})
+}
+
+// GetTMDBCoverByName: /cover <name>. The name in any language (ספיידרמן, Spiderman, سبايدرمان):
+// it is searched in the user's language, in the language of its letters and in English. The
+// image is a backdrop (landscape), with text in the user's language, else English, else none.
+func GetTMDBCoverByName(ctx context.Context, name, lang string) (string, error) {
+	name = strings.TrimSpace(name)
+	year := ""
+	if m := tmdbYearRegex.FindStringIndex(name); m != nil && m[0] > 0 {
+		year = name[m[0]:m[1]]
+		name = strings.TrimSpace(name[:m[0]] + name[m[1]:])
+	}
+	var langs []string
+	add := func(l string) {
+		for _, x := range langs {
+			if x == l {
+				return
+			}
+		}
+		langs = append(langs, l)
+	}
+	if l := scriptLang(name); l != "" {
+		add(l)
+	}
+	if l := shortLang(lang); l != "" && l != "en" {
+		add(l)
+	}
+	add("en-US")
+	return tmdbImageLink(ctx, name, year, false, lang, langs)
+}
+
+// scriptLang: the language of the letters of a text (Hebrew, Arabic, Russian ...), "" for Latin.
+func scriptLang(s string) string {
+	for _, r := range s {
+		switch {
+		case r >= 0x0590 && r <= 0x05FF:
+			return "he"
+		case r >= 0x0600 && r <= 0x06FF:
+			return "ar"
+		case r >= 0x0400 && r <= 0x04FF:
+			return "ru"
+		case r >= 0x0900 && r <= 0x097F:
+			return "hi"
+		case r >= 0x0E00 && r <= 0x0E7F:
+			return "th"
+		case r >= 0x3040 && r <= 0x30FF:
+			return "ja"
+		case r >= 0xAC00 && r <= 0xD7AF:
+			return "ko"
+		case r >= 0x4E00 && r <= 0x9FFF:
+			return "zh"
+		}
+	}
+	return ""
+}
+
+// tmdbImageLink: the search is tried in each of searchLangs until something is found.
+func tmdbImageLink(ctx context.Context, title, year string, asDoc bool, lang string, searchLangs []string) (string, error) {
 	cfg := config.Get()
 	token := strings.TrimSpace(cfg.TMDBAccessToken)
 	if token == "" {
@@ -157,41 +216,46 @@ func GetTMDBPosterLink(ctx context.Context, title, year string, asDoc bool, lang
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 
 	searchURL := "https://api.themoviedb.org/3/search/multi"
-	q := url.Values{}
-	q.Set("query", title)
-	q.Set("include_adult", "false")
-	q.Set("language", "en-US")
-	q.Set("page", "1")
-	if year != "" {
-		q.Set("year", year)
-	}
-
-	if len(token) < 50 {
-		q.Set("api_key", token)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", searchURL+"?"+q.Encode(), nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Accept", "application/json")
-	if len(token) >= 50 {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("tmdb search returned status %d", resp.StatusCode)
-	}
-
 	var searchRes tmdbSearchResult
-	if err := json.NewDecoder(resp.Body).Decode(&searchRes); err != nil {
-		return "", err
+	for _, sl := range searchLangs {
+		q := url.Values{}
+		q.Set("query", title)
+		q.Set("include_adult", "false")
+		q.Set("language", sl)
+		q.Set("page", "1")
+		if year != "" {
+			q.Set("year", year)
+		}
+		if len(token) < 50 {
+			q.Set("api_key", token)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", searchURL+"?"+q.Encode(), nil)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Accept", "application/json")
+		if len(token) >= 50 {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return "", err
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return "", fmt.Errorf("tmdb search returned status %d", resp.StatusCode)
+		}
+		searchRes = tmdbSearchResult{}
+		dErr := json.NewDecoder(resp.Body).Decode(&searchRes)
+		resp.Body.Close()
+		if dErr != nil {
+			return "", dErr
+		}
+		if len(searchRes.Results) > 0 {
+			break
+		}
 	}
 
 	if len(searchRes.Results) == 0 {

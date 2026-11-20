@@ -332,8 +332,7 @@ func (m *BotSettingsModule) buildMainMenu() (string, *telegram.ButtonMaker) {
 	btn.Row()
 	btn.IButton("Shortener Settings", "botset shortener")
 	btn.Row()
-	btn.IButton("📤 Export Settings", "botset export")
-	btn.IButton("📥 Import Settings", "botset import")
+	btn.IButton("Import/Export Settings", "botset ie")
 	btn.Row()
 	btn.IButtonStyled("❌", "botset close", "danger")
 	btn.Row()
@@ -606,6 +605,13 @@ func (m *BotSettingsModule) HandleSessionValue(ctx context.Context, peer tg.Inpu
 }
 
 func (m *BotSettingsModule) HandleSessionCancelled(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key string, page int) {
+	if key == ImportSettingsKey {
+		text, btn := m.buildIEMenu("× <i>Import cancelled.</i>")
+		if m.sender != nil {
+			_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
+		}
+		return
+	}
 	if page == -2 {
 		text, btn := m.buildSessionMenu()
 		text += "\n\n× <i>Edit cancelled.</i>"
@@ -683,20 +689,37 @@ func (m *BotSettingsModule) HandleCallback(ctx context.Context, peer tg.InputPee
 		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
 		m.sender.DeleteWithCommand(ctx, peer, msgID)
 
-	case "export":
-		// the file holds API keys and channel IDs: only in PM
-		if !isPrivatePeer(peer) {
-			_ = m.sender.AnswerCallback(ctx, queryID, "Export works only in the bot PM: open /bs there.", true)
-			return
-		}
-		if err := m.sendExport(ctx, peer, msgID, ext.BotVersion()); err != nil {
-			_ = m.sender.AnswerCallback(ctx, queryID, "Export failed: "+err.Error(), true)
-			return
-		}
-		_ = m.sender.AnswerCallback(ctx, queryID, "Exported", false)
+	case "ie":
+		ext.ClearPendingBotSettingSession(fromUID)
+		text, btn := m.buildIEMenu("")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
-	case "import":
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send the file "+SettingsFileName+" (from Export) to the bot PM. Deploy variables (token, API, database) are never changed.", true)
+	case "export":
+		ext.ClearPendingBotSettingSession(fromUID)
+		// the file holds API keys and channel IDs: only in PM
+		note := "✓ <i>Exported: the file is below.</i>"
+		if !isPrivatePeer(peer) {
+			note = "× <i>Export works only in the bot PM: open /bs there.</i>"
+		} else if err := m.sendExport(ctx, peer, msgID, ext.BotVersion()); err != nil {
+			note = "× <i>Export failed: " + telegram.EscapeHTML(err.Error()) + "</i>"
+		}
+		text, btn := m.buildIEMenu(note)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+
+	case "prompt_import":
+		ext.SetPendingBotSettingSession(fromUID, ImportSettingsKey, 0, msgID, -3, 60*time.Second)
+		text, _ := m.buildIEMenu("")
+		text += "\n\n<i>Send the file</i> <code>" + SettingsFileName + "</code> <i>(from Export).</i> <b>Timeout:</b> 60 sec\n<i>Send /cancel to abort.</i>"
+		btn := telegram.NewButtonMaker()
+		btn.IButtonStyled("Stop Edit", "botset ie", "danger")
+		btn.Row()
+		btn.IButtonStyled("◀️", "botset back", "primary")
+		btn.IButtonStyled("❌", "botset close", "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "back":
 		ext.ClearPendingBotSettingSession(fromUID)

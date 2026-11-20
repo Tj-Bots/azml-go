@@ -279,12 +279,12 @@ func (b *BotApp) SetBotSettingsInputHandlers(val func(ctx context.Context, peer 
 	b.bsettingCancelHandler = cancel
 }
 
-// SetUserSettingsImporter: the azml_user_settings.json of /us Export, for the user who sends it.
+// SetUserSettingsImporter: the azml_user_settings.json of /us Export (sent after /us → Import).
 func (b *BotApp) SetUserSettingsImporter(fn func(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, data []byte)) {
 	b.userSettingsImporter = fn
 }
 
-// SetSettingsImporter: the azml_settings.json of /bs Export, sent back to the bot.
+// SetSettingsImporter: the azml_settings.json of /bs Export (sent after /bs → Import).
 func (b *BotApp) SetSettingsImporter(fn func(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte)) {
 	b.settingsImporter = fn
 }
@@ -653,7 +653,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	}
 
 	// Check if user is in an active pending setting prompt session (e.g. from /us)
-	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !(sess.Key == "ycookies" && m.Media != nil) {
+	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !((sess.Key == "ycookies" || sess.Key == "importset") && m.Media != nil) {
 		inMsgID := m.ID
 		if text == "/cancel" {
 			ext.ClearPendingSettingSession(senderID)
@@ -676,6 +676,13 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 				_ = b.sender.DeleteMessage(delCtx, peer, []int{inMsgID})
 			}()
 			u := b.userMap.GetOrCreate(senderID)
+			if sess.Key == "importset" { // a file is expected, not text
+				ext.SetSettingNote(senderID, "× <i>Send the file, not text.</i>")
+				if sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
+					b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, u, "importset")
+				}
+				return
+			}
 			b.applyUserSettingValue(ctx, peer, u, sess.Key, text, sess.PromptMsgID)
 			return
 		}
@@ -684,6 +691,23 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	// Check if user is in an active pending bot setting prompt session (from /bs)
 	if bSess, ok := ext.GetPendingBotSettingSession(senderID, chatID); ok && bSess != nil {
 		inMsgID := m.ID
+		if bSess.Key == "IMPORT_SETTINGS" && text != "/cancel" {
+			if docMedia, ok := m.Media.(*tg.MessageMediaDocument); ok && b.settingsImporter != nil {
+				if doc, ok := docMedia.Document.(*tg.Document); ok && doc.Size <= 1<<20 {
+					ext.ClearPendingBotSettingSession(senderID)
+					var buf bytes.Buffer
+					if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err == nil {
+						b.settingsImporter(ctx, peer, bSess.PromptMsgID, buf.Bytes())
+					}
+					_ = b.sender.DeleteMessage(ctx, peer, []int{inMsgID})
+					return
+				}
+			}
+			if !strings.HasPrefix(text, "/") { // text while a file is expected: keep waiting
+				_ = b.sender.DeleteMessage(ctx, peer, []int{inMsgID})
+				return
+			}
+		}
 		if text == "/cancel" {
 			ext.ClearPendingBotSettingSession(senderID)
 			go func() {
@@ -1477,6 +1501,32 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 			}
 			lowerName := strings.ToLower(fileName)
 
+			// 0. /us → Import/Export Settings → Import: the azml_user_settings.json of Export
+			if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && sess.Key == "importset" {
+				if b.userSettingsImporter == nil {
+					return false
+				}
+				ext.ClearPendingSettingSession(senderID)
+				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // it has the user's keys
+				if doc.Size > 4<<20 {
+					ext.SetSettingNote(senderID, "× <i>The file is too big.</i>")
+					if b.settingsUpdateHandler != nil {
+						b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, b.userMap.GetOrCreate(senderID), "importset")
+					}
+					return true
+				}
+				var buf bytes.Buffer
+				if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
+					ext.SetSettingNote(senderID, "× <i>Download failed: "+telegram.EscapeHTML(err.Error())+"</i>")
+					if b.settingsUpdateHandler != nil {
+						b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, b.userMap.GetOrCreate(senderID), "importset")
+					}
+					return true
+				}
+				b.userSettingsImporter(ctx, peer, sess.PromptMsgID, senderID, buf.Bytes())
+				return true
+			}
+
 			// 1. the user's own cookies.txt from /us → Universal → YT-DLP Cookies
 			if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && sess.Key == "ycookies" {
 				if !strings.HasSuffix(lowerName, ".txt") || doc.Size > 2<<20 {
@@ -1541,35 +1591,6 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				}
 				_, _ = config.LoadConfig("config.env")
 				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>config.env</b> received and saved! Configurations reloaded.", m.ID, nil)
-				return true
-
-			case "azml_user_settings.json":
-				if b.userSettingsImporter == nil || doc.Size > 4<<20 {
-					return false
-				}
-				var buf bytes.Buffer
-				if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
-					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading <b>%s</b>: %v", fileName, err), m.ID, nil)
-					return true
-				}
-				b.userSettingsImporter(ctx, peer, m.ID, senderID, buf.Bytes())
-				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // it has the user's keys
-				return true
-
-			case "azml_settings.json":
-				if !telegram.IsOwner(senderID) && !telegram.IsSudo(senderID, b.userMap) {
-					_, _ = b.sender.SendMessage(ctx, peer, "Only Owner/Sudo can import bot settings!", m.ID, nil)
-					return true
-				}
-				if b.settingsImporter == nil || doc.Size > 1<<20 {
-					return false
-				}
-				var buf bytes.Buffer
-				if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
-					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading <b>%s</b>: %v", fileName, err), m.ID, nil)
-					return true
-				}
-				b.settingsImporter(ctx, peer, m.ID, buf.Bytes())
 				return true
 
 			case "cookies.txt":

@@ -17,6 +17,9 @@ import (
 // SettingsFileName: the file /bs Export sends and Import takes back.
 const SettingsFileName = "azml_settings.json"
 
+// ImportSettingsKey: the /bs session that waits for that file.
+const ImportSettingsKey = "IMPORT_SETTINGS"
+
 // noExportKeys: what belongs to this deploy / this bot and must not move to another one:
 // the deploy variables (token, API, owner, database), the helper bot tokens, the user session
 // and the address of this app.
@@ -75,17 +78,18 @@ func (m *BotSettingsModule) sendExport(ctx context.Context, peer tg.InputPeerCla
 		"┠ <b>Variables:</b> %d (only the changed ones)\n"+
 		"╰ <i>Not included: BOT_TOKEN, OWNER_ID, TELEGRAM_API, TELEGRAM_HASH, DATABASE_URL, DATABASE_NAME, "+
 		"BOT_TOKENS, USER_SESSION_STRING, BASE_URL</i>\n\n"+
-		"<i>To import: send this file to the bot as it is (name</i> <code>%s</code><i>).</i>", n, SettingsFileName)
+		"<i>To import: /bs → Import/Export Settings → Import, then send this file.</i>", n)
 	_, err := m.sender.SendDocumentBytes(ctx, peer, SettingsFileName, data, caption, replyTo, nil)
 	return err
 }
 
 // ImportSettings: the file of /bs Export. Only known variables that may move between bots;
 // each one is saved to the database like an edit in /bs.
-func (m *BotSettingsModule) ImportSettings(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte) {
+func (m *BotSettingsModule) ImportSettings(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, data []byte) {
 	var f settingsFile
 	if err := json.Unmarshal(data, &f); err != nil || f.Settings == nil {
-		_, _ = m.sender.SendMessage(ctx, peer, "× <b>Import failed:</b> this is not a settings file of /bs Export.", replyTo, nil)
+		text, btn := m.buildIEMenu("× <i>This is not a settings file of /bs Export.</i>")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
 		return
 	}
 	known := map[string]bool{}
@@ -129,7 +133,7 @@ func (m *BotSettingsModule) ImportSettings(ctx context.Context, peer tg.InputPee
 	}
 
 	var sb strings.Builder
-	sb.WriteString("✓ <b>Bot Settings Imported</b>\n\n")
+	sb.WriteString("✓ <b>Imported</b>\n")
 	sb.WriteString(fmt.Sprintf("┠ <b>Applied:</b> %d\n", len(applied)))
 	if len(skipped) > 0 {
 		sb.WriteString(fmt.Sprintf("┠ <b>Skipped:</b> <code>%s</code>\n", telegram.EscapeHTML(strings.Join(skipped, " "))))
@@ -139,5 +143,25 @@ func (m *BotSettingsModule) ImportSettings(ctx context.Context, peer tg.InputPee
 	} else {
 		sb.WriteString("╰ <i>Everything applies at once.</i>")
 	}
-	_, _ = m.sender.SendMessage(ctx, peer, sb.String(), replyTo, nil)
+	text, btn := m.buildIEMenu(sb.String())
+	_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
+}
+
+// buildIEMenu: /bs → Import/Export Settings.
+func (m *BotSettingsModule) buildIEMenu(note string) (string, *telegram.ButtonMaker) {
+	text := "㊂ <b><u>Import/Export Settings :</u></b>\n\n" +
+		"<blockquote><b>╭</b> <b>Export :</b> <i>a file with every changed variable, sent here (PM only).</i>\n" +
+		"<b>┠</b> <b>Import :</b> <i>send that file and the variables are set and saved.</i>\n" +
+		"<b>╰</b> <b>Never included :</b> <i>BOT_TOKEN, OWNER_ID, TELEGRAM_API, TELEGRAM_HASH, DATABASE_URL, DATABASE_NAME, BOT_TOKENS, USER_SESSION_STRING, BASE_URL</i></blockquote>"
+	if note != "" {
+		text += "\n\n" + note
+	}
+	btn := telegram.NewButtonMaker()
+	btn.IButton("📤 Export", "botset export")
+	btn.IButton("📥 Import", "botset prompt_import")
+	btn.Row()
+	btn.IButtonStyled("◀️", "botset back", "primary")
+	btn.IButtonStyled("❌", "botset close", "danger")
+	btn.Row()
+	return text, btn
 }

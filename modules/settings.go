@@ -321,8 +321,7 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 	btn.Row()
 	btn.IButton("Leech Settings", fmt.Sprintf("userset %d leech", u.UserID))
 	btn.Row()
-	btn.IButton("📤 Export", fmt.Sprintf("userset %d export", u.UserID))
-	btn.IButton("📥 Import", fmt.Sprintf("userset %d import", u.UserID))
+	btn.IButton("Import/Export Settings", fmt.Sprintf("userset %d iesettings", u.UserID))
 	btn.Row()
 	if m.settingsChanged(u) {
 		btn.IButtonStyled("Reset Setting", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
@@ -723,19 +722,36 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildMainMenu(u, "")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 1)
+	case "iesettings":
+		text, btn := m.buildIEMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	case "export":
 		// the file has the user's cookies and keys: only in PM
 		if _, ok := peer.(*tg.InputPeerUser); !ok {
-			_ = m.sender.AnswerCallback(ctx, queryID, "Export works only in the bot PM: open /us there.", true)
+			text, btn := m.buildIEMenu(u, "× <i>Export works only in the bot PM: open /us there.</i>")
+			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 			return
 		}
+		note := "✓ <i>Exported: the file is below.</i>"
 		if err := m.sendUserExport(ctx, peer, msgID, u); err != nil {
-			_ = m.sender.AnswerCallback(ctx, queryID, "Export failed: "+err.Error(), true)
-			return
+			note = "× <i>Export failed: " + telegram.EscapeHTML(err.Error()) + "</i>"
 		}
-		_ = m.sender.AnswerCallback(ctx, queryID, "Exported", false)
-	case "import":
-		_ = m.sender.AnswerCallback(ctx, queryID, "Send the file "+UserSettingsFileName+" (from /us Export of any bot) to this bot PM.", true)
+		text, btn := m.buildIEMenu(u, note)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+	case "edit_importset":
+		ext.SetPendingSettingSession(targetUID, "importset", 0, msgID, 60*time.Second)
+		text, _ := m.buildIEMenu(u, "")
+		btn := telegram.NewButtonMaker()
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d iesettings", u.UserID))
+		btn.Row()
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d back", u.UserID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n➲ <i>Send the file <code>"+UserSettingsFileName+"</code> (from Export of any bot) within 60 seconds.</i>", btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	case "leech":
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildLeechMenu(u, "")
@@ -1312,6 +1328,8 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 		text, btn = m.buildExtraMenu(u, key, ext.TakeSettingNote(u.UserID))
 	case "ytopt", "ycookies":
 		text, btn = m.buildYtdlSettingMenu(u, key, "")
+	case "importset", "iesettings":
+		text, btn = m.buildIEMenu(u, ext.TakeSettingNote(u.UserID))
 	case "lexcluded":
 		text, btn = m.buildExcludedMenu(u)
 	case "lprefix":

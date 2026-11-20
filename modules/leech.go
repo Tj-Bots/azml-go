@@ -1057,7 +1057,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		aria := downloader.GetAria2Client()
 
 		if isLocalTorrent {
-			log.Printf("[LEECH] Adding local .torrent file to Aria2c: %s", link)
+			log.Printf("[LEECH] Adding local .torrent file to dlurl: %s", link)
 			gid, err := aria.AddTorrent(link, taskDir)
 			if err != nil {
 				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("Torrent Error: %v", err), modeStr, taskStartTime)
@@ -1169,7 +1169,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			if err != nil {
 				// If Aria2c is unreachable or errors on HTTP/HTTPS DDL link, seamlessly fallback to DirectDownloader!
 				if ext.IsURL(link) && (strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://")) {
-					log.Printf("[LEECH] Aria2c AddURI error: %v, falling back to DirectDownloader for %s", err, link)
+					log.Printf("[LEECH] dlurl AddURI error: %v, falling back to DirectDownloader for %s", err, link)
 					directDl := downloader.NewDirectDownloader()
 					dest := filepath.Join(taskDir, "downloaded_file")
 					if opt.CustomName != "" {

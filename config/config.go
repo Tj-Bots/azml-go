@@ -76,6 +76,7 @@ type Config struct {
 	UserTasksLimit            int
 	PlaylistLimit             int
 	ExtensionFilter           string
+	Images                    string
 	ExcepChats                string
 	DeleteLinks               bool
 	RichMessages              bool
@@ -243,6 +244,7 @@ func buildConfig() Config {
 		UserTasksLimit:            getEnvInt("USER_TASKS_LIMIT", 0),
 		PlaylistLimit:             getEnvInt("PLAYLIST_LIMIT", 0),
 		ExtensionFilter:           getEnv("EXTENSION_FILTER", ""),
+		Images:                    getEnv("IMAGES", ""),
 		ExcepChats:                getEnv("EXCEP_CHATS", ""),
 		DeleteLinks:               getEnvBool("DELETE_LINKS", false),
 		RichMessages:              getEnvBool("RICH_MESSAGES", false),
@@ -515,6 +517,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.ExcepChats = val
 	case "EXTENSION_FILTER":
 		GlobalConfig.ExtensionFilter = val
+	case "IMAGES":
+		GlobalConfig.Images = strings.TrimSpace(val)
 	case "LEECH_FILENAME_REMNAME":
 		GlobalConfig.LeechFilenameRemname = val
 	case "PLAYLIST_LIMIT":
@@ -737,6 +741,7 @@ func configMapLocked() map[string]string {
 		"PLAYLIST_LIMIT":               strconv.Itoa(GlobalConfig.PlaylistLimit),
 		"LEECH_FILENAME_REMNAME":       GlobalConfig.LeechFilenameRemname,
 		"EXTENSION_FILTER":             GlobalConfig.ExtensionFilter,
+		"IMAGES":                       GlobalConfig.Images,
 		"EXCEP_CHATS":                  GlobalConfig.ExcepChats,
 		"DELETE_LINKS":                 strconv.FormatBool(GlobalConfig.DeleteLinks),
 		"RICH_MESSAGES":                strconv.FormatBool(GlobalConfig.RichMessages),

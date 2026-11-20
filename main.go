@@ -257,6 +257,7 @@ func main() {
 	app.SetTaskExtras(leechMod.HandleHistory, leechMod.HandleRetryCallback)
 	app.SetSelectHandler(leechMod.HandleSelectCallback)
 	app.SetCmdHelpHandler(leechMod.HandleHelpCallback)
+	app.SetToolHandlers(leechMod.HandleCover, modules.HandleShell(sender))
 	app.SetSaveHandler(leechMod.HandleSaveCallback)
 	app.SetVTHandlers(leechMod.HandleVTCallback, leechMod.HandleVTInput)
 	app.SetYtdlHandler(ytdlMod.HandleYtdl, ytdlMod.HandleYtdlCallback)

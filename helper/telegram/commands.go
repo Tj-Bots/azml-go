@@ -31,6 +31,8 @@ type Commands struct {
 	Restart     []string
 	Help        []string
 	Log         []string
+	Cover       []string
+	Shell       []string
 	UserSetting []string
 	BotSetting  []string
 	Speedtest   []string
@@ -156,6 +158,13 @@ func InitCommands() {
 		},
 		Log: []string{
 			"log" + suffix,
+		},
+		Cover: []string{
+			"cover" + suffix,
+		},
+		Shell: []string{
+			"shell" + suffix,
+			"exec" + suffix,
 		},
 		UserSetting: []string{
 			"usetting" + suffix,

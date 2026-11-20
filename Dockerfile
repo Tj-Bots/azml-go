@@ -27,9 +27,18 @@ RUN apt-get update && \
 COPY --from=builder /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}"
 
-# Pre-cache Go modules from builder stage for instant builds
+# Pre-cache Go modules and the compiled packages from builder stage: the update on every start
+# (and /restart) compiles only what changed, in seconds and with little memory
 COPY --from=builder /go/pkg/mod /go/pkg/mod
+COPY --from=builder /root/.cache/go-build /root/.cache/go-build
 ENV GOPATH="/go"
+ENV GOFLAGS="-p=2"
+
+# aria2c of the base image (named studymaterial there) runs as dlurl
+RUN B="$(command -v dlurl || command -v studymaterial || command -v aria2c)" && \
+    if [ "$B" != "/usr/local/bin/dlurl" ]; then mv "$B" /usr/local/bin/dlurl; fi && \
+    chmod a+rx /usr/local/bin/dlurl && \
+    dlurl --version | head -1
 
 RUN mkdir -p /usr/src/app/downloads /usr/src/app/Thumbnails
 

@@ -1,7 +1,7 @@
 {
   "description": "Telegram leech bot written in Go",
   "keywords": ["telegram", "leech", "go"],
-  "repository": "https://github.com/Tj-Bots/azml-go",
+  "repository": "https://github.com/Tj-Bots/azml-go/tree/new",
   "stack": "container",
   "env": {
     "BOT_TOKEN": {

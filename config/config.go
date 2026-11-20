@@ -280,7 +280,7 @@ func buildConfig() Config {
 		StorageThreshold:          getEnvInt64("STORAGE_THRESHOLD", 1), // Default 1GB safety cushion
 		DumpChatID:                getEnvInt64("DUMP_CHAT_ID", getEnvInt64("BIN_CHANNEL", getEnvInt64("STORAGE_CHANNEL", getEnvInt64("STORAGE_CHANNELS", getEnvInt64("LEECH_LOG_ID", 0))))),
 		UpstreamRepo:              getEnv("UPSTREAM_REPO", "https://github.com/Tj-Bots/azml-go"),
-		UpstreamBranch:            getEnv("UPSTREAM_BRANCH", "main"),
+		UpstreamBranch:            getEnv("UPSTREAM_BRANCH", "new"),
 		UpdateOnStartup:           getEnvBool("UPDATE_ON_STARTUP", false),
 		GoFileToken:               getEnv("GOFILE_TOKEN", ""),
 		PixelDrainKey:             getEnv("PIXELDRAIN_KEY", ""),

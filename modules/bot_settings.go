@@ -172,7 +172,7 @@ var defaultVarValues = map[string]string{
 	"SHORTENER_ENABLED":            "true",
 	"TOKEN_TIMEOUT":                "0",
 	"UPSTREAM_REPO":                "https://github.com/Tj-Bots/azml-go",
-	"UPSTREAM_BRANCH":              "main",
+	"UPSTREAM_BRANCH":              "new",
 	"GOFILE_TOKEN":                 "",
 	"PIXELDRAIN_KEY":               "",
 	"BUZZHEAVIER_TOKEN":            "",

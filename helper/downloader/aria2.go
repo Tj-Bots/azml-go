@@ -114,6 +114,12 @@ func GetAria2Client() *Aria2RPCClient {
 
 func findAriaBinary() string {
 	candidates := []string{
+		// the Dockerfile renames the aria2c of the base image to dlurl
+		"dlurl",
+		"/usr/local/bin/dlurl",
+		"/usr/bin/dlurl",
+		"/tmp/dlurl",
+		// older images (and a /restart on a container built before the rename)
 		"studymaterial",
 		"/app/.apt/usr/bin/studymaterial",
 		"/usr/bin/studymaterial",
@@ -122,7 +128,6 @@ func findAriaBinary() string {
 		"/app/.apt/bin/aria2c",
 		"/usr/bin/aria2c",
 		"/usr/local/bin/aria2c",
-		"/tmp/aria2c",
 	}
 
 	for _, cand := range candidates {
@@ -139,7 +144,7 @@ func findAriaBinary() string {
 	}
 
 	if runtime.GOOS == "linux" {
-		targetPath := "/tmp/aria2c"
+		targetPath := "/tmp/dlurl"
 		if fi, err := os.Stat(targetPath); err == nil && !fi.IsDir() {
 			_ = os.Chmod(targetPath, 0755)
 			return targetPath
@@ -149,7 +154,7 @@ func findAriaBinary() string {
 		}
 	}
 
-	return "aria2c"
+	return "dlurl"
 }
 
 func autoInstallStaticAria2(targetPath string) error {
@@ -242,7 +247,7 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 		return nil
 	}
 
-	// Start aria2c / studymaterial daemon with max connection and speed optimizations
+	// Start the aria2c (dlurl) daemon with max connection and speed optimizations
 	binName := findAriaBinary()
 	defaultTrackers := "udp://tracker.opentrackr.org:1337/announce," +
 		"udp://open.stealth.si:80/announce," +

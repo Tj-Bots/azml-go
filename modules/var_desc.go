@@ -20,6 +20,7 @@ var varDescriptions = map[string]string{
 	"YT_DLP_OPTIONS":               "Default yt-dlp options for everyone (command line style, e.g. --embed-subs --sub-langs en). Users can add their own in /us → Universal → YT-DLP Options. Str",
 	"PLAYLIST_LIMIT":               "Maximum number of videos taken from a yt-dlp playlist (0 = no limit). Int",
 	"LEECH_FILENAME_REMNAME":       "Remove words from every leeched file name. Separate them by | (e.g. www.site.com|[Group]). Str",
+	"IMAGES":                       "Image links (separated by space) shown with /start and /stats, a random one each time. Empty = text only (default). Str",
 	"EXTENSION_FILTER":             "File extensions that won't be uploaded, for all users (e.g. .txt .nfo .url). Separate them by space. Users can add their own in /us. Str",
 	"EXCEP_CHATS":                  "Chats (IDs separated by space) that don't use logging: no Leech Started and no copy in LEECH_LOG_ID for tasks started there. Str",
 	"DELETE_LINKS":                 "Delete TgLink/Magnet/File on Start of Task to Auto Clean Group. Default is False. Bool",

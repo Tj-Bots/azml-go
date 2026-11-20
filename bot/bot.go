@@ -68,6 +68,8 @@ type BotApp struct {
 	settingsHandler       func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	autoRenameHandler     func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	settingsCbHandler     func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	coverHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	shellHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	cmdHelpCbHandler      func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	userSettingsImporter  func(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, data []byte)
 	settingsImporter      func(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte)
@@ -278,6 +280,12 @@ func (b *BotApp) SetBotSettingsHandlers(h func(ctx context.Context, peer tg.Inpu
 func (b *BotApp) SetBotSettingsInputHandlers(val func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key, val string, page int), cancel func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key string, page int)) {
 	b.bsettingInputHandler = val
 	b.bsettingCancelHandler = cancel
+}
+
+// SetToolHandlers: /cover and /shell.
+func (b *BotApp) SetToolHandlers(cover, shell func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)) {
+	b.coverHandler = cover
+	b.shellHandler = shell
 }
 
 // SetCmdHelpHandler: the buttons of the /leech /mirror /ytdl usage menu.
@@ -991,6 +999,14 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		if b.logHandler != nil {
 			b.logHandler(ctx, peer, msgCtx)
 		}
+	case telegram.MatchCommand(text, telegram.BotCommands.Cover, b.botUsername):
+		if b.coverHandler != nil {
+			b.coverHandler(ctx, peer, msgCtx)
+		}
+	case telegram.MatchCommand(text, telegram.BotCommands.Shell, b.botUsername):
+		if b.shellHandler != nil {
+			b.shellHandler(ctx, peer, msgCtx)
+		}
 	case telegram.MatchCommand(text, telegram.BotCommands.Restart, b.botUsername):
 		if b.restartHandler != nil {
 			b.restartHandler(ctx, peer, msgCtx)
@@ -1347,6 +1363,9 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 	if len(bc.Log) > 0 {
 		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
+	}
+	if len(bc.Cover) > 0 {
+		addCmd(bc.Cover[0], "Reply to a video: send it again with your thumbnail as cover")
 	}
 	if len(bc.Authorize) > 1 {
 		addCmd(bc.Authorize[0], fmt.Sprintf("or /%s Authorize a user or chat (Owner/Sudo)", bc.Authorize[1]))

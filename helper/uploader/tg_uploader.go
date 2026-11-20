@@ -429,6 +429,11 @@ func saveBigFilePartWithRetry(ctx context.Context, clients []*tg.Client, workerI
 	return fmt.Errorf("exceeded max retries (%d) for part %d", maxAttempts, partIndex)
 }
 
+// UploadCover: a cover image as an InputPhoto for a video (/cover), with the main bot.
+func (u *TelegramUploader) UploadCover(ctx context.Context, peer tg.InputPeerClass, coverPath string) (tg.InputPhotoClass, error) {
+	return u.uploadVideoCover(ctx, u.botClient, peer, coverPath)
+}
+
 func (u *TelegramUploader) uploadVideoCover(ctx context.Context, client *tg.Client, peer tg.InputPeerClass, coverPath string) (tg.InputPhotoClass, error) {
 	if coverPath == "" {
 		return nil, nil

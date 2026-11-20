@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"azml-go/helper/ext"
+	"azml-go/helper/telegram"
 	"azml-go/types"
 
 	"github.com/gotd/td/tg"
@@ -112,21 +113,46 @@ func (m *SettingsModule) sendUserExport(ctx context.Context, peer tg.InputPeerCl
 	}, "", "  ")
 	caption := "⌬ <b>User Settings Export</b>\n\n" +
 		"<i>Prefix, suffix, caption, rename, thumbnail, dump channel, split, metadata, mirror host, keys and the rest of /us.</i>\n\n" +
-		"<i>To import in another bot: send it this file as it is (name</i> <code>" + UserSettingsFileName + "</code><i>).</i>\n" +
+		"<i>To import: /us → Import/Export Settings → Import, then send this file.</i>\n" +
 		"⚠️ <i>The file has your cookies and API keys: do not share it.</i>"
 	_, err := m.sender.SendDocumentBytes(ctx, peer, UserSettingsFileName, data, caption, replyTo, nil)
 	return err
 }
 
-// ImportUserSettings: the file of /us Export, applied to the user who sent it.
-func (m *SettingsModule) ImportUserSettings(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, data []byte) {
-	var f userSettingsFile
-	if err := json.Unmarshal(data, &f); err != nil || f.Kind != "user" {
-		_, _ = m.sender.SendMessage(ctx, peer, "× <b>Import failed:</b> this is not a file of /us Export.", replyTo, nil)
-		return
+// buildIEMenu: /us → Import/Export Settings.
+func (m *SettingsModule) buildIEMenu(u *types.UserSettings, note string) (string, *telegram.ButtonMaker) {
+	text := "㊂ <b><u>Import/Export Settings :</u></b>\n\n" +
+		"<blockquote><b>╭</b> <b>Export :</b> <i>a file with your /us settings (thumbnail included), sent here.</i>\n" +
+		"<b>╰</b> <b>Import :</b> <i>send that file to this bot (or another one) and the settings come back.</i></blockquote>"
+	if note != "" {
+		text += "\n\n" + note
 	}
+	btn := telegram.NewButtonMaker()
+	btn.IButton("📤 Export", fmt.Sprintf("userset %d export", u.UserID))
+	btn.IButton("📥 Import", fmt.Sprintf("userset %d edit_importset", u.UserID))
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d back", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+// ImportUserSettings: the file of /us Export, applied to the user who sent it; the prompt
+// message goes back to the Import/Export menu with the result.
+func (m *SettingsModule) ImportUserSettings(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, userID int64, data []byte) {
 	u := m.userMap.GetOrCreate(userID)
-	applyPrefs(u, f.Settings)
-	_ = ext.DB.SaveUser(u)
-	_, _ = m.sender.SendMessage(ctx, peer, "✓ <b>User Settings Imported!</b> Open /us to see them.", replyTo, nil)
+	var f userSettingsFile
+	note := "✓ <i>Settings imported.</i>"
+	if err := json.Unmarshal(data, &f); err != nil || f.Kind != "user" {
+		note = "× <i>This is not a file of /us Export.</i>"
+	} else {
+		applyPrefs(u, f.Settings)
+		_ = ext.DB.SaveUser(u)
+	}
+	text, btn := m.buildIEMenu(u, note)
+	if promptMsgID > 0 {
+		_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
+	} else {
+		_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, 0, btn, 2)
+	}
 }

@@ -93,7 +93,7 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 			if aria != nil {
 				resumeList := strings.Join(selectedIDs, ",")
 				_ = aria.ChangeOption(id, map[string]interface{}{"select-file": resumeList})
-				log.Printf("[WEB ARIA2] GID=%s updated select-file: %s", id, resumeList)
+				log.Printf("[WEB DLURL] GID=%s updated select-file: %s", id, resumeList)
 			}
 		}
 

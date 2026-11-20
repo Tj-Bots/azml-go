@@ -166,7 +166,7 @@ func autoInstallStaticAria2(targetPath string) error {
 	client := &http.Client{Timeout: 90 * time.Second}
 
 	for _, u := range urls {
-		log.Printf("[Aria2c] Auto-installing static aria2c binary from %s to %s...", u, targetPath)
+		log.Printf("[dlurl] Auto-installing static dlurl binary from %s to %s...", u, targetPath)
 		resp, err := client.Get(u)
 		if err != nil {
 			lastErr = err
@@ -210,7 +210,7 @@ func autoInstallStaticAria2(targetPath string) error {
 				}
 				_ = os.Chmod(targetPath, 0755)
 				found = true
-				log.Printf("[Aria2c] Static aria2c binary successfully installed to %s", targetPath)
+				log.Printf("[dlurl] Static dlurl binary successfully installed to %s", targetPath)
 				break
 			}
 		}
@@ -223,7 +223,7 @@ func autoInstallStaticAria2(targetPath string) error {
 	}
 
 	if lastErr != nil {
-		log.Printf("[Aria2c] Auto-install failed: %v", lastErr)
+		log.Printf("[dlurl] Auto-install failed: %v", lastErr)
 		return lastErr
 	}
 	return errors.New("static binary not found in archive")
@@ -283,7 +283,7 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 			"--follow-torrent=false",
 			"--follow-metalink=false",
 		}
-		log.Printf("[Aria2c] DISABLE_TORRENTS: BitTorrent is off")
+		log.Printf("[dlurl] DISABLE_TORRENTS: BitTorrent is off")
 	}
 	args := []string{
 		"--enable-rpc",
@@ -308,7 +308,7 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 	cmd := exec.Command(binName, append(args, btArgs...)...)
 
 	if err := cmd.Run(); err != nil {
-		log.Printf("[Aria2c] Failed to start daemon (%s): %v", binName, err)
+		log.Printf("[dlurl] Failed to start daemon (%s): %v", binName, err)
 		return err
 	}
 
@@ -316,11 +316,11 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 		time.Sleep(300 * time.Millisecond)
 		if _, err := a.rawCall(req); err == nil {
 			a.started = true
-			log.Printf("[Aria2c] Daemon successfully started on port %d", port)
+			log.Printf("[dlurl] Daemon successfully started on port %d", port)
 			return nil
 		}
 	}
-	log.Printf("[Aria2c] Warning: daemon process launched but not yet responding on port %d", port)
+	log.Printf("[dlurl] Warning: daemon process launched but not yet responding on port %d", port)
 	return nil
 }
 
@@ -341,7 +341,7 @@ func (a *Aria2RPCClient) rawCall(req JSONRPCRequest) (*JSONRPCResponse, error) {
 		return nil, err
 	}
 	if rpcResp.Error != nil {
-		return nil, fmt.Errorf("aria2 error (%d): %s", rpcResp.Error.Code, rpcResp.Error.Message)
+		return nil, fmt.Errorf("dlurl error (%d): %s", rpcResp.Error.Code, rpcResp.Error.Message)
 	}
 	return &rpcResp, nil
 }
@@ -350,7 +350,7 @@ func (a *Aria2RPCClient) call(req JSONRPCRequest) (*JSONRPCResponse, error) {
 	res, err := a.rawCall(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "connect:") {
-			log.Printf("[Aria2c] RPC unreachable (%v), attempting to restart daemon...", err)
+			log.Printf("[dlurl] RPC unreachable (%v), attempting to restart daemon...", err)
 			_ = a.EnsureStarted()
 			return a.rawCall(req)
 		}
@@ -692,7 +692,7 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 			// If this download spawned a follow-up download (e.g. torrent metadata completed -> payload started)
 			if len(res.FollowedBy) > 0 {
 				newGID := res.FollowedBy[0]
-				log.Printf("[Aria2c] Torrent followed: GID %s -> %s", t.gid, newGID)
+				log.Printf("[dlurl] Torrent followed: GID %s -> %s", t.gid, newGID)
 				t.mu.Lock()
 				t.gid = newGID
 				t.mu.Unlock()
@@ -704,7 +704,7 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 				// If followedBy is present on completion, switch to payload
 				if len(res.FollowedBy) > 0 {
 					newGID := res.FollowedBy[0]
-					log.Printf("[Aria2c] Torrent followed on complete: GID %s -> %s", t.gid, newGID)
+					log.Printf("[dlurl] Torrent followed on complete: GID %s -> %s", t.gid, newGID)
 					t.mu.Lock()
 					t.gid = newGID
 					t.mu.Unlock()
@@ -732,7 +732,7 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 				}
 				return path, nil
 			case "error":
-				return "", fmt.Errorf("aria2 download failed: %s", res.ErrorMessage)
+				return "", fmt.Errorf("dlurl download failed: %s", res.ErrorMessage)
 			case "removed":
 				t.mu.RLock()
 				path := t.downloadPath

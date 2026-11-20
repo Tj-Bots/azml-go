@@ -68,6 +68,7 @@ type BotApp struct {
 	settingsHandler       func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	autoRenameHandler     func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	settingsCbHandler     func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
+	userSettingsImporter  func(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, data []byte)
 	settingsImporter      func(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte)
 	settingsUpdateHandler func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, u *types.UserSettings, key string)
 	bsettingHandler       func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -276,6 +277,11 @@ func (b *BotApp) SetBotSettingsHandlers(h func(ctx context.Context, peer tg.Inpu
 func (b *BotApp) SetBotSettingsInputHandlers(val func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key, val string, page int), cancel func(ctx context.Context, peer tg.InputPeerClass, promptMsgID int, key string, page int)) {
 	b.bsettingInputHandler = val
 	b.bsettingCancelHandler = cancel
+}
+
+// SetUserSettingsImporter: the azml_user_settings.json of /us Export, for the user who sends it.
+func (b *BotApp) SetUserSettingsImporter(fn func(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, data []byte)) {
+	b.userSettingsImporter = fn
 }
 
 // SetSettingsImporter: the azml_settings.json of /bs Export, sent back to the bot.
@@ -1535,6 +1541,19 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				}
 				_, _ = config.LoadConfig("config.env")
 				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>config.env</b> received and saved! Configurations reloaded.", m.ID, nil)
+				return true
+
+			case "azml_user_settings.json":
+				if b.userSettingsImporter == nil || doc.Size > 4<<20 {
+					return false
+				}
+				var buf bytes.Buffer
+				if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
+					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading <b>%s</b>: %v", fileName, err), m.ID, nil)
+					return true
+				}
+				b.userSettingsImporter(ctx, peer, m.ID, senderID, buf.Bytes())
+				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // it has the user's keys
 				return true
 
 			case "azml_settings.json":

@@ -321,6 +321,9 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 	btn.Row()
 	btn.IButton("Leech Settings", fmt.Sprintf("userset %d leech", u.UserID))
 	btn.Row()
+	btn.IButton("📤 Export", fmt.Sprintf("userset %d export", u.UserID))
+	btn.IButton("📥 Import", fmt.Sprintf("userset %d import", u.UserID))
+	btn.Row()
 	if m.settingsChanged(u) {
 		btn.IButtonStyled("Reset Setting", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
 		btn.Row()
@@ -720,6 +723,19 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildMainMenu(u, "")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 1)
+	case "export":
+		// the file has the user's cookies and keys: only in PM
+		if _, ok := peer.(*tg.InputPeerUser); !ok {
+			_ = m.sender.AnswerCallback(ctx, queryID, "Export works only in the bot PM: open /us there.", true)
+			return
+		}
+		if err := m.sendUserExport(ctx, peer, msgID, u); err != nil {
+			_ = m.sender.AnswerCallback(ctx, queryID, "Export failed: "+err.Error(), true)
+			return
+		}
+		_ = m.sender.AnswerCallback(ctx, queryID, "Exported", false)
+	case "import":
+		_ = m.sender.AnswerCallback(ctx, queryID, "Send the file "+UserSettingsFileName+" (from /us Export of any bot) to this bot PM.", true)
 	case "leech":
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildLeechMenu(u, "")

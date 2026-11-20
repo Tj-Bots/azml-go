@@ -112,20 +112,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 		}
 	}
 	if link == "" {
-		helpMsg := "㊂ <b><u>YT-DLP Command Usage :</u></b>\n\n" +
-			"<b>Usage:</b> <code>/ytdl" + config.Get().CmdSuffix + " [link] [quality]</code> or reply to a link\n\n" +
-			"<blockquote><b>╭</b> <code>/ytdl" + config.Get().CmdSuffix + " link</code> — Choose the quality from buttons\n" +
-			"┠ <code>720p</code> — Direct quality (144p - 2160p)\n" +
-			"┠ <code>best</code> — Best video + audio\n" +
-			"┠ <code>audio</code> / <code>mp3</code> — Audio only\n" +
-			"┠ <code>-q format</code> — Custom yt-dlp format\n" +
-			"┠ <code>-n name</code> — Custom File Name\n" +
-			"┠ <code>-z</code> — Compress as Zip\n" +
-			"┠ <code>-d</code> / <code>-m</code> — Upload as Document / Media\n" +
-			"<b>╰</b> <code>-up gofile</code> — Mirror to a host</blockquote>\n\n" +
-			"➲ <b>Supported :</b> YouTube, Instagram, TikTok, X, Facebook and more\n" +
-			"➲ <b>Cookies :</b> <code>cookies.txt</code> in the bot folder is used when present"
-		m.leech.replyTemp(ctx, peer, msg, helpMsg)
+		m.leech.sendCmdHelp(ctx, peer, msg, "ytdl")
 		return
 	}
 

@@ -31,10 +31,10 @@ func TestParseNewFlags(t *testing.T) {
 	if parseSizeArg("500MB") != 500<<20 || parseSizeArg("2G") != 2<<30 {
 		t.Fatal("sizes")
 	}
-	if strings.Contains(leechHelpText(), "%!") {
+	if strings.Contains(leechHelpForTest(), "%!") {
 		t.Fatal("help fmt")
 	}
-	if plain, _ := telegram.ParseFormatting(leechHelpText()); plain == leechHelpText() {
+	if plain, _ := telegram.ParseFormatting(leechHelpForTest()); plain == leechHelpForTest() {
 		t.Fatal("help html")
 	}
 }
@@ -145,4 +145,18 @@ func TestSameDirGroup(t *testing.T) {
 		t.Fatalf("files in folder: %d", n)
 	}
 	_ = os.RemoveAll(filepath.Dir(f))
+}
+
+func leechHelpForTest() string {
+	var sb strings.Builder
+	for _, k := range []string{"leech", "mirror", "ytdl"} {
+		t, _ := cmdHelpMenu(k, 1, 0)
+		sb.WriteString(t)
+		_, _, args := helpKind(k)
+		for i := range args {
+			it, _ := cmdHelpItem(k, 1, i, 0)
+			sb.WriteString(it)
+		}
+	}
+	return sb.String()
 }

@@ -867,41 +867,17 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		sentID, _ := b.sender.SendMessage(ctx, peer, "⌬ <b>Access Denied!</b>\nYou are not authorized to use this bot.\nContact the bot owner to get authorization.", m.ID, nil)
 		if sentID > 0 {
 			switch m.PeerID.(type) {
-			case *tg.PeerChat, *tg.PeerChannel:
+			case *tg.PeerChat, *tg.PeerChannel: // the answer and the command go together
 				b.sender.AutoDeleteMessage(peer, sentID, 15)
+				b.sender.AutoDeleteMessage(peer, m.ID, 15)
 			}
 		}
 		return
 	}
 
-	// 6. Bot PM Check (AZML style): If command is executed in a group, verify user has started the bot in PM
-	isOwnerOrSudo := telegram.IsSudo(senderID, b.userMap)
-	isGroupChat := chatID != senderID
-	switch m.PeerID.(type) {
-	case *tg.PeerChat, *tg.PeerChannel:
-		isGroupChat = true
-	}
-
-	// task commands run their own check (PM + FSUB in one message, like the Python bot)
-	isTaskCmd := telegram.MatchCommand(text, telegram.BotCommands.Leech, b.botUsername) ||
-		telegram.MatchCommand(text, telegram.BotCommands.Mirror, b.botUsername) ||
-		telegram.MatchCommand(text, telegram.BotCommands.Ytdl, b.botUsername)
-	if !isOwnerOrSudo && isGroupChat && !isTaskCmd {
-		u := b.userMap.Get(senderID)
-		if u == nil || !u.StartedInPM {
-			botUser := b.botUsername
-			if botUser == "" {
-				botUser = telegram.CurrentBotUsername
-			}
-			btn := telegram.NewButtonMaker()
-			btn.UButtonStyled("◈ "+telegram.ToSmallCaps("Start Bot in PM"), fmt.Sprintf("https://t.me/%s?start=start", botUser), "primary")
-			sentID, err := b.sender.SendMessage(ctx, peer, "<i>You didn't START the bot in PM (Private)</i>", m.ID, btn.BuildMenu(1))
-			if err == nil && sentID > 0 {
-				b.sender.AutoDeleteMessage(peer, sentID, 20)
-			}
-			return
-		}
-	}
+	// 6. no "start the bot in PM" check here, like the Python bot: /us, /status, /history ...
+	// work for everyone authorized; the task commands (/leech /mirror /ytdl /cover) check the
+	// PM and FSUB themselves and start by themselves once the user is done
 
 	isCancel, _ := telegram.MatchCancelCommand(text, b.botUsername)
 

@@ -172,11 +172,8 @@ func InitCommands() {
 			"usersetting" + suffix,
 			"usersettings" + suffix,
 			"setthumb" + suffix,
-			"setthumb",
 			"t" + suffix,
-			"t",
 			"thumb" + suffix,
-			"thumb",
 		},
 		BotSetting: []string{
 			"bsetting" + suffix,
@@ -367,4 +364,21 @@ func MatchCancelCommand(text string, botUsername ...string) (bool, string) {
 	}
 
 	return false, ""
+}
+
+// IsThumbCommand: /t /thumb /setthumb (with this bot's suffix) or /us thumb, e.g. as a photo
+// caption. With CMD_SUFFIX only this bot's command matches (/t2 is not /t).
+func IsThumbCommand(text, botUsername string) bool {
+	suffix := config.Get().CmdSuffix
+	if MatchCommand(text, []string{"t" + suffix, "thumb" + suffix, "setthumb" + suffix}, botUsername) {
+		return true
+	}
+	parts := strings.Fields(strings.ToLower(text))
+	return len(parts) >= 2 && parts[1] == "thumb" &&
+		MatchCommand(parts[0], []string{"us" + suffix, "usetting" + suffix, "usersetting" + suffix}, botUsername)
+}
+
+// IsCancelCommand: /cancel of this bot (with CMD_SUFFIX /cancel2 for the second bot).
+func IsCancelCommand(text, botUsername string) bool {
+	return MatchCommand(strings.TrimSpace(text), []string{"cancel" + config.Get().CmdSuffix}, botUsername)
 }

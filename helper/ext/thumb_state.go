@@ -8,6 +8,7 @@ import (
 type PendingThumbSession struct {
 	ChatID      int64
 	PromptMsgID int
+	CmdMsgID    int // the /t command (0 for the /us menu)
 	ExpiresAt   time.Time
 }
 
@@ -94,4 +95,28 @@ func rawChatID(id int64) int64 {
 		return -id - 1000000000000
 	}
 	return -id
+}
+
+// SetThumbCommandSession: /t waits for a photo; promptMsgID is the bot's prompt, cmdMsgID the /t.
+func SetThumbCommandSession(userID, chatID int64, promptMsgID, cmdMsgID int, d time.Duration) {
+	globalThumbState.mu.Lock()
+	defer globalThumbState.mu.Unlock()
+	globalThumbState.pending[userID] = &PendingThumbSession{
+		ChatID:      chatID,
+		PromptMsgID: promptMsgID,
+		CmdMsgID:    cmdMsgID,
+		ExpiresAt:   time.Now().Add(d),
+	}
+}
+
+// TakeThumbPrompt: true (and the session is removed) when the user still has the /t session of
+// this prompt, also after it expired; false when it was saved or cancelled meanwhile.
+func TakeThumbPrompt(userID int64, promptMsgID int) bool {
+	globalThumbState.mu.Lock()
+	defer globalThumbState.mu.Unlock()
+	if s, ok := globalThumbState.pending[userID]; ok && s != nil && s.PromptMsgID == promptMsgID {
+		delete(globalThumbState.pending, userID)
+		return true
+	}
+	return false
 }

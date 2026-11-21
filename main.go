@@ -249,7 +249,7 @@ func main() {
 	speedMod := modules.NewSpeedtestModule(sender)
 	miMod := modules.NewMediaInfoModule(sender)
 	miMod.SetRawAPI(app.GetRawAPI)
-	bcMod := modules.NewBroadcastModule(sender, userMap)
+	bcMod := modules.NewBroadcastModule(app.GetRawAPI(), sender, userMap)
 	imdbMod := modules.NewImdbModule(sender)
 	animeMod := modules.NewAnimeModule(sender)
 

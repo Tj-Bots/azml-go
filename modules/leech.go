@@ -2032,6 +2032,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		_ = ext.DB.SaveUser(user)
 	}
 
+	// the "Task Started" in PM goes after the upload, like the Python bot: when DELETE_LINKS is
+	// off (the source is still in the group) or CLEAN_LOG_MSG is on
+	if pmStartID > 0 && (!cfg.DeleteLinks || cfg.CleanLogMsg) {
+		pm := &tg.InputPeerUser{UserID: msg.UserID, AccessHash: telegram.GetUserAccessHash(msg.UserID)}
+		_ = m.sender.DeleteMessage(context.Background(), pm, []int{pmStartID})
+	}
+
 	m.taskMgr.RemoveTask(taskUID)
 	if m.taskMgr.Count() == 0 {
 		if m.statusMod != nil {

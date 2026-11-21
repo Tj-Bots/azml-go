@@ -930,10 +930,12 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	case telegram.MatchCommand(text, telegram.BotCommands.AddSudo, b.botUsername):
 		if b.addSudoHandler != nil {
 			b.addSudoHandler(ctx, peer, msgCtx)
+			go b.registerBotCommands(context.Background()) // he gets the admin commands
 		}
 	case telegram.MatchCommand(text, telegram.BotCommands.RmSudo, b.botUsername):
 		if b.rmSudoHandler != nil {
 			b.rmSudoHandler(ctx, peer, msgCtx)
+			go b.registerBotCommands(context.Background())
 		}
 	case telegram.MatchCommand(text, telegram.BotCommands.AddPremium, b.botUsername):
 		if b.addPremHandler != nil {
@@ -1282,7 +1284,7 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	bc := telegram.BotCommands
-	// the order of the Python bot (Leech-TJ), its extra commands, then /bs and /restart last
+	// everyone: the order of the Python bot (Leech-TJ)
 	if len(bc.Mirror) > 1 {
 		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Upload to GoFile, PixelDrain and more", bc.Mirror[1]))
 	}
@@ -1312,10 +1314,6 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 
 	if len(bc.History) > 0 {
 		addCmd(bc.History[0], "Your last finished tasks")
-	}
-
-	if len(bc.Users) > 0 {
-		addCmd(bc.Users[0], "Users, Sudo and Blacklist lists (Owner/Sudo)")
 	}
 
 	if len(bc.Cover) > 0 {
@@ -1354,16 +1352,22 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 		addCmd(bc.MediaInfo[0], fmt.Sprintf("or /%s Generate Mediainfo for Media or DL links", bc.MediaInfo[1]))
 	}
 
-	if len(bc.Broadcast) > 1 {
-		addCmd(bc.Broadcast[0], fmt.Sprintf("or /%s Broadcast message to all users", bc.Broadcast[1]))
-	}
-
 	if len(bc.Ping) > 1 {
 		addCmd(bc.Ping[0], fmt.Sprintf("or /%s Check Bot Ping & Latency", bc.Ping[1]))
 	}
 
+	userCount := len(cmds)
+	// Owner / Sudo only, at the end; /bs and /restart last
+	if len(bc.Broadcast) > 1 {
+		addCmd(bc.Broadcast[0], fmt.Sprintf("or /%s Broadcast message to all users", bc.Broadcast[1]))
+	}
+
 	if len(bc.Log) > 0 {
 		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
+	}
+
+	if len(bc.Users) > 0 {
+		addCmd(bc.Users[0], "Users, Sudo and Blacklist lists (Owner/Sudo)")
 	}
 
 	if len(bc.Authorize) > 1 {
@@ -1386,17 +1390,101 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 		addCmd(bc.Restart[0], fmt.Sprintf("or /%s Restart the Bot (Owner/Sudo)", bc.Restart[1]))
 	}
 
-	req := &tg.BotsSetBotCommandsRequest{
-		Scope:    &tg.BotCommandScopeDefault{},
-		LangCode: "",
-		Commands: cmds,
+	userCmds := cmds[:userCount]
+	set := func(scope tg.BotCommandScopeClass, list []tg.BotCommand) error {
+		_, err := b.rawAPI.BotsSetBotCommands(ctx, &tg.BotsSetBotCommandsRequest{Scope: scope, LangCode: "", Commands: list})
+		return err
 	}
-
-	if ok, err := b.rawAPI.BotsSetBotCommands(ctx, req); err != nil {
+	if err := set(&tg.BotCommandScopeDefault{}, userCmds); err != nil {
 		log.Printf("[AZML-Go Bot Client] Failed to register bot commands with Telegram: %v", err)
-	} else {
-		log.Printf("[AZML-Go Bot Client] Successfully registered %d commands in bot command list (ok=%v)", len(cmds), ok)
+		return
 	}
+	// the Owner and the Sudo users see also the admin commands: in their PM and in the
+	// authorized groups (scopes per user, like a menu only they get)
+	admins, chats := b.commandAdminsAndChats()
+	// a user who is no longer Sudo (/rmsudo) gets the normal list back
+	cmdAdminsMu.Lock()
+	now := map[int64]bool{}
+	for _, id := range admins {
+		now[id] = true
+	}
+	for id := range cmdAdmins {
+		if now[id] {
+			continue
+		}
+		if hash := telegram.GetUserAccessHash(id); hash != 0 {
+			_, _ = b.rawAPI.BotsResetBotCommands(ctx, &tg.BotsResetBotCommandsRequest{Scope: &tg.BotCommandScopePeer{Peer: &tg.InputPeerUser{UserID: id, AccessHash: hash}}})
+			for _, cid := range chats {
+				if cp := b.getPeerForChatID(cid); cp != nil {
+					_, _ = b.rawAPI.BotsResetBotCommands(ctx, &tg.BotsResetBotCommandsRequest{Scope: &tg.BotCommandScopePeerUser{Peer: cp, UserID: &tg.InputUser{UserID: id, AccessHash: hash}}})
+				}
+			}
+		}
+	}
+	cmdAdmins = now
+	cmdAdminsMu.Unlock()
+	n := 0
+	for _, uid := range admins {
+		hash := telegram.GetUserAccessHash(uid)
+		if hash == 0 {
+			continue // never seen: Telegram does not know him for this bot yet
+		}
+		user := &tg.InputUser{UserID: uid, AccessHash: hash}
+		if set(&tg.BotCommandScopePeer{Peer: &tg.InputPeerUser{UserID: uid, AccessHash: hash}}, cmds) == nil {
+			n++
+		}
+		for _, cid := range chats {
+			if cp := b.getPeerForChatID(cid); cp != nil {
+				_ = set(&tg.BotCommandScopePeerUser{Peer: cp, UserID: user}, cmds)
+			}
+		}
+	}
+	log.Printf("[AZML-Go Bot Client] Successfully registered %d commands in bot command list (%d more for %d Owner/Sudo)", len(userCmds), len(cmds)-len(userCmds), n)
+}
+
+var (
+	cmdAdminsMu sync.Mutex
+	cmdAdmins   = map[int64]bool{} // who got the admin command list (this run)
+)
+
+// commandAdminsAndChats: the Owner and Sudo users, and the authorized groups (config and /authorize).
+func (b *BotApp) commandAdminsAndChats() (admins, chats []int64) {
+	cfg := config.Get()
+	seen := map[int64]bool{}
+	addA := func(id int64) {
+		if id > 0 && !seen[id] {
+			seen[id] = true
+			admins = append(admins, id)
+		}
+	}
+	addA(cfg.OwnerID)
+	for _, id := range cfg.SudoUsers {
+		addA(id)
+	}
+	seenC := map[int64]bool{}
+	addC := func(id int64) {
+		if id < 0 && !seenC[id] {
+			seenC[id] = true
+			chats = append(chats, id)
+		}
+	}
+	for _, id := range cfg.AuthorizedChats {
+		addC(id)
+	}
+	if b.userMap != nil {
+		for _, u := range b.userMap.GetAllUsers() {
+			if u == nil {
+				continue
+			}
+			if u.IsSudo {
+				addA(u.UserID)
+			}
+			if u.IsAuth {
+				addC(u.UserID)
+			}
+		}
+	}
+	return admins, chats
 }
 
 func (b *BotApp) cacheAccessHash(userID, hash int64) {

@@ -28,7 +28,7 @@ func (m *LeechModule) HandleCover(ctx context.Context, peer tg.InputPeerClass, m
 		_, _ = m.sender.SendMessage(ctx, peer, msgText, msg.MessageID, markup)
 		return
 	}
-	if !m.forceSubOK(ctx, peer, msg) {
+	if !m.forceSubOK(ctx, peer, msg, func() { m.HandleCover(context.Background(), peer, msg) }) {
 		return
 	}
 	fail := func(text string) { m.replyTemp(ctx, peer, msg, text) }

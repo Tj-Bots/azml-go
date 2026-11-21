@@ -83,7 +83,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 		m.deleteCommandLinks(peer, msg) // like the Python bot: the refused command goes too
 		return
 	}
-	if !m.forceSubOK(ctx, peer, msg) {
+	if !m.forceSubOK(ctx, peer, msg, func() { m.HandleLeech(context.Background(), peer, msg, isZip, isUnzip) }) {
 		return
 	}
 

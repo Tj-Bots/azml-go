@@ -53,7 +53,7 @@ type BotApp struct {
 
 	// Modules
 	leechHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, isZip, isUnzip bool)
-	gateHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool
+	gateHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, resume func()) bool
 	ytdlHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	ytdlCbHandler         func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	selectCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
@@ -244,7 +244,7 @@ func (b *BotApp) SetLeechHandler(h func(ctx context.Context, peer tg.InputPeerCl
 }
 
 // SetGateHandler: the PM / FSUB check of task commands (false = blocked, the user was told).
-func (b *BotApp) SetGateHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool) {
+func (b *BotApp) SetGateHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, resume func()) bool) {
 	b.gateHandler = h
 }
 

@@ -99,7 +99,7 @@ func (m *YtdlModule) HandleYtdl(ctx context.Context, peer tg.InputPeerClass, msg
 		return
 	}
 
-	if !m.leech.forceSubOK(ctx, peer, msg) {
+	if !m.leech.forceSubOK(ctx, peer, msg, func() { m.HandleYtdl(context.Background(), peer, msg) }) {
 		return
 	}
 	link, quality := parseYtdlArgs(msg.Text)

@@ -155,8 +155,10 @@ func gateRender(tag string, g gateState) (string, *telegram.ButtonMaker) {
 	return text, btn
 }
 
-// forceSubOK runs the gate; false = the user got the message and the task does not start.
-func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
+// forceSubOK runs the gate; false = the user got the message and the task does not start now.
+// With resume, the task starts by itself as soon as the user is done (joined, started the bot),
+// like the Retry button; the command and its replied file stay until then.
+func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, resume ...func()) bool {
 	if msg.ChatID == msg.UserID || msg.Internal || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
 		return true
 	}
@@ -173,14 +175,21 @@ func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, ms
 	if err != nil || id == 0 {
 		return false
 	}
-	go m.gateFollow(peer, msg.UserID, id, tag, g)
-	m.deleteCommandLinks(peer, msg)
+	var run func()
+	if len(resume) > 0 {
+		run = resume[0]
+	}
+	if run == nil {
+		m.deleteCommandLinks(peer, msg)
+	}
+	go m.gateFollow(peer, msg, id, tag, g, run)
 	return false
 }
 
 // gateFollow re-checks the user every few seconds (10 minutes at most) and edits the message.
-func (m *LeechModule) gateFollow(peer tg.InputPeerClass, userID int64, msgID int, tag string, g gateState) {
+func (m *LeechModule) gateFollow(peer tg.InputPeerClass, msg *types.MessageContext, msgID int, tag string, g gateState, resume func()) {
 	ctx := context.Background()
+	userID := msg.UserID
 	last := g.key()
 	kick, stop := ext.GateWatch(userID)
 	defer stop()
@@ -193,6 +202,12 @@ func (m *LeechModule) gateFollow(peer tg.InputPeerClass, userID int64, msgID int
 		}
 		cur := m.gateCheck(ctx, userID)
 		if cur.empty() {
+			if resume != nil { // the task starts now, the gate message goes
+				_ = m.sender.EditMessage(ctx, peer, msgID, fmt.Sprintf("<b><i>User:</i> %s</b>,\n\n✓ <b>All set!</b> <i>Starting your task...</i>", tag), nil)
+				m.sender.AutoDeleteMessage(peer, msgID, 3)
+				resume()
+				return
+			}
 			done := fmt.Sprintf("<b><i>User:</i> %s</b>,\n\n✓ <b>All set!</b> Send the command again.", tag)
 			_ = m.sender.EditMessage(ctx, peer, msgID, done, nil)
 			m.sender.AutoDeleteMessage(peer, msgID, 60)
@@ -205,6 +220,9 @@ func (m *LeechModule) gateFollow(peer tg.InputPeerClass, userID int64, msgID int
 		}
 	}
 	_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+	if resume != nil { // gave up: the waiting command goes now (DELETE_LINKS)
+		m.deleteCommandLinks(peer, msg)
+	}
 }
 
 // ---- USER_TIME_INTERVAL: a user waits between tasks (Python bot: timeval_check) ----
@@ -240,6 +258,6 @@ func (m *LeechModule) timeIntervalOK(ctx context.Context, peer tg.InputPeerClass
 }
 
 // TaskGate is the PM / FSUB check for commands that start in bot/ (like /mirror before its host question).
-func (m *LeechModule) TaskGate(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) bool {
-	return m.forceSubOK(ctx, peer, msg)
+func (m *LeechModule) TaskGate(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, resume func()) bool {
+	return m.forceSubOK(ctx, peer, msg, resume)
 }

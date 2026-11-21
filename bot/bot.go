@@ -1306,7 +1306,7 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	bc := telegram.BotCommands
-	// the order of the Python bot (Leech-TJ), then the commands it does not have
+	// the order of the Python bot (Leech-TJ), its extra commands, then /bs and /restart last
 	if len(bc.Mirror) > 1 {
 		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Upload to GoFile, PixelDrain and more", bc.Mirror[1]))
 	}
@@ -1378,14 +1378,6 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 		addCmd(bc.MediaInfo[0], fmt.Sprintf("or /%s Generate Mediainfo for Media or DL links", bc.MediaInfo[1]))
 	}
 
-	if len(bc.BotSetting) > 1 {
-		addCmd(bc.BotSetting[0], fmt.Sprintf("or /%s Bot Settings (Owner/Sudo)", bc.BotSetting[1]))
-	}
-
-	if len(bc.Restart) > 1 {
-		addCmd(bc.Restart[0], fmt.Sprintf("or /%s Restart the Bot (Owner/Sudo)", bc.Restart[1]))
-	}
-
 	if len(bc.Broadcast) > 1 {
 		addCmd(bc.Broadcast[0], fmt.Sprintf("or /%s Broadcast message to all users", bc.Broadcast[1]))
 	}
@@ -1408,6 +1400,14 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 
 	if len(bc.Blacklist) > 1 {
 		addCmd(bc.Blacklist[0], fmt.Sprintf("or /%s Blacklist a user (Owner/Sudo)", bc.Blacklist[1]))
+	}
+
+	if len(bc.BotSetting) > 1 {
+		addCmd(bc.BotSetting[0], fmt.Sprintf("or /%s Bot Settings (Owner/Sudo)", bc.BotSetting[1]))
+	}
+
+	if len(bc.Restart) > 1 {
+		addCmd(bc.Restart[0], fmt.Sprintf("or /%s Restart the Bot (Owner/Sudo)", bc.Restart[1]))
 	}
 
 	req := &tg.BotsSetBotCommandsRequest{

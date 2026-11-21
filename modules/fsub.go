@@ -159,6 +159,8 @@ func gateRender(tag string, g gateState) (string, *telegram.ButtonMaker) {
 // With resume, the task starts by itself as soon as the user is done (joined, started the bot),
 // like the Retry button; the command and its replied file stay until then.
 func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, resume ...func()) bool {
+	// a new command of this user replaces the one waiting at the gate (it never starts twice)
+	stopGateFollow(msg.UserID)
 	if msg.ChatID == msg.UserID || msg.Internal || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
 		return true
 	}
@@ -182,20 +184,61 @@ func (m *LeechModule) forceSubOK(ctx context.Context, peer tg.InputPeerClass, ms
 	if run == nil {
 		m.deleteCommandLinks(peer, msg)
 	}
-	go m.gateFollow(peer, msg, id, tag, g, run)
+	stop := startGateFollow(msg.UserID)
+	go m.gateFollow(peer, msg, id, tag, g, run, stop)
 	return false
 }
 
+// one waiting gate per user: the newest command wins
+var (
+	gateFollowMu sync.Mutex
+	gateFollows  = map[int64]chan struct{}{}
+)
+
+func startGateFollow(userID int64) chan struct{} {
+	ch := make(chan struct{})
+	gateFollowMu.Lock()
+	gateFollows[userID] = ch
+	gateFollowMu.Unlock()
+	return ch
+}
+
+func stopGateFollow(userID int64) {
+	gateFollowMu.Lock()
+	if ch, ok := gateFollows[userID]; ok {
+		close(ch)
+		delete(gateFollows, userID)
+	}
+	gateFollowMu.Unlock()
+}
+
+// endGateFollow: the follower is done by itself (started, gave up); only its own entry goes.
+func endGateFollow(userID int64, ch chan struct{}) {
+	gateFollowMu.Lock()
+	if gateFollows[userID] == ch {
+		delete(gateFollows, userID)
+	}
+	gateFollowMu.Unlock()
+}
+
 // gateFollow re-checks the user every few seconds (10 minutes at most) and edits the message.
-func (m *LeechModule) gateFollow(peer tg.InputPeerClass, msg *types.MessageContext, msgID int, tag string, g gateState, resume func()) {
+func (m *LeechModule) gateFollow(peer tg.InputPeerClass, msg *types.MessageContext, msgID int, tag string, g gateState, resume func(), replaced chan struct{}) {
 	ctx := context.Background()
 	userID := msg.UserID
+	defer endGateFollow(userID, replaced)
 	last := g.key()
 	kick, stop := ext.GateWatch(userID)
 	defer stop()
 	deadline := time.Now().Add(10 * time.Minute)
 	for time.Now().Before(deadline) {
 		select {
+		case <-replaced: // a newer command of his took over: this one and its message go
+			_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+			// only the old command itself: the new one may answer the same file / link
+			if resume != nil && config.Get().DeleteLinks && !msg.Internal {
+				_ = m.sender.DeleteMessage(ctx, peer, []int{msg.MessageID})
+			}
+			return
 		case <-kick: // he joined a channel / started the bot: check now
 			time.Sleep(700 * time.Millisecond)
 		case <-time.After(4 * time.Second):

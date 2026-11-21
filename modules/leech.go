@@ -1926,8 +1926,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if botUser == "" {
 		botUser = ""
 	}
-	finishBtn := telegram.NewButtonMaker()
-	if opt.IsMirror {
+	// the link buttons of a mirror (up to 3 different links)
+	addMirrorLinks := func(btn *telegram.ButtonMaker) {
 		seen := map[string]bool{}
 		var uniq []string
 		for _, link := range mirrorLinks {
@@ -1944,7 +1944,36 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			if len(uniq) > 1 {
 				label = fmt.Sprintf("%s %d", label, idx+1)
 			}
-			finishBtn.UButtonStyled(label, link, "primary")
+			btn.UButtonStyled(label, link, "primary")
+			btn.Row()
+		}
+	}
+	showSource := cfg.SourceLink && !cfg.SafeMode && (ext.IsURL(sourceURL) || strings.HasPrefix(sourceURL, "https://t.me/")) && !ext.IsMagnet(sourceURL)
+
+	// a mirror with Bot PM (BOT_PM or the user's /us) from a group, like the Python bot: the links
+	// go to the user's PM; the group gets the message with "View in Bot PM" and, only without
+	// MIRROR_LOG_ID, the link buttons too
+	mirrorToPM := false
+	if opt.IsMirror && msg.ChatID != msg.UserID && (cfg.BotPM || (user != nil && user.BotPM)) {
+		pmBtn := telegram.NewButtonMaker()
+		addMirrorLinks(pmBtn)
+		if showSource {
+			pmBtn.UButtonStyled("🔐 Source Link", sourceURL, "primary")
+			pmBtn.Row()
+		}
+		pm := &tg.InputPeerUser{UserID: msg.UserID, AccessHash: telegram.GetUserAccessHash(msg.UserID)}
+		if id, err := m.sender.SendMessageWithButtons(ctx, pm, sb.String(), pmStartID, pmBtn, 1); err == nil && id > 0 {
+			mirrorToPM = true
+		}
+	}
+
+	finishBtn := telegram.NewButtonMaker()
+	if opt.IsMirror {
+		if !mirrorToPM || cfg.MirrorLogID == 0 {
+			addMirrorLinks(finishBtn)
+		}
+		if mirrorToPM && botUser != "" {
+			finishBtn.IButtonStyled("📥 View in Bot PM", fmt.Sprintf("start_botpm %d", msg.UserID), "primary")
 			finishBtn.Row()
 		}
 	} else {
@@ -1954,20 +1983,33 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 
-	if cfg.SourceLink && !cfg.SafeMode && (ext.IsURL(sourceURL) || strings.HasPrefix(sourceURL, "https://t.me/")) && !ext.IsMagnet(sourceURL) {
+	if showSource {
 		finishBtn.UButtonStyled("🔐 Source Link", sourceURL, "primary")
 		finishBtn.Row()
 	}
 	if cfg.SaveMsg && msg.ChatID != msg.UserID { // in PM there is nothing to save
 		saveMsgButton(finishBtn)
 	}
+	groupText := sb.String()
+	if mirrorToPM {
+		groupText += "➲ <b><i>Link(s) have been Sent to Bot PM (Private)</i></b>\n"
+	}
 	// Send completion message into the group / chat where leech was initiated, replying to user's command
-	_, _ = m.sender.SendMessageWithButtons(ctx, peer, sb.String(), msg.MessageID, finishBtn, 1)
+	_, _ = m.sender.SendMessageWithButtons(ctx, peer, groupText, msg.MessageID, finishBtn, 1)
 
 	// MIRROR_LOG_ID: the mirror finish message with its buttons (like the Python bot)
 	if opt.IsMirror && cfg.MirrorLogID != 0 && !isExcepChat(msg.ChatID) {
 		if lp := m.logPeerFor(ctx, cfg.MirrorLogID); lp != nil {
-			if _, err := m.sender.SendMessageWithButtons(ctx, lp, sb.String(), 0, finishBtn, 1); err != nil {
+			logBtn := telegram.NewButtonMaker()
+			addMirrorLinks(logBtn)
+			if showSource {
+				logBtn.UButtonStyled("🔐 Source Link", sourceURL, "primary")
+				logBtn.Row()
+			}
+			if cfg.SaveMsg {
+				saveMsgButton(logBtn)
+			}
+			if _, err := m.sender.SendMessageWithButtons(ctx, lp, sb.String(), 0, logBtn, 1); err != nil {
 				log.Printf("[MIRROR_LOG] %v", err)
 			}
 		}

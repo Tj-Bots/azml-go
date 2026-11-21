@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"maps"
@@ -97,9 +98,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 								u.ThumbData = ext.ThumbBytes(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
-								if id, _ := m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied photo!</b> It will be attached to all your future leeched files.", msg.MessageID, nil); id > 0 {
-									m.sender.AutoDeleteMessage(peer, id, 2)
-								}
+								m.thumbNotice(ctx, peer, msg, "✓ <b>Custom thumbnail saved from the replied photo!</b>")
 								return
 							}
 						}
@@ -117,9 +116,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 								u.ThumbData = ext.ThumbBytes(destThumb)
 								_ = ext.DB.SaveUser(u)
 								ext.ClearPendingThumbSession(msg.UserID)
-								if id, _ := m.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved from replied document!</b> It will be attached to all your future leeched files.", msg.MessageID, nil); id > 0 {
-									m.sender.AutoDeleteMessage(peer, id, 2)
-								}
+								m.thumbNotice(ctx, peer, msg, "✓ <b>Custom thumbnail saved from the replied file!</b>")
 								return
 							}
 						}
@@ -128,13 +125,48 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 			}
 		}
 
-		// Activate 60s listener
-		ext.SetPendingThumbSession(msg.UserID, msg.ChatID, msg.MessageID, 60*time.Second)
-		promptText := "㊂ <b><u>Send Custom Thumbnail</u></b>\n\n" +
-			"Please send a <b>photo</b> or image document within the next <b>60 seconds</b>.\n\n" +
-			"<i>Once received, it will be automatically saved as your custom thumbnail.</i>\n" +
-			"<i>Send /cancel to abort.</i>"
-		_, _ = m.sender.SendMessage(ctx, peer, promptText, msg.MessageID, nil)
+		// /t <image link>: the thumbnail from the link
+		if len(parts) >= 2 && (strings.HasPrefix(parts[1], "http://") || strings.HasPrefix(parts[1], "https://")) {
+			_ = os.MkdirAll("Thumbnails", 0755)
+			dest := fmt.Sprintf("Thumbnails/%d.jpg", msg.UserID)
+			tmp := dest + ".dl"
+			note := "✓ <b>Custom thumbnail saved from the link!</b>"
+			if err := ext.DownloadImage(ctx, parts[1], tmp); err != nil || !isImageFile(tmp) {
+				_ = os.Remove(tmp)
+				note = "× <i>That link is not an image.</i>"
+			} else if err := os.Rename(tmp, dest); err == nil {
+				u.CustomThumb = dest
+				u.ThumbData = ext.ThumbBytes(dest)
+				_ = ext.DB.SaveUser(u)
+			}
+			ext.ClearPendingThumbSession(msg.UserID)
+			m.thumbNotice(ctx, peer, msg, note)
+			return
+		}
+
+		// wait 60s for a photo; the prompt is edited with the result (see bot.thumbSaved)
+		suffix := config.Get().CmdSuffix
+		promptText := "㊂ <b><u>Custom Thumbnail :</u></b>\n\n" +
+			"<blockquote>Send a <b>photo</b> or an image file within <b>60 seconds</b>.\n" +
+			"Also: reply to a photo with <code>/t" + suffix + "</code>, or <code>/t" + suffix + " image-link</code></blockquote>\n" +
+			"<i>Send</i> /cancel" + suffix + " <i>to abort.</i>"
+		promptID, _ := m.sender.SendMessage(ctx, peer, promptText, msg.MessageID, nil)
+		if promptID <= 0 {
+			return
+		}
+		ext.SetThumbCommandSession(msg.UserID, msg.ChatID, promptID, msg.MessageID, 60*time.Second)
+		uid, cmdID := msg.UserID, msg.MessageID
+		time.AfterFunc(61*time.Second, func() {
+			// still waiting (not saved, not cancelled): time out
+			if !ext.TakeThumbPrompt(uid, promptID) {
+				return
+			}
+			c, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			_ = m.sender.EditMessage(c, peer, promptID, "㊂ <b><u>Custom Thumbnail :</u></b>\n\n× <i>Timed out.</i>", nil)
+			time.Sleep(3 * time.Second)
+			_ = m.sender.DeleteMessage(c, peer, []int{promptID, cmdID})
+		})
 		return
 	}
 
@@ -1858,4 +1890,33 @@ func (m *SettingsModule) buildExtraMenu(u *types.UserSettings, key, note string)
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn
+}
+
+// thumbNotice: the result of /t, deleted with the /t command after 5 seconds.
+func (m *SettingsModule) thumbNotice(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, text string) {
+	id, _ := m.sender.SendMessage(ctx, peer, "㊂ <b><u>Custom Thumbnail :</u></b>\n\n"+text, msg.MessageID, nil)
+	ids := []int{msg.MessageID}
+	if id > 0 {
+		ids = append([]int{id}, ids...)
+	}
+	go func() {
+		time.Sleep(5 * time.Second)
+		c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = m.sender.DeleteMessage(c, peer, ids)
+	}()
+}
+
+// isImageFile: JPEG, PNG or WEBP by its first bytes.
+func isImageFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	h := make([]byte, 12)
+	n, _ := f.Read(h)
+	h = h[:n]
+	return bytes.HasPrefix(h, []byte{0xFF, 0xD8, 0xFF}) || bytes.HasPrefix(h, []byte("\x89PNG")) ||
+		(len(h) >= 12 && string(h[:4]) == "RIFF" && string(h[8:12]) == "WEBP")
 }

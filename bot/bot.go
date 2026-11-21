@@ -669,7 +669,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	// Check if user is in an active pending setting prompt session (e.g. from /us)
 	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !((sess.Key == "ycookies" || sess.Key == "importset") && m.Media != nil) {
 		inMsgID := m.ID
-		if text == "/cancel" {
+		if telegram.IsCancelCommand(text, b.botUsername) {
 			ext.ClearPendingSettingSession(senderID)
 			go func() {
 				delCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -705,7 +705,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	// Check if user is in an active pending bot setting prompt session (from /bs)
 	if bSess, ok := ext.GetPendingBotSettingSession(senderID, chatID); ok && bSess != nil {
 		inMsgID := m.ID
-		if bSess.Key == "IMPORT_SETTINGS" && text != "/cancel" {
+		if bSess.Key == "IMPORT_SETTINGS" && !telegram.IsCancelCommand(text, b.botUsername) {
 			if docMedia, ok := m.Media.(*tg.MessageMediaDocument); ok && b.settingsImporter != nil {
 				if doc, ok := docMedia.Document.(*tg.Document); ok && doc.Size <= 1<<20 {
 					ext.ClearPendingBotSettingSession(senderID)
@@ -722,7 +722,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 				return
 			}
 		}
-		if text == "/cancel" {
+		if telegram.IsCancelCommand(text, b.botUsername) {
 			ext.ClearPendingBotSettingSession(senderID)
 			go func() {
 				delCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -748,7 +748,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		}
 	}
 
-	if sess, ok := ext.GetPendingThumbSession(senderID, chatID); ok && text == "/cancel" {
+	if sess, ok := ext.GetPendingThumbSession(senderID, chatID); ok && telegram.IsCancelCommand(text, b.botUsername) {
 		inMsgID := m.ID
 		ext.ClearPendingThumbSession(senderID)
 		go func() {
@@ -756,6 +756,10 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 			defer cancel()
 			_ = b.sender.DeleteMessage(delCtx, peer, []int{inMsgID})
 		}()
+		if sess != nil && sess.CmdMsgID > 0 { // the /t prompt: it says so and goes with the command
+			b.finishThumbPrompt(peer, sess, "× <i>Cancelled.</i>")
+			return
+		}
 		if sess != nil && sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
 			u := b.userMap.GetOrCreate(senderID)
 			b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, u, "thumb")
@@ -1302,6 +1306,11 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	bc := telegram.BotCommands
+	// the order of the Python bot (Leech-TJ), then the commands it does not have
+	if len(bc.Mirror) > 1 {
+		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Upload to GoFile, PixelDrain and more", bc.Mirror[1]))
+	}
+
 	if len(bc.Leech) > 1 {
 		addCmd(bc.Leech[0], fmt.Sprintf("or /%s Leech [links/media/rclone_path]", bc.Leech[1]))
 	} else if len(bc.Leech) > 0 {
@@ -1313,72 +1322,90 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 		addCmd(bc.Leech[4], fmt.Sprintf("or /%s Leech and Unzip [links/media]", bc.Leech[5]))
 	}
 
-	if len(bc.Mirror) > 1 {
-		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Upload to GoFile, PixelDrain and more", bc.Mirror[1]))
-	}
 	if len(bc.Ytdl) > 1 {
 		addCmd(bc.Ytdl[0], fmt.Sprintf("or /%s Leech yt-dlp supported links", bc.Ytdl[1]))
 	}
+
 	if len(bc.Status) > 1 {
 		addCmd(bc.Status[0], fmt.Sprintf("or /%s Get Bot All Status Stats Message", bc.Status[1]))
 	}
+
 	if len(bc.Stats) > 1 {
 		addCmd(bc.Stats[0], fmt.Sprintf("or /%s Check Bot & System stats", bc.Stats[1]))
 	}
-	if len(bc.Cancel) > 0 {
-		addCmd(bc.Cancel[0], "Cancel a Task of yours!")
-	}
-	if len(bc.CancelAll) > 0 {
-		addCmd(bc.CancelAll[0], "Cancel all Tasks in whole Bots.")
-	}
-	if len(bc.Help) > 0 {
-		addCmd(bc.Help[0], "Get detailed help about the Bot")
-	}
-	if len(bc.UserSetting) > 1 {
-		addCmd(bc.UserSetting[0], fmt.Sprintf("or /%s User's Personal Settings (Open in PM)", bc.UserSetting[1]))
-	}
-	if len(bc.BotSetting) > 1 {
-		addCmd(bc.BotSetting[0], fmt.Sprintf("or /%s Bot Settings (Owner/Sudo)", bc.BotSetting[1]))
-	}
-	if len(bc.Speedtest) > 1 {
-		addCmd(bc.Speedtest[0], fmt.Sprintf("or /%s Check Server Up & Down Speed", bc.Speedtest[1]))
-	}
-	if len(bc.MediaInfo) > 1 {
-		addCmd(bc.MediaInfo[0], fmt.Sprintf("or /%s Generate Mediainfo for Media or DL links", bc.MediaInfo[1]))
-	}
-	if len(bc.Broadcast) > 1 {
-		addCmd(bc.Broadcast[0], fmt.Sprintf("or /%s Broadcast message to all users", bc.Broadcast[1]))
-	}
-	if len(bc.Imdb) > 0 {
-		addCmd(bc.Imdb[0], "Search Movies/Series on IMDB.com")
-	}
-	if len(bc.Anime) > 1 {
-		addCmd(bc.Anime[0], fmt.Sprintf("or /%s Search Animes on AniList.com", bc.Anime[1]))
-	}
-	if len(bc.Ping) > 1 {
-		addCmd(bc.Ping[0], fmt.Sprintf("or /%s Check Bot Ping & Latency", bc.Ping[1]))
-	}
-	if len(bc.Restart) > 1 {
-		addCmd(bc.Restart[0], fmt.Sprintf("or /%s Restart the Bot (Owner/Sudo)", bc.Restart[1]))
-	}
-	if len(bc.Log) > 0 {
-		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
-	}
-	if len(bc.Cover) > 0 {
-		addCmd(bc.Cover[0], "Reply to a video: send it again with your thumbnail as cover")
-	}
-	if len(bc.Authorize) > 1 {
-		addCmd(bc.Authorize[0], fmt.Sprintf("or /%s Authorize a user or chat (Owner/Sudo)", bc.Authorize[1]))
-	}
-	if len(bc.UnAuthorize) > 1 {
-		addCmd(bc.UnAuthorize[0], fmt.Sprintf("or /%s Unauthorize a user or chat (Owner/Sudo)", bc.UnAuthorize[1]))
-	}
+
 	if len(bc.History) > 0 {
 		addCmd(bc.History[0], "Your last finished tasks")
 	}
+
 	if len(bc.Users) > 0 {
 		addCmd(bc.Users[0], "Users, Sudo and Blacklist lists (Owner/Sudo)")
 	}
+
+	if len(bc.Cover) > 0 {
+		addCmd(bc.Cover[0], "Reply to a video: send it again with your thumbnail as cover")
+	}
+
+	if len(bc.Cancel) > 0 {
+		addCmd(bc.Cancel[0], "Cancel a Task of yours!")
+	}
+
+	if len(bc.CancelAll) > 0 {
+		addCmd(bc.CancelAll[0], "Cancel all Tasks in whole Bots.")
+	}
+
+	if len(bc.Help) > 0 {
+		addCmd(bc.Help[0], "Get detailed help about the Bot")
+	}
+
+	if len(bc.UserSetting) > 1 {
+		addCmd(bc.UserSetting[0], fmt.Sprintf("or /%s User's Personal Settings (Open in PM)", bc.UserSetting[1]))
+	}
+
+	if len(bc.Imdb) > 0 {
+		addCmd(bc.Imdb[0], "Search Movies/Series on IMDB.com")
+	}
+
+	if len(bc.Anime) > 1 {
+		addCmd(bc.Anime[0], fmt.Sprintf("or /%s Search Animes on AniList.com", bc.Anime[1]))
+	}
+
+	if len(bc.Speedtest) > 1 {
+		addCmd(bc.Speedtest[0], fmt.Sprintf("or /%s Check Server Up & Down Speed", bc.Speedtest[1]))
+	}
+
+	if len(bc.MediaInfo) > 1 {
+		addCmd(bc.MediaInfo[0], fmt.Sprintf("or /%s Generate Mediainfo for Media or DL links", bc.MediaInfo[1]))
+	}
+
+	if len(bc.BotSetting) > 1 {
+		addCmd(bc.BotSetting[0], fmt.Sprintf("or /%s Bot Settings (Owner/Sudo)", bc.BotSetting[1]))
+	}
+
+	if len(bc.Restart) > 1 {
+		addCmd(bc.Restart[0], fmt.Sprintf("or /%s Restart the Bot (Owner/Sudo)", bc.Restart[1]))
+	}
+
+	if len(bc.Broadcast) > 1 {
+		addCmd(bc.Broadcast[0], fmt.Sprintf("or /%s Broadcast message to all users", bc.Broadcast[1]))
+	}
+
+	if len(bc.Ping) > 1 {
+		addCmd(bc.Ping[0], fmt.Sprintf("or /%s Check Bot Ping & Latency", bc.Ping[1]))
+	}
+
+	if len(bc.Log) > 0 {
+		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
+	}
+
+	if len(bc.Authorize) > 1 {
+		addCmd(bc.Authorize[0], fmt.Sprintf("or /%s Authorize a user or chat (Owner/Sudo)", bc.Authorize[1]))
+	}
+
+	if len(bc.UnAuthorize) > 1 {
+		addCmd(bc.UnAuthorize[0], fmt.Sprintf("or /%s Unauthorize a user or chat (Owner/Sudo)", bc.UnAuthorize[1]))
+	}
+
 	if len(bc.Blacklist) > 1 {
 		addCmd(bc.Blacklist[0], fmt.Sprintf("or /%s Blacklist a user (Owner/Sudo)", bc.Blacklist[1]))
 	}
@@ -1682,7 +1709,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 			isImageDoc := strings.HasSuffix(lowerName, ".jpg") || strings.HasSuffix(lowerName, ".jpeg") || strings.HasSuffix(lowerName, ".png") || strings.HasSuffix(lowerName, ".webp") || strings.HasPrefix(doc.MimeType, "image/")
 			if isImageDoc {
 				caption := strings.ToLower(strings.TrimSpace(m.Message))
-				isThumbCmd := strings.HasPrefix(caption, "/us thumb") || strings.HasPrefix(caption, "/setthumb") || strings.HasPrefix(caption, "/usersetting thumb") || strings.HasPrefix(caption, "/t") || strings.HasPrefix(caption, "/thumb")
+				isThumbCmd := telegram.IsThumbCommand(caption, b.botUsername)
 				sess, isPending := ext.GetPendingThumbSession(senderID, chatID)
 				if isThumbCmd || (isPending && sess != nil && !strings.HasPrefix(caption, "/")) {
 					ext.ClearPendingThumbSession(senderID)
@@ -1698,22 +1725,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 							u.ThumbData = ext.ThumbBytes(destThumb)
 							_ = ext.DB.SaveUser(u)
 
-							// Always send immediate confirmation to user in current chat
-							_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // the photo itself goes at once, like the Python bot
-							if id, _ := b.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved!</b> It will be attached to all your future leeched files.", 0, nil); id > 0 {
-								b.sender.AutoDeleteMessage(peer, id, 2) // a short notice
-							}
-
-							// Refresh interactive /us settings menu if prompt was active
-							if sess != nil && sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
-								settingsPeer := peer
-								if sess.ChatID != 0 && !ext.SameChat(sess.ChatID, chatID) {
-									if p := b.getPeerForChatID(sess.ChatID); p != nil {
-										settingsPeer = p
-									}
-								}
-								b.settingsUpdateHandler(ctx, settingsPeer, sess.PromptMsgID, u, "thumb")
-							}
+							b.thumbSaved(ctx, peer, chatID, m.ID, sess, u)
 							return true
 						}
 					}
@@ -1749,7 +1761,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 	// Case 2: Photo media (Custom thumbnail for user)
 	if photoMedia, ok := m.Media.(*tg.MessageMediaPhoto); ok {
 		caption := strings.ToLower(strings.TrimSpace(m.Message))
-		isThumbCmd := strings.HasPrefix(caption, "/us thumb") || strings.HasPrefix(caption, "/setthumb") || strings.HasPrefix(caption, "/usersetting thumb") || strings.HasPrefix(caption, "/t") || strings.HasPrefix(caption, "/thumb")
+		isThumbCmd := telegram.IsThumbCommand(caption, b.botUsername)
 		sess, isPending := ext.GetPendingThumbSession(senderID, chatID)
 		if isThumbCmd || (isPending && sess != nil && !strings.HasPrefix(caption, "/")) {
 			ext.ClearPendingThumbSession(senderID)
@@ -1775,22 +1787,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 						u.ThumbData = ext.ThumbBytes(destThumb)
 						_ = ext.DB.SaveUser(u)
 
-						// Always send immediate confirmation to user in current chat
-						_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // the photo itself goes at once, like the Python bot
-						if id, _ := b.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved!</b> It will be attached to all your future leeched files.", 0, nil); id > 0 {
-							b.sender.AutoDeleteMessage(peer, id, 2) // a short notice
-						}
-
-						// Refresh interactive /us settings menu if prompt was active
-						if sess != nil && sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
-							settingsPeer := peer
-							if sess.ChatID != 0 && !ext.SameChat(sess.ChatID, chatID) {
-								if p := b.getPeerForChatID(sess.ChatID); p != nil {
-									settingsPeer = p
-								}
-							}
-							b.settingsUpdateHandler(ctx, settingsPeer, sess.PromptMsgID, u, "thumb")
-						}
+						b.thumbSaved(ctx, peer, chatID, m.ID, sess, u)
 						return true
 					}
 				}
@@ -2018,4 +2015,41 @@ func (b *BotApp) notifyIncompleteTasks(ctx context.Context) {
 		sb.WriteString("</blockquote>")
 		_, _ = b.sender.SendMessage(ctx, peer, sb.String(), 0, nil)
 	}
+}
+
+// thumbSaved: the photo / image sent for the thumbnail goes; the /t prompt is edited to "saved"
+// (and goes with the command), the /us menu is refreshed, else a short notice.
+func (b *BotApp) thumbSaved(ctx context.Context, peer tg.InputPeerClass, chatID int64, photoMsgID int, sess *ext.PendingThumbSession, u *types.UserSettings) {
+	_ = b.sender.DeleteMessage(ctx, peer, []int{photoMsgID}) // the photo itself goes at once, like the Python bot
+	if sess != nil && sess.CmdMsgID > 0 {
+		b.finishThumbPrompt(peer, sess, "✓ <b>Custom thumbnail saved!</b> <i>It will be attached to all your future leeched files.</i>")
+		return
+	}
+	if sess != nil && sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
+		settingsPeer := peer
+		if sess.ChatID != 0 && !ext.SameChat(sess.ChatID, chatID) {
+			if p := b.getPeerForChatID(sess.ChatID); p != nil {
+				settingsPeer = p
+			}
+		}
+		b.settingsUpdateHandler(ctx, settingsPeer, sess.PromptMsgID, u, "thumb")
+		return
+	}
+	if id, _ := b.sender.SendMessage(ctx, peer, "✓ <b>Custom thumbnail saved!</b> It will be attached to all your future leeched files.", 0, nil); id > 0 {
+		b.sender.AutoDeleteMessage(peer, id, 5) // a short notice
+	}
+}
+
+// finishThumbPrompt: the /t prompt shows the result, then it and the /t command go.
+func (b *BotApp) finishThumbPrompt(peer tg.InputPeerClass, sess *ext.PendingThumbSession, text string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = b.sender.EditMessage(ctx, peer, sess.PromptMsgID, "㊂ <b><u>Custom Thumbnail :</u></b>\n\n"+text, nil)
+	ids := []int{sess.PromptMsgID, sess.CmdMsgID}
+	go func() {
+		time.Sleep(5 * time.Second)
+		dctx, dcancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer dcancel()
+		_ = b.sender.DeleteMessage(dctx, peer, ids)
+	}()
 }

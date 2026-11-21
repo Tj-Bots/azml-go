@@ -34,6 +34,12 @@ func runCmd(ctx context.Context, dir string, name string, args ...string) (strin
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+// deployEnviron: the environment the bot started with (the deploy: Heroku config vars, compose).
+// Every /bs change also goes into the environment (config.UpdateConfigVar); if the restarted
+// process got those, it saw "deploy variables changed" and deleted the /bs settings from the
+// database. So a restart (/restart, the update at start) gets only the deploy environment.
+var deployEnviron = os.Environ()
+
 // DefaultUpstreamBranch: the branch this code updates from when UPSTREAM_BRANCH is not set.
 const DefaultUpstreamBranch = "new"
 
@@ -309,7 +315,7 @@ func UpdateAndRestart(ctx context.Context, onStatus func(status string), recordR
 	time.Sleep(800 * time.Millisecond)
 
 	log.Printf("[Updater] Initiating process restart for %s...", exePath)
-	if rErr := RestartProcess(exePath, os.Args, os.Environ()); rErr != nil {
+	if rErr := RestartProcess(exePath, os.Args, deployEnviron); rErr != nil {
 		log.Printf("[Updater] RestartProcess error: %v, falling back to os.Exit(0)", rErr)
 		os.Exit(0)
 	}
@@ -339,7 +345,7 @@ func BootUpdate() {
 		return
 	}
 	log.Printf("[BootUpdate] Starting the updated binary %s", exePath)
-	if rErr := RestartProcess(exePath, os.Args, os.Environ()); rErr != nil {
+	if rErr := RestartProcess(exePath, os.Args, deployEnviron); rErr != nil {
 		log.Printf("[BootUpdate] RestartProcess error: %v: starting with the current code", rErr)
 	}
 }

@@ -1,9 +1,14 @@
 package modules
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	mathrand "math/rand"
+	"mime/multipart"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -189,6 +194,14 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 		_ = m.sender.AnswerCallbackURL(ctx, queryID, fmt.Sprintf("https://t.me/%s?start=pm", telegram.CurrentBotUsername))
 		return
 	}
+	if strings.HasPrefix(data, "start_logdisp ") || strings.HasPrefix(data, "start_logpaste ") {
+		if !telegram.IsSudo(fromUID, m.userMap) || !strings.HasSuffix(data, fmt.Sprintf(" %d", fromUID)) {
+			_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+			return
+		}
+		m.logButton(ctx, peer, queryID, msgID, fromUID, strings.HasPrefix(data, "start_logdisp "))
+		return
+	}
 	if data == "start_close" || strings.HasPrefix(data, "start_close ") {
 		if owner := strings.TrimSpace(strings.TrimPrefix(data, "start_close")); owner != "" && owner != fmt.Sprintf("%d", fromUID) {
 			_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
@@ -250,7 +263,15 @@ func (m *HelpModule) HandleLog(ctx context.Context, peer tg.InputPeerClass, msg 
 		_, _ = m.sender.SendMessage(ctx, peer, "⌬ <b>Logs:</b> nothing logged yet.", msg.MessageID, nil)
 		return
 	}
-	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, "⌬ <b>Latest logs</b>\n<i>Clear with</i> <code>/log clear</code>", msg.MessageID, telegram.CloseMarkup(msg.UserID)); err != nil {
+	// like the Python bot: the file with Log Display and Web Paste
+	btn := telegram.NewButtonMaker()
+	btn.IButton("Log Display", fmt.Sprintf("start_logdisp %d", msg.UserID))
+	btn.Row()
+	btn.IButton("Web Paste", fmt.Sprintf("start_logpaste %d", msg.UserID))
+	btn.Row()
+	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", msg.UserID), "danger")
+	btn.Row()
+	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, logCaption, msg.MessageID, btn.BuildMenu(1)); err != nil {
 		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Could not send the log:</b> <code>%s</code>", telegram.EscapeHTML(err.Error())), msg.MessageID, nil)
 	}
 }
@@ -301,4 +322,82 @@ func sendWithImage(ctx context.Context, sender *telegram.MessageSender, peer tg.
 		}
 	}
 	_, _ = sender.SendMessageWithButtons(ctx, peer, text, replyTo, btn, cols)
+}
+
+const logCaption = "⌬ <b>Latest logs</b>\n<i>Clear with</i> <code>/log clear</code>"
+
+// pasteAPI: the TJ Files paste of the Python bot (web_paste).
+const pasteAPI = "https://tjfiles.tjbots.chatgpt.site/api/"
+
+// logButton: Log Display (the last lines as a message) or Web Paste (the whole log as a link).
+func (m *HelpModule) logButton(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, uid int64, display bool) {
+	data := ext.LogBuffer.Bytes()
+	if display {
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+		var out []string
+		size := 0
+		for i := len(lines) - 1; i >= 0 && size <= 3500; i-- {
+			out = append([]string{lines[i]}, out...)
+			size += len(lines[i]) + 1
+		}
+		text := fmt.Sprintf("<b>Showing Last %d Lines from log.txt:</b>\n\n<pre>%s</pre>", len(out), telegram.EscapeHTML(strings.Join(out, "\n")))
+		_, _ = m.sender.SendMessage(ctx, peer, text, msgID, telegram.CloseMarkup(uid))
+		return
+	}
+	_ = m.sender.AnswerCallback(ctx, queryID, "Uploading the log...", false)
+	link := webPaste(ctx, string(data))
+	btn := telegram.NewButtonMaker()
+	btn.IButton("Log Display", fmt.Sprintf("start_logdisp %d", uid))
+	btn.Row()
+	if link == "" {
+		_, _ = m.sender.SendMessage(ctx, peer, "× <i>Web Paste failed, see the log.</i>", msgID, telegram.CloseMarkup(uid))
+		btn.IButton("Web Paste", fmt.Sprintf("start_logpaste %d", uid))
+	} else {
+		btn.UButton("📨 Web Paste", link)
+	}
+	btn.Row()
+	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", uid), "danger")
+	btn.Row()
+	_ = m.sender.EditMessage(ctx, peer, msgID, logCaption, btn.BuildMenu(1))
+}
+
+// webPaste: the text to the paste site; the newest part when it is too big (like the Python bot).
+func webPaste(ctx context.Context, text string) string {
+	for _, limit := range []int{0, 1_000_000, 200_000} {
+		content := text
+		if limit > 0 && len(content) > limit {
+			content = content[len(content)-limit:]
+		}
+		var body bytes.Buffer
+		w := multipart.NewWriter(&body)
+		_ = w.WriteField("content", content)
+		_ = w.Close()
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, pasteAPI, &body)
+		if err != nil {
+			return ""
+		}
+		req.Header.Set("Content-Type", w.FormDataContentType())
+		resp, err := (&http.Client{Timeout: 60 * time.Second}).Do(req)
+		if err == nil {
+			var res struct {
+				Payload struct {
+					ID string `json:"id"`
+				} `json:"payload"`
+				Error string `json:"error"`
+			}
+			_ = json.NewDecoder(resp.Body).Decode(&res)
+			resp.Body.Close()
+			if (resp.StatusCode == 200 || resp.StatusCode == 201) && res.Payload.ID != "" {
+				return strings.TrimSuffix(pasteAPI, "api/") + res.Payload.ID
+			}
+			log.Printf("[Web Paste] failed: %d %s", resp.StatusCode, res.Error)
+		} else {
+			log.Printf("[Web Paste] failed: %v", err)
+		}
+		if len(content) <= 200_000 {
+			break
+		}
+	}
+	return ""
 }

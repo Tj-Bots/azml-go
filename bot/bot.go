@@ -1284,7 +1284,8 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	bc := telegram.BotCommands
-	// everyone: the order of the Python bot (Leech-TJ)
+	// the same commands as the Python bot (Leech-TJ), in its order; the others still work,
+	// they are only not in the list
 	if len(bc.Mirror) > 1 {
 		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Upload to GoFile, PixelDrain and more", bc.Mirror[1]))
 	}
@@ -1352,34 +1353,14 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 		addCmd(bc.MediaInfo[0], fmt.Sprintf("or /%s Generate Mediainfo for Media or DL links", bc.MediaInfo[1]))
 	}
 
-	if len(bc.Ping) > 1 {
-		addCmd(bc.Ping[0], fmt.Sprintf("or /%s Check Bot Ping & Latency", bc.Ping[1]))
-	}
-
 	userCount := len(cmds)
-	// Owner / Sudo only, at the end; /bs and /restart last
-	if len(bc.Broadcast) > 1 {
-		addCmd(bc.Broadcast[0], fmt.Sprintf("or /%s Broadcast message to all users", bc.Broadcast[1]))
-	}
-
-	if len(bc.Log) > 0 {
-		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
-	}
-
+	// Owner / Sudo only, at the end (users ~ authlist/sudolist, log); /bs and /restart last
 	if len(bc.Users) > 0 {
 		addCmd(bc.Users[0], "Users, Sudo and Blacklist lists (Owner/Sudo)")
 	}
 
-	if len(bc.Authorize) > 1 {
-		addCmd(bc.Authorize[0], fmt.Sprintf("or /%s Authorize a user or chat (Owner/Sudo)", bc.Authorize[1]))
-	}
-
-	if len(bc.UnAuthorize) > 1 {
-		addCmd(bc.UnAuthorize[0], fmt.Sprintf("or /%s Unauthorize a user or chat (Owner/Sudo)", bc.UnAuthorize[1]))
-	}
-
-	if len(bc.Blacklist) > 1 {
-		addCmd(bc.Blacklist[0], fmt.Sprintf("or /%s Blacklist a user (Owner/Sudo)", bc.Blacklist[1]))
+	if len(bc.Log) > 0 {
+		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
 	}
 
 	if len(bc.BotSetting) > 1 {

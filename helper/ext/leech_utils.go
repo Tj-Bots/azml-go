@@ -470,16 +470,14 @@ func SplitFile(filePath string, maxSplitSize int64, outDir string, equalSplits b
 		return nil, err
 	}
 	fileSize := fi.Size()
-	safeMaxSize := maxSplitSize - 32*1024*1024
-	if safeMaxSize <= 0 {
-		safeMaxSize = maxSplitSize
-	}
+	// like the Python bot: a file up to the split size stays whole, the parts are 5 MB under it
+	// (ffmpeg -fs); 4194304000 / 2097152000 is exactly what Telegram takes (4000 / 2000 MiB)
+	safeMaxSize := maxSplitSize
 	if fileSize <= safeMaxSize {
 		return []string{filePath}, nil
 	}
 
-	// Safety margin of 5MB so Telegram never rejects with FILE_TOO_BIG (under 2GB / 4GB)
-	splitSize := safeMaxSize - (5 * 1024 * 1024)
+	splitSize := safeMaxSize - 5000000
 	if splitSize <= 0 {
 		splitSize = safeMaxSize
 	}

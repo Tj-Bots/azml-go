@@ -551,6 +551,17 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 
+	if opt.IsMirror { // the error messages say where it uploads: #tjgd / #tjrc / #DDL, not #Leech
+		kind := "#DDL"
+		switch opt.MirrorHost {
+		case ext.GDriveHostID:
+			kind = "#tjgd"
+		case ext.RcloneHostID:
+			kind = "#tjrc"
+		}
+		modeStr = strings.Replace(strings.Replace(modeStr, "#Leech", kind, 1), "#Mirror", kind, 1)
+	}
+
 	// 0. Queue Check for Download (Sleep v0 Engine)
 	queuedDL, qErr := ext.AcquireDownloadQueue(ctx, taskUID, displayName, msg.FileSize, msg.ChatID, msg.UserID, notifyID, cancel)
 	if qErr != nil {

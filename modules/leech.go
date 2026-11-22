@@ -2079,7 +2079,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		if typ != "" {
 			sb.WriteString(fmt.Sprintf("┠ <b>Type: </b>%s\n", typ))
 		}
-		sb.WriteString(fmt.Sprintf("<b>╰</b> <b>By: </b>%s\n\n</blockquote>", userTag))
+		sb.WriteString(fmt.Sprintf("<b>╰</b> <b>By: </b>%s</blockquote>\n\n", userTag)) // the empty line after the quote, like leech
 	} else {
 		sb.WriteString(fmt.Sprintf("┠ <b>Total Files: </b>%d\n", len(uploadedNames)))
 		sb.WriteString(fmt.Sprintf("<b>╰</b> <b>By: </b>%s</blockquote>\n\n", userTag))

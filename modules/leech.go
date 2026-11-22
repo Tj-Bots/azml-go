@@ -2066,6 +2066,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				if idx != "" && !seen[idx] {
 					seen[idx] = true
 					btn.UButtonStyled("⚡ Index Link", idx, "primary")
+					// like the Python bot: a video / audio / image file also gets the index player
+					if !strings.HasSuffix(idx, "/") {
+						if mt := mime.TypeByExtension(strings.ToLower(filepath.Ext(idx))); strings.HasPrefix(mt, "video/") ||
+							strings.HasPrefix(mt, "audio/") || strings.HasPrefix(mt, "image/") || strings.HasSuffix(strings.ToLower(idx), ".mkv") {
+							btn.UButtonStyled("🌐 View Link", idx+"?a=view", "primary")
+						}
+					}
 					btn.Row()
 				}
 				if len(seen) >= 4 {

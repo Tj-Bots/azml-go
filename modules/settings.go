@@ -386,7 +386,8 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.AutoThumbSet || u.EqualSplits || u.MediaGroup ||
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" ||
-		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet || u.MediaStoreSet
+		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet || u.MediaStoreSet ||
+		len(u.Metadata) > 0 || u.DumpChatID != 0 || len(u.FFmpegCommands) > 0 || u.YtOpt != ""
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -513,25 +514,7 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 		autorename, autoThumb, metadata, capFontName(u.CapFont), excludedText(u.ExcludedExts), shotsText(u.Screenshots), sampleText(u.SampleSec))
 
 	btn := telegram.NewButtonMaker()
-	docLabel := "Send As Document"
-	if u.AsDoc {
-		docLabel = "Send As Media"
-	}
-	btn.IButton(docLabel, fmt.Sprintf("userset %d doc", u.UserID))
-	btn.IButton("Thumbnail", fmt.Sprintf("userset %d thumb", u.UserID))
-	btn.Row()
-	btn.IButton("Leech Splits", fmt.Sprintf("userset %d split_size", u.UserID))
-	btn.IButton("Caption", fmt.Sprintf("userset %d lcaption", u.UserID))
-	btn.Row()
-	btn.IButton("Prefix", fmt.Sprintf("userset %d lprefix", u.UserID))
-	btn.IButton("Suffix", fmt.Sprintf("userset %d lsuffix", u.UserID))
-	btn.Row()
-	btn.IButton("AutoRename Template", fmt.Sprintf("userset %d lremname_auto", u.UserID))
-	btn.IButton("Regex Remname", fmt.Sprintf("userset %d lremname_regex", u.UserID))
-	btn.Row()
-	btn.IButton("Dump", fmt.Sprintf("userset %d ldump", u.UserID))
-	btn.IButton("Metadata", fmt.Sprintf("userset %d lmeta", u.UserID))
-	btn.Row()
+	// ✓ and green: a toggle that is on, or a value that is set (like the Python bot)
 	toggle := func(label string, on bool, data string) {
 		if on {
 			btn.IButtonStyled("✓ "+label, data, "success")
@@ -539,14 +522,33 @@ func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) 
 			btn.IButton(label, data)
 		}
 	}
+	docLabel := "Send As Document"
+	if u.AsDoc {
+		docLabel = "Send As Media"
+	}
+	btn.IButton(docLabel, fmt.Sprintf("userset %d doc", u.UserID))
+	toggle("Thumbnail", u.CustomThumb != "", fmt.Sprintf("userset %d thumb", u.UserID))
+	btn.Row()
+	toggle("Leech Splits", u.SplitSize != 0, fmt.Sprintf("userset %d split_size", u.UserID))
+	toggle("Caption", u.Caption != "", fmt.Sprintf("userset %d lcaption", u.UserID))
+	btn.Row()
+	toggle("Prefix", u.Prefix != "", fmt.Sprintf("userset %d lprefix", u.UserID))
+	toggle("Suffix", u.Suffix != "", fmt.Sprintf("userset %d lsuffix", u.UserID))
+	btn.Row()
+	toggle("AutoRename Template", u.RemnameAuto != "", fmt.Sprintf("userset %d lremname_auto", u.UserID))
+	toggle("Regex Remname", u.RemnameRegex != "", fmt.Sprintf("userset %d lremname_regex", u.UserID))
+	btn.Row()
+	toggle("Dump", u.DumpChatID != 0, fmt.Sprintf("userset %d ldump", u.UserID))
+	toggle("Metadata", len(u.Metadata) > 0, fmt.Sprintf("userset %d lmeta", u.UserID))
+	btn.Row()
 	toggle("AutoRename", u.Autorename, fmt.Sprintf("userset %d autorename", u.UserID))
 	toggle("Auto Thumbnail", u.AutoThumbOn(config.Get().AutoThumbnail), fmt.Sprintf("userset %d auto_thumb", u.UserID))
 	btn.Row()
-	btn.IButton("Caption Font", fmt.Sprintf("userset %d capfont", u.UserID))
-	btn.IButton("Excluded Ext", fmt.Sprintf("userset %d lexcluded", u.UserID))
+	toggle("Caption Font", u.CapFont != "", fmt.Sprintf("userset %d capfont", u.UserID))
+	toggle("Excluded Ext", u.ExcludedExts != "", fmt.Sprintf("userset %d lexcluded", u.UserID))
 	btn.Row()
-	btn.IButton("Screenshots", fmt.Sprintf("userset %d shots", u.UserID))
-	btn.IButton("Sample Video", fmt.Sprintf("userset %d sample", u.UserID))
+	toggle("Screenshots", u.Screenshots != 0, fmt.Sprintf("userset %d shots", u.UserID))
+	toggle("Sample Video", u.SampleSec != 0, fmt.Sprintf("userset %d sample", u.UserID))
 	btn.Row()
 	toggle("Media Store", u.MediaStoreOn(config.Get().MediaStore), fmt.Sprintf("userset %d media_store", u.UserID))
 	if u.RenameMethod == "regex" {
@@ -843,6 +845,10 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.MediaInfo = false
 		u.MediaInfoSet = false
 		u.MediaStore, u.MediaStoreSet = false, false
+		u.Metadata = nil
+		u.DumpChatID = 0
+		u.FFmpegCommands = nil
+		u.YtOpt = ""
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1508,10 +1514,15 @@ func mirrorHostText(id string) string {
 }
 
 func (m *SettingsModule) buildCapFontMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+	font := u.CapFont // the example in the font he gets: his own, else CAP_FONT of /bs
+	if font == "" {
+		font = config.Get().CapFont
+	}
 	text := fmt.Sprintf("㊂ <b><u>Caption Font Settings :</u></b>\n\n"+
-		"➲ <b>Caption Font :</b> <i>%s</i>\n\n"+
-		"➲ <b>Description :</b> <i>Font of the caption of your leeched files</i>",
-		capFontName(u.CapFont))
+		"<blockquote><b>╭</b> <b>Caption Font :</b> <i>%s</i>\n"+
+		"<b>╰</b> <b>Example :</b> %s</blockquote>\n\n"+
+		"<i>Choose how the file name looks in the caption of your leeched files.</i>",
+		capFontName(u.CapFont), applyCaptionFont("Movie.2024.1080p.mkv", font))
 	btn := telegram.NewButtonMaker()
 	for i, f := range append([]string{"none", "regular"}, captionFontOrder...) {
 		label := capFontName(f)

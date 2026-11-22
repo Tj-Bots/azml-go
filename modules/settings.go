@@ -44,7 +44,8 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 	isThumbCmd := false
 	if len(parts) >= 1 {
 		cmd := strings.ToLower(parts[0])
-		if strings.Contains(cmd, "setthumb") || strings.Contains(cmd, "thumb") || cmd == "/t" || strings.HasPrefix(cmd, "/t@") {
+		// /t2 with CMD_SUFFIX too (it used to check only "/t")
+		if strings.Contains(cmd, "thumb") || telegram.IsThumbCommand(msg.Text, telegram.CurrentBotUsername) {
 			isThumbCmd = true
 		}
 	}

@@ -1664,7 +1664,7 @@ func (m *SettingsModule) buildDDLServersMenu(u *types.UserSettings) (string, *te
 		}
 	}
 	btn.Row()
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn
@@ -2173,11 +2173,11 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 	ddlCount := 1 // his DDL server (or the first one) is used
 	_ = ddl
 	text := fmt.Sprintf("㊂ <b><u>Mirror/Clone Settings : %s</u></b>\n\n"+
-		"<blockquote><b>╭</b> <b>RClone Config :</b> <i>%s</i>\n"+
+		"<blockquote><b>╭</b> <b>Upload To :</b> <i>%s</i>\n"+
+		"┠ <b>RClone Config :</b> <i>%s</i>\n"+
 		"┠ <b>RClone Path :</b> <code>%s</code>\n"+
 		"┠ <b>RClone Flags :</b> <code>%s</code>\n"+
 		"┠ <b>Upload Paths :</b> <i>0</i>\n"+
-		"┠ <b>Upload To :</b> <i>%s</i>\n"+
 		"┠ <b>Mirror Prefix :</b> <code>%s</code>\n"+
 		"┠ <b>Mirror Suffix :</b> <code>%s</code>\n"+
 		"┠ <b>Mirror Remname :</b> <code>%s</code>\n"+
@@ -2186,7 +2186,7 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		"┠ <b>Total User TD(s) :</b> <i>0</i>\n"+
 		"┠ <b>Stop Duplicate :</b> <i>%s</i>\n"+
 		"<b>╰</b> <b>Daily Mirror :</b> <code>∞ / ∞</code> per day</blockquote>",
-		telegram.EscapeHTML(name), rcc, val(u.RclonePath), val(u.RcloneFlags), up,
+		telegram.EscapeHTML(name), up, rcc, val(u.RclonePath), val(u.RcloneFlags),
 		val(u.MPrefix), val(u.MSuffix), val(u.MRemname), ddlCount, stop)
 
 	btn := telegram.NewButtonMaker()

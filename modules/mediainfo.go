@@ -221,8 +221,8 @@ func runMediaInfo(filePath string) string {
 	}
 
 	// Fallback to ffprobe
-	if _, err := exec.LookPath("ffprobe"); err == nil {
-		cmd := exec.Command("ffprobe", "-hide_banner", filePath)
+	if _, err := exec.LookPath(ext.FFprobeBin()); err == nil {
+		cmd := exec.Command(ext.FFprobeBin(), "-hide_banner", filePath)
 		var out bytes.Buffer
 		cmd.Stderr = &out
 		if err := cmd.Run(); err == nil || out.Len() > 0 {

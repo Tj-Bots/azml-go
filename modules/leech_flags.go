@@ -188,7 +188,7 @@ func probeKind(p string) (video, audio bool) {
 }
 
 func runFFmpeg(args ...string) error {
-	out, err := exec.Command("ffmpeg", append([]string{"-hide_banner", "-loglevel", "error", "-y"}, args...)...).CombinedOutput()
+	out, err := exec.Command(ext.FFmpegBin(), append([]string{"-hide_banner", "-loglevel", "error", "-y"}, args...)...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -333,7 +333,7 @@ func extractAllStreams(path, outDir string) (string, error) {
 	_ = os.MkdirAll(outDir, 0755)
 	done := 0
 	for _, f := range mediaFiles(path) {
-		out, err := exec.Command("ffprobe", "-v", "error", "-show_entries", "stream=index,codec_type,codec_name:stream_tags=language", "-of", "csv=p=0", f).Output()
+		out, err := exec.Command(ext.FFprobeBin(), "-v", "error", "-show_entries", "stream=index,codec_type,codec_name:stream_tags=language", "-of", "csv=p=0", f).Output()
 		if err != nil {
 			continue
 		}

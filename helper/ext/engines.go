@@ -65,7 +65,7 @@ func EngineName(kind string) string {
 		})
 	case "ytdlp":
 		return cachedEngine(kind, func() string {
-			out, err := exec.Command("yt-dlp", "--version").Output()
+			out, err := exec.Command(YtdlBin(), "--version").Output()
 			if v := strings.TrimSpace(string(out)); err == nil && v != "" {
 				return "yt-dlp v" + v
 			}

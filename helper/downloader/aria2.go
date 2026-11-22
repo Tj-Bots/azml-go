@@ -114,12 +114,16 @@ func GetAria2Client() *Aria2RPCClient {
 
 func findAriaBinary() string {
 	candidates := []string{
-		// the Dockerfile renames the aria2c of the base image to dlurl
+		// the Dockerfile renames the aria2c of the base image to tjurl
+		"tjurl",
+		"/usr/local/bin/tjurl",
+		"/usr/bin/tjurl",
+		"/tmp/tjurl",
+		// older images (and a /restart on a container built before the rename)
 		"dlurl",
 		"/usr/local/bin/dlurl",
 		"/usr/bin/dlurl",
 		"/tmp/dlurl",
-		// older images (and a /restart on a container built before the rename)
 		"studymaterial",
 		"/app/.apt/usr/bin/studymaterial",
 		"/usr/bin/studymaterial",
@@ -144,7 +148,7 @@ func findAriaBinary() string {
 	}
 
 	if runtime.GOOS == "linux" {
-		targetPath := "/tmp/dlurl"
+		targetPath := "/tmp/tjurl"
 		if fi, err := os.Stat(targetPath); err == nil && !fi.IsDir() {
 			_ = os.Chmod(targetPath, 0755)
 			return targetPath
@@ -154,7 +158,7 @@ func findAriaBinary() string {
 		}
 	}
 
-	return "dlurl"
+	return "tjurl"
 }
 
 func autoInstallStaticAria2(targetPath string) error {
@@ -166,7 +170,7 @@ func autoInstallStaticAria2(targetPath string) error {
 	client := &http.Client{Timeout: 90 * time.Second}
 
 	for _, u := range urls {
-		log.Printf("[dlurl] Auto-installing static dlurl binary from %s to %s...", u, targetPath)
+		log.Printf("[tjurl] Auto-installing static tjurl binary from %s to %s...", u, targetPath)
 		resp, err := client.Get(u)
 		if err != nil {
 			lastErr = err
@@ -210,7 +214,7 @@ func autoInstallStaticAria2(targetPath string) error {
 				}
 				_ = os.Chmod(targetPath, 0755)
 				found = true
-				log.Printf("[dlurl] Static dlurl binary successfully installed to %s", targetPath)
+				log.Printf("[tjurl] Static tjurl binary successfully installed to %s", targetPath)
 				break
 			}
 		}
@@ -223,7 +227,7 @@ func autoInstallStaticAria2(targetPath string) error {
 	}
 
 	if lastErr != nil {
-		log.Printf("[dlurl] Auto-install failed: %v", lastErr)
+		log.Printf("[tjurl] Auto-install failed: %v", lastErr)
 		return lastErr
 	}
 	return errors.New("static binary not found in archive")
@@ -247,7 +251,7 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 		return nil
 	}
 
-	// Start the aria2c (dlurl) daemon with max connection and speed optimizations
+	// Start the aria2c (tjurl) daemon with max connection and speed optimizations
 	binName := findAriaBinary()
 	defaultTrackers := "udp://tracker.opentrackr.org:1337/announce," +
 		"udp://open.stealth.si:80/announce," +
@@ -283,7 +287,7 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 			"--follow-torrent=false",
 			"--follow-metalink=false",
 		}
-		log.Printf("[dlurl] DISABLE_TORRENTS: BitTorrent is off")
+		log.Printf("[tjurl] DISABLE_TORRENTS: BitTorrent is off")
 	}
 	args := []string{
 		"--enable-rpc",
@@ -308,7 +312,7 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 	cmd := exec.Command(binName, append(args, btArgs...)...)
 
 	if err := cmd.Run(); err != nil {
-		log.Printf("[dlurl] Failed to start daemon (%s): %v", binName, err)
+		log.Printf("[tjurl] Failed to start daemon (%s): %v", binName, err)
 		return err
 	}
 
@@ -316,11 +320,11 @@ func (a *Aria2RPCClient) EnsureStarted() error {
 		time.Sleep(300 * time.Millisecond)
 		if _, err := a.rawCall(req); err == nil {
 			a.started = true
-			log.Printf("[dlurl] Daemon successfully started on port %d", port)
+			log.Printf("[tjurl] Daemon successfully started on port %d", port)
 			return nil
 		}
 	}
-	log.Printf("[dlurl] Warning: daemon process launched but not yet responding on port %d", port)
+	log.Printf("[tjurl] Warning: daemon process launched but not yet responding on port %d", port)
 	return nil
 }
 
@@ -341,7 +345,7 @@ func (a *Aria2RPCClient) rawCall(req JSONRPCRequest) (*JSONRPCResponse, error) {
 		return nil, err
 	}
 	if rpcResp.Error != nil {
-		return nil, fmt.Errorf("dlurl error (%d): %s", rpcResp.Error.Code, rpcResp.Error.Message)
+		return nil, fmt.Errorf("tjurl error (%d): %s", rpcResp.Error.Code, rpcResp.Error.Message)
 	}
 	return &rpcResp, nil
 }
@@ -350,7 +354,7 @@ func (a *Aria2RPCClient) call(req JSONRPCRequest) (*JSONRPCResponse, error) {
 	res, err := a.rawCall(req)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "connect:") {
-			log.Printf("[dlurl] RPC unreachable (%v), attempting to restart daemon...", err)
+			log.Printf("[tjurl] RPC unreachable (%v), attempting to restart daemon...", err)
 			_ = a.EnsureStarted()
 			return a.rawCall(req)
 		}
@@ -692,7 +696,7 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 			// If this download spawned a follow-up download (e.g. torrent metadata completed -> payload started)
 			if len(res.FollowedBy) > 0 {
 				newGID := res.FollowedBy[0]
-				log.Printf("[dlurl] Torrent followed: GID %s -> %s", t.gid, newGID)
+				log.Printf("[tjurl] Torrent followed: GID %s -> %s", t.gid, newGID)
 				t.mu.Lock()
 				t.gid = newGID
 				t.mu.Unlock()
@@ -704,7 +708,7 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 				// If followedBy is present on completion, switch to payload
 				if len(res.FollowedBy) > 0 {
 					newGID := res.FollowedBy[0]
-					log.Printf("[dlurl] Torrent followed on complete: GID %s -> %s", t.gid, newGID)
+					log.Printf("[tjurl] Torrent followed on complete: GID %s -> %s", t.gid, newGID)
 					t.mu.Lock()
 					t.gid = newGID
 					t.mu.Unlock()
@@ -732,7 +736,7 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 				}
 				return path, nil
 			case "error":
-				return "", fmt.Errorf("dlurl download failed: %s", res.ErrorMessage)
+				return "", fmt.Errorf("tjurl download failed: %s", res.ErrorMessage)
 			case "removed":
 				t.mu.RLock()
 				path := t.downloadPath
@@ -742,7 +746,7 @@ func (t *Aria2DownloadTask) PollUntilComplete(ctx context.Context, onProgress fu
 						return path, nil
 					}
 				}
-				return "", errors.New("download cancelled or removed from aria2")
+				return "", errors.New("download cancelled or removed from tjurl")
 			}
 		}
 	}

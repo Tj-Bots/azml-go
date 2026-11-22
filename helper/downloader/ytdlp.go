@@ -32,7 +32,7 @@ func NewYtDlpDownloader() *YtDlpDownloader {
 }
 
 func (y *YtDlpDownloader) GetInfo(ctx context.Context, link string) (title string, isPlaylist bool, count int, err error) {
-	cmd := exec.CommandContext(ctx, "yt-dlp", "--dump-single-json", "--flat-playlist", link)
+	cmd := exec.CommandContext(ctx, ext.YtdlBin(), "--dump-single-json", "--flat-playlist", link)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", false, 0, err
@@ -76,11 +76,12 @@ func (y *YtDlpDownloader) Download(ctx context.Context, link, outDir, customForm
 	if _, err := os.Stat("cookies.txt"); err == nil {
 		args = append(args, "--cookies", "cookies.txt")
 	}
+	args = append(args, ext.YtdlFFmpegArgs()...) // tjff / tjprobe
 	args = append(args, extraArgs...)
 
 	args = append(args, link)
 
-	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
+	cmd := exec.CommandContext(ctx, ext.YtdlBin(), args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", err
@@ -273,7 +274,7 @@ func (y *YtDlpDownloader) GetFormats(ctx context.Context, link string, extraArgs
 	}
 	args = append(args, extraArgs...)
 	args = append(args, link)
-	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
+	cmd := exec.CommandContext(ctx, ext.YtdlBin(), args...)
 	var stderr strings.Builder
 	cmd.Stderr = &tailWriter{b: &stderr, max: 4000}
 	out, err := cmd.Output()

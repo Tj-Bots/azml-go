@@ -438,7 +438,7 @@ func (g *GDriveClient) DownloadFile(ctx context.Context, fileID, destDir, fileNa
 							return nil
 						}
 						if status.Status == "error" {
-							return fmt.Errorf("dlurl gdrive download failed: %s", status.ErrorMessage)
+							return fmt.Errorf("tjurl gdrive download failed: %s", status.ErrorMessage)
 						}
 					}
 				}

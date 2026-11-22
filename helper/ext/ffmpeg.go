@@ -72,7 +72,7 @@ type MediaDetails struct {
 }
 
 func ProbeMedia(filePath string) (*MediaDetails, error) {
-	cmd := exec.Command("ffprobe",
+	cmd := exec.Command(FFprobeBin(),
 		"-hide_banner",
 		"-loglevel", "error",
 		"-print_format", "json",
@@ -241,7 +241,7 @@ func EditMetadata(inputFile, outputFile string, meta map[string]string) error {
 
 	args = append(args, outputFile, "-y")
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(FFmpegBin(), args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -265,7 +265,7 @@ func ExtractStreams(inputFile, outDir string, streamOptions []string) ([]string,
 		switch strings.ToLower(opt) {
 		case "video":
 			outPath := filepath.Join(outDir, fmt.Sprintf("%s_video.mkv", baseName))
-			cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-i", inputFile, "-map", "0:v:0", "-c:v", "copy", outPath, "-y")
+			cmd := exec.Command(FFmpegBin(), "-hide_banner", "-loglevel", "error", "-i", inputFile, "-map", "0:v:0", "-c:v", "copy", outPath, "-y")
 			if cmd.Run() == nil {
 				outputs = append(outputs, outPath)
 			}
@@ -276,13 +276,13 @@ func ExtractStreams(inputFile, outDir string, streamOptions []string) ([]string,
 				ext = codec
 			}
 			outPath := filepath.Join(outDir, fmt.Sprintf("%s_audio.%s", baseName, ext))
-			cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-i", inputFile, "-map", "0:a:0", "-c:a", "copy", outPath, "-y")
+			cmd := exec.Command(FFmpegBin(), "-hide_banner", "-loglevel", "error", "-i", inputFile, "-map", "0:a:0", "-c:a", "copy", outPath, "-y")
 			if cmd.Run() == nil {
 				outputs = append(outputs, outPath)
 			}
 		case "subtitle":
 			outPath := filepath.Join(outDir, fmt.Sprintf("%s_sub.srt", baseName))
-			cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "error", "-i", inputFile, "-map", "0:s:0", "-c:s", "srt", outPath, "-y")
+			cmd := exec.Command(FFmpegBin(), "-hide_banner", "-loglevel", "error", "-i", inputFile, "-map", "0:s:0", "-c:s", "srt", outPath, "-y")
 			if cmd.Run() == nil {
 				outputs = append(outputs, outPath)
 			}
@@ -380,7 +380,7 @@ func ExecuteCustomFFmpeg(inputFile, outputFile string, rawCmd string, allowEncod
 	args = append(args, parts...)
 	args = append(args, outputFile, "-y")
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(FFmpegBin(), args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {

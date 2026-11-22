@@ -21,7 +21,7 @@ func MakeSampleVideo(videoPath string, seconds int) string {
 	}
 	start := details.Duration/2 - seconds/2
 	out := filepath.Join(filepath.Dir(videoPath), "SAMPLE."+filepath.Base(videoPath))
-	cmd := exec.Command("ffmpeg",
+	cmd := exec.Command(FFmpegBin(),
 		"-hide_banner", "-loglevel", "error",
 		"-ss", strconv.Itoa(start),
 		"-i", videoPath,

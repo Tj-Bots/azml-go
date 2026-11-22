@@ -36,21 +36,33 @@ ENV GOPATH="/go"
 ENV CGO_ENABLED=0
 ENV GOFLAGS="-p=1"
 
-# aria2c of the base image (named studymaterial there) runs as dlurl
-RUN B="$(command -v dlurl || command -v studymaterial || command -v aria2c)" && \
-    if [ "$B" != "/usr/local/bin/dlurl" ]; then mv "$B" /usr/local/bin/dlurl; fi && \
-    chmod a+rx /usr/local/bin/dlurl && \
-    dlurl --version >/dev/null
+# TJ names: aria2c of the base image (named studymaterial / dlurl there) runs as tjurl,
+# ffmpeg as tjff and ffprobe as tjprobe
+RUN B="$(command -v tjurl || command -v dlurl || command -v studymaterial || command -v aria2c)" && \
+    if [ "$B" != "/usr/local/bin/tjurl" ]; then mv "$B" /usr/local/bin/tjurl; fi && \
+    chmod a+rx /usr/local/bin/tjurl && \
+    tjurl --version >/dev/null && \
+    F="$(command -v tjff || command -v ffmpeg)" && \
+    if [ "$F" != "/usr/local/bin/tjff" ]; then mv "$F" /usr/local/bin/tjff; fi && \
+    P="$(command -v tjprobe || command -v ffprobe)" && \
+    if [ "$P" != "/usr/local/bin/tjprobe" ]; then mv "$P" /usr/local/bin/tjprobe; fi && \
+    chmod a+rx /usr/local/bin/tjff /usr/local/bin/tjprobe && \
+    tjff -version >/dev/null && tjprobe -version >/dev/null && \
+    mkdir -p /usr/local/lib/tjdl && \
+    printf '#!/bin/sh\nexec /usr/local/bin/tjff "$@"\n' > /usr/local/lib/tjdl/ffmpeg && \
+    printf '#!/bin/sh\nexec /usr/local/bin/tjprobe "$@"\n' > /usr/local/lib/tjdl/ffprobe && \
+    chmod a+rx /usr/local/lib/tjdl/ffmpeg /usr/local/lib/tjdl/ffprobe
 
 RUN mkdir -p /usr/src/app/downloads /usr/src/app/Thumbnails
 
-# Latest yt-dlp (YouTube changes often) + Deno, which yt-dlp needs for YouTube
-RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp && \
+# Latest yt-dlp (YouTube changes often), installed as tjdl, + Deno, which it needs for YouTube
+RUN rm -f /usr/local/bin/yt-dlp && \
+    curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/tjdl && \
+    chmod a+rx /usr/local/bin/tjdl && \
     curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o /tmp/deno.zip && \
     unzip -o /tmp/deno.zip -d /usr/local/bin && \
     chmod a+rx /usr/local/bin/deno && rm -f /tmp/deno.zip && \
-    (yt-dlp --version && deno --version || true)
+    (tjdl --version && deno --version || true)
 
 # rclone for TJ RClone (/mirror -up rc), installed as tjrc
 RUN curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.zip -o /tmp/rc.zip && \

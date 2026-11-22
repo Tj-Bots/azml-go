@@ -543,7 +543,7 @@ func splitVideo(filePath string, totalSize int64, splitSize int64, duration int,
 			if i == expectedParts-1 {
 				currentDuration = duration - start
 			}
-			cmd := exec.Command("ffmpeg",
+			cmd := exec.Command(FFmpegBin(),
 				"-hide_banner", "-loglevel", "error",
 				"-ss", strconv.Itoa(start),
 				"-i", filePath,
@@ -576,7 +576,7 @@ func splitVideo(filePath string, totalSize int64, splitSize int64, duration int,
 		_ = os.Remove(partPath)
 
 		// Try with -map 0 first (preserves all audio/subtitle streams like AZML)
-		cmd := exec.Command("ffmpeg",
+		cmd := exec.Command(FFmpegBin(),
 			"-hide_banner", "-loglevel", "error",
 			"-ss", strconv.Itoa(startTime),
 			"-i", filePath,
@@ -592,7 +592,7 @@ func splitVideo(filePath string, totalSize int64, splitSize int64, duration int,
 		if err != nil {
 			// If -map 0 failed, retry without -map 0
 			_ = os.Remove(partPath)
-			cmdRetry := exec.Command("ffmpeg",
+			cmdRetry := exec.Command(FFmpegBin(),
 				"-hide_banner", "-loglevel", "error",
 				"-ss", strconv.Itoa(startTime),
 				"-i", filePath,
@@ -700,7 +700,7 @@ func MakeScreenshots(videoPath string, count int) ([]string, error) {
 	var files []string
 	for i := 1; i <= count; i++ {
 		imgPath := filepath.Join(tmpDir, fmt.Sprintf("SS%02d.jpg", i))
-		cmd := exec.Command("ffmpeg",
+		cmd := exec.Command(FFmpegBin(),
 			"-hide_banner", "-loglevel", "error",
 			"-ss", fmt.Sprintf("%.2f", step*float64(i)),
 			"-i", videoPath,
@@ -713,7 +713,7 @@ func MakeScreenshots(videoPath string, count int) ([]string, error) {
 				files = append(files, imgPath)
 			}
 		} else {
-			log.Printf("[Screenshots] ffmpeg failed at %.0fs: %v %s", step*float64(i), err, strings.TrimSpace(string(out)))
+			log.Printf("[Screenshots] tjff failed at %.0fs: %v %s", step*float64(i), err, strings.TrimSpace(string(out)))
 		}
 	}
 	if len(files) == 0 {
@@ -766,7 +766,7 @@ func GenerateThumbnail(filePath, customThumbPath string) string {
 	if customThumbPath != "" {
 		if _, err := os.Stat(customThumbPath); err == nil {
 			outThumb := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_320_%s.jpg", RandomHex(4)))
-			cmd := exec.Command("ffmpeg",
+			cmd := exec.Command(FFmpegBin(),
 				"-hide_banner", "-loglevel", "error",
 				"-i", customThumbPath,
 				"-vf", "scale=320:320:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2",
@@ -793,7 +793,7 @@ func GenerateThumbnail(filePath, customThumbPath string) string {
 	outThumb := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_%s.jpg", RandomHex(4)))
 
 	// Primary attempt: fast input seeking with even dimension scaling
-	cmd := exec.Command("ffmpeg",
+	cmd := exec.Command(FFmpegBin(),
 		"-hide_banner", "-loglevel", "error",
 		"-ss", strconv.Itoa(captureSec),
 		"-i", filePath,
@@ -810,7 +810,7 @@ func GenerateThumbnail(filePath, customThumbPath string) string {
 	}
 
 	// Fallback attempt 1: accurate output seeking at 2s
-	cmdFallback := exec.Command("ffmpeg",
+	cmdFallback := exec.Command(FFmpegBin(),
 		"-hide_banner", "-loglevel", "error",
 		"-i", filePath,
 		"-ss", "00:00:02",
@@ -827,7 +827,7 @@ func GenerateThumbnail(filePath, customThumbPath string) string {
 	}
 
 	// Fallback attempt 2: frame 0 without seek (guaranteed for short / tricky files)
-	cmdFallback0 := exec.Command("ffmpeg",
+	cmdFallback0 := exec.Command(FFmpegBin(),
 		"-hide_banner", "-loglevel", "error",
 		"-i", filePath,
 		"-vframes", "1",
@@ -863,7 +863,7 @@ func GenerateVideoCover(filePath, customThumbPath string) string {
 
 	outCover := filepath.Join(os.TempDir(), fmt.Sprintf("cover_hd_%s.jpg", RandomHex(4)))
 
-	cmd := exec.Command("ffmpeg",
+	cmd := exec.Command(FFmpegBin(),
 		"-hide_banner", "-loglevel", "error",
 		"-ss", strconv.Itoa(captureSec),
 		"-i", filePath,
@@ -879,7 +879,7 @@ func GenerateVideoCover(filePath, customThumbPath string) string {
 		}
 	}
 
-	cmdFallback := exec.Command("ffmpeg",
+	cmdFallback := exec.Command(FFmpegBin(),
 		"-hide_banner", "-loglevel", "error",
 		"-i", filePath,
 		"-ss", "00:00:02",
@@ -896,7 +896,7 @@ func GenerateVideoCover(filePath, customThumbPath string) string {
 	}
 
 	// Fallback 0: first frame
-	cmdFallback0 := exec.Command("ffmpeg",
+	cmdFallback0 := exec.Command(FFmpegBin(),
 		"-hide_banner", "-loglevel", "error",
 		"-i", filePath,
 		"-vframes", "1",

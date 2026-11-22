@@ -603,9 +603,10 @@ func vtMuxExtra(path, kind string) {
 }
 
 func vtExtractStreams(path, kind string) {
+	probe := ext.FFprobeBin() // before the loop: ext is a local below
 	for _, video := range vtVideos(path) {
 		base, ext := strings.TrimSuffix(video, filepath.Ext(video)), filepath.Ext(video)
-		out, err := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", video).Output()
+		out, err := exec.Command(probe, "-v", "error", "-print_format", "json", "-show_streams", video).Output()
 		if err != nil {
 			continue
 		}

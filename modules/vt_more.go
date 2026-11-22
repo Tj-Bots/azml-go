@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"azml-go/helper/ext"
 )
 
 // More video tools, all without re-encoding (stream copy): sync, metadata, chapters, default
@@ -95,7 +97,7 @@ func vtShift(path, kind, sec string) {
 }
 
 func probeDuration(p string) float64 {
-	out, err := exec.Command("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", p).Output()
+	out, err := exec.Command(ext.FFprobeBin(), "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", p).Output()
 	if err != nil {
 		return 0
 	}
@@ -141,7 +143,7 @@ type probeStream struct {
 }
 
 func probeStreams(p string) []probeStream {
-	out, err := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", p).Output()
+	out, err := exec.Command(ext.FFprobeBin(), "-v", "error", "-print_format", "json", "-show_streams", p).Output()
 	if err != nil {
 		return nil
 	}

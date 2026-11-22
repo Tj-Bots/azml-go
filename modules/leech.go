@@ -100,6 +100,17 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	if opt.Password != "" && !opt.IsZip && opt.Username == "" {
 		opt.IsExtract = true
 	}
+	// like WZML-X: no upload destination / token = an error before the download, not after it
+	if opt.IsMirror {
+		var u *types.UserSettings
+		if m.userMap != nil {
+			u = m.userMap.Get(msg.UserID)
+		}
+		if e := mirrorDestError(cfg, u, opt.MirrorHost, opt.RcloneDest); e != "" {
+			_, _ = m.sender.SendMessage(ctx, peer, "㊂ <b><u>Mirror Error :</u></b>\n\n<blockquote>"+e+"</blockquote>", msg.MessageID, nil)
+			return
+		}
+	}
 
 	if link == "" && msg.IsReply && msg.ReplyText != "" && !msg.HasMedia && msg.RawMedia == nil {
 		for _, w := range strings.Fields(msg.ReplyText) {
@@ -3336,6 +3347,43 @@ var (
 // mtp:<id> = his token.pickle to that folder; tp:<id> = the bot's token to that folder;
 // USER mode (/us) = his token.pickle to his GDrive ID; else the bot's token to his GDrive ID
 // or GDRIVE_ID. The index: his Index URL with his folder, INDEX_URL with the bot's.
+// mirrorDestError: why GDrive / RClone cannot take his upload (WZML-X messages), "" = fine.
+func mirrorDestError(cfg *config.Config, u *types.UserSettings, host, dest string) string {
+	fileOK := func(p string) bool { fi, err := os.Stat(p); return err == nil && !fi.IsDir() }
+	switch host {
+	case ext.GDriveHostID:
+		low := strings.ToLower(dest)
+		useUser := strings.HasPrefix(low, "mtp:") || (!strings.HasPrefix(low, "tp:") && u != nil && u.UserTokens)
+		if useUser {
+			if u == nil || len(u.TokenPickle) == 0 {
+				return "<b>NO TOKEN!</b> token.pickle not Exists!\n➲ <i>Send yours in /us → Mirror Settings → GDrive</i>"
+			}
+		} else if !fileOK("token.pickle") {
+			return "<b>NO TOKEN!</b> token.pickle not Exists!\n➲ <i>GDrive is not set up: set your own token.pickle and GDrive ID in /us → Mirror Settings → GDrive (USER mode)</i>"
+		}
+		if _, f, ok := strings.Cut(dest, ":"); ok && f != "" {
+			return ""
+		}
+		if (u != nil && u.GDriveID != "") || (!useUser && cfg.GDriveID != "") {
+			return ""
+		}
+		return "<b>No Upload Destination Found!</b>\n➲ <i>Set your GDrive ID in /us → Mirror Settings → GDrive</i>"
+	case ext.RcloneHostID:
+		own := strings.HasPrefix(dest, "mrcc:") || (u != nil && u.UserTokens && len(u.RcloneConf) > 0)
+		if strings.TrimPrefix(dest, "mrcc:") == "" && !(own && u != nil && strings.TrimPrefix(u.RclonePath, "mrcc:") != "") {
+			return "<b>No Rclone Destination!</b>\n➲ <i>Set your RClone Path in /us → Mirror Settings → RClone</i>"
+		}
+		if own {
+			if u == nil || len(u.RcloneConf) == 0 {
+				return "<b>Rclone Config:</b> rclone.conf not Exists!\n➲ <i>Send yours in /us → Mirror Settings → RClone</i>"
+			}
+		} else if !fileOK("rclone.conf") {
+			return "<b>Rclone Config:</b> rclone.conf not Exists!\n➲ <i>RClone is not set up: send your own rclone.conf in /us → Mirror Settings → RClone (USER mode)</i>"
+		}
+	}
+	return ""
+}
+
 func gdriveTarget(cfg *config.Config, u *types.UserSettings, dest string) (downloader.GDUploadOptions, error) {
 	o := downloader.GDUploadOptions{IsTeamDrive: cfg.IsTeamDrive, StopDuplicate: u.StopDupOn(cfg.StopDuplicate)}
 	useUser, folder := false, ""

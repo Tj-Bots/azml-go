@@ -2148,12 +2148,9 @@ func (m *SettingsModule) buildRcloneMenu(u *types.UserSettings, note string) (st
 	if len(u.RcloneConf) > 0 {
 		conf = "Exists"
 	}
-	val := func(s, def string) string {
+	val := func(s, _ string) string { // only his own values: the owner's RCLONE_PATH is not shown
 		if s != "" {
 			return telegram.EscapeHTML(s)
-		}
-		if def != "" {
-			return telegram.EscapeHTML(def) + " (Default)"
 		}
 		return "Not Exists"
 	}
@@ -2369,19 +2366,14 @@ func (m *SettingsModule) buildGDToolsMenu(u *types.UserSettings, note string) (s
 	if len(u.TokenPickle) > 0 {
 		tok = "Exists"
 	}
+	// only his own values: the owner's GDRIVE_ID / INDEX_URL are not shown to users
 	gd, idx := u.GDriveID, u.IndexURL
 	gdNote, idxNote := "", ""
 	if gd == "" {
-		gd, gdNote = cfg.GDriveID, " <i>(Default)</i>"
-		if idx == "" {
-			idx, idxNote = cfg.IndexURL, " <i>(Default)</i>"
-		}
-	}
-	if gd == "" {
-		gd = "None"
+		gd = "Not Exists"
 	}
 	if idx == "" {
-		idx = "None"
+		idx = "Not Exists"
 	}
 	mode := map[bool]string{true: "USER", false: "OWNER"}[u.UserTokens]
 	text := "㊂ <b><u>GDrive Settings :</u></b>\n\n" +

@@ -2,6 +2,12 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
+	"DEFAULT_UPLOAD":               "Where /mirror uploads without -up: gd (TJ GDrive) or ddl (GoFile and the other DDL servers). Default is gd; without GDRIVE_ID it is ddl. Str",
+	"GDRIVE_ID":                    "The Drive folder ID or Team Drive ID where /mirror -up gd uploads (with token.pickle). Str",
+	"INDEX_URL":                    "Your index of that Drive (e.g. https://index.example.workers.dev/0:); the finish message gets the Index Link. Str",
+	"IS_TEAM_DRIVE":                "GDRIVE_ID is a Team Drive (Shared Drive): the files are not made public. Default is False. Bool",
+	"STOP_DUPLICATE":               "Don't upload to Drive a file or folder that is already there with the same name. Default is False. Bool",
+	"DISABLE_DRIVE_LINK":           "Hide the Drive link: only the Index Link is shown, so the Google account is not exposed. Default is False. Bool",
 	"MIRROR_LOG_ID":                "Chat ID where the finish message of /mirror tasks is also sent, with its buttons. Int. Add -100 before the id.",
 	"LINKS_LOG_ID":                 "Chat ID where every task's link/source is logged when it starts (Task Started + Source). Int. Add -100 before the id.",
 	"GDRIVE_WORKER":                "Worker that downloads PUBLIC Google Drive files and folders when there is no token.pickle (or the token can't open the link). Empty = off.",

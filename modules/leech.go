@@ -521,6 +521,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var totalSize int64
 	var uploadedNames []string
 	var mirrorLinks []string
+	var gdIndexLinks []string // TJ GDrive: the INDEX_URL links next to mirrorLinks
+	gdSess := &downloader.GDSession{}
 	var fileLinks []string // link to each uploaded file in the dump / log channel
 	mirrorSess := &ext.MirrorSession{}
 	if user != nil {
@@ -1650,6 +1652,50 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		uTask.SetSize(itemSize)
 		uTask.SetProgress(0, itemSize, 0, "-")
 
+		if opt.IsMirror && opt.MirrorHost == ext.GDriveHostID {
+			// TJ GDrive: several files of one task go into one Drive folder (like the Python bot)
+			if len(filesToUpload) > 1 && gdSess.FolderName == "" {
+				gdSess.FolderName = displayName
+				if msg.SameDirKey != "" || downloadedPath != "" {
+					if fi2, e2 := os.Stat(downloadedPath); e2 == nil && fi2.IsDir() {
+						gdSess.FolderName = filepath.Base(downloadedPath)
+					}
+				}
+			}
+			uTask.SetStatus(types.StatusUploading, ext.GDriveHostName)
+			gdStart := time.Now()
+			res, gErr := downloader.UploadToGDrive(ctx, curFile, downloader.GDUploadOptions{
+				ParentID: cfg.GDriveID, IsTeamDrive: cfg.IsTeamDrive, StopDuplicate: cfg.StopDuplicate, IndexURL: cfg.IndexURL,
+			}, gdSess, func(sent, total int64) {
+				secs := time.Since(gdStart).Seconds()
+				if secs < 0.5 {
+					return
+				}
+				speed := float64(sent) / secs
+				eta := "-"
+				if speed > 0 && total > sent {
+					eta = ext.GetReadableTime(int64(float64(total-sent) / speed))
+				}
+				if speed > maxULSpeed {
+					maxULSpeed = speed
+				}
+				uTask.SetProgress(sent, total, speed, eta)
+			})
+			if gErr != nil {
+				log.Printf("[TJ GDrive] upload error for %s: %v", curFile, gErr)
+				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("%s Upload Failed: %v", ext.GDriveHostName, gErr), modeStr, taskStartTime)
+				return
+			}
+			primary := res.DriveLink
+			if cfg.DisableDriveLink && res.IndexLink != "" {
+				primary = res.IndexLink
+			}
+			mirrorLinks = append(mirrorLinks, primary)
+			gdIndexLinks = append(gdIndexLinks, res.IndexLink)
+			ext.RecordDailyUsage(msg.UserID, itemSize)
+			continue
+		}
+
 		if opt.IsMirror {
 			hostID := opt.MirrorHost
 			if hostID == "" {
@@ -1928,6 +1974,29 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	// the link buttons of a mirror (up to 3 different links)
 	addMirrorLinks := func(btn *telegram.ButtonMaker) {
+		if opt.MirrorHost == ext.GDriveHostID { // Drive Link (unless DISABLE_DRIVE_LINK) and Index Link
+			seen := map[string]bool{}
+			for i, link := range mirrorLinks {
+				idx := ""
+				if i < len(gdIndexLinks) {
+					idx = gdIndexLinks[i]
+				}
+				if !cfg.DisableDriveLink && link != "" && link != idx && !seen[link] {
+					seen[link] = true
+					btn.UButtonStyled("☁️ Drive Link", link, "primary")
+					btn.Row()
+				}
+				if idx != "" && !seen[idx] {
+					seen[idx] = true
+					btn.UButtonStyled("⚡ Index Link", idx, "primary")
+					btn.Row()
+				}
+				if len(seen) >= 4 {
+					break
+				}
+			}
+			return
+		}
 		seen := map[string]bool{}
 		var uniq []string
 		for _, link := range mirrorLinks {
@@ -2261,6 +2330,9 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 
 // mirrorHostName is the display name of a /mirror host id (first host when empty).
 func mirrorHostName(id string) string {
+	if id == ext.GDriveHostID {
+		return ext.GDriveHostName
+	}
 	if id == "" {
 		id = ext.MirrorHosts[0].ID
 	}
@@ -3081,6 +3153,9 @@ func pythonMode(modeStr string, opt types.LeechOptions) string {
 	kind := "#Leech"
 	if opt.IsMirror {
 		kind = "#DDL"
+		if opt.MirrorHost == ext.GDriveHostID {
+			kind = "#tjgd"
+		}
 	}
 	if opt.IsZip {
 		kind += " (Zip)"

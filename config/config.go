@@ -77,6 +77,12 @@ type Config struct {
 	PlaylistLimit             int
 	ExtensionFilter           string
 	Images                    string
+	GDriveID                  string
+	IndexURL                  string
+	IsTeamDrive               bool
+	StopDuplicate             bool
+	DisableDriveLink          bool
+	DefaultUpload             string
 	ExcepChats                string
 	DeleteLinks               bool
 	RichMessages              bool
@@ -245,6 +251,12 @@ func buildConfig() Config {
 		PlaylistLimit:             getEnvInt("PLAYLIST_LIMIT", 0),
 		ExtensionFilter:           getEnv("EXTENSION_FILTER", ""),
 		Images:                    getEnv("IMAGES", ""),
+		GDriveID:                  strings.TrimSpace(getEnv("GDRIVE_ID", "")),
+		IndexURL:                  strings.TrimRight(strings.TrimSpace(getEnv("INDEX_URL", "")), "/"),
+		IsTeamDrive:               getEnvBool("IS_TEAM_DRIVE", false),
+		StopDuplicate:             getEnvBool("STOP_DUPLICATE", false),
+		DisableDriveLink:          getEnvBool("DISABLE_DRIVE_LINK", false),
+		DefaultUpload:             strings.ToLower(strings.TrimSpace(getEnv("DEFAULT_UPLOAD", "gd"))),
 		ExcepChats:                getEnv("EXCEP_CHATS", ""),
 		DeleteLinks:               getEnvBool("DELETE_LINKS", false),
 		RichMessages:              getEnvBool("RICH_MESSAGES", false),
@@ -519,6 +531,18 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.ExtensionFilter = val
 	case "IMAGES":
 		GlobalConfig.Images = strings.TrimSpace(val)
+	case "GDRIVE_ID":
+		GlobalConfig.GDriveID = strings.TrimSpace(val)
+	case "INDEX_URL":
+		GlobalConfig.IndexURL = strings.TrimRight(strings.TrimSpace(val), "/")
+	case "IS_TEAM_DRIVE":
+		GlobalConfig.IsTeamDrive = isTrueVal(val)
+	case "STOP_DUPLICATE":
+		GlobalConfig.StopDuplicate = isTrueVal(val)
+	case "DISABLE_DRIVE_LINK":
+		GlobalConfig.DisableDriveLink = isTrueVal(val)
+	case "DEFAULT_UPLOAD":
+		GlobalConfig.DefaultUpload = strings.ToLower(strings.TrimSpace(val))
 	case "LEECH_FILENAME_REMNAME":
 		GlobalConfig.LeechFilenameRemname = val
 	case "PLAYLIST_LIMIT":
@@ -742,6 +766,12 @@ func configMapLocked() map[string]string {
 		"LEECH_FILENAME_REMNAME":       GlobalConfig.LeechFilenameRemname,
 		"EXTENSION_FILTER":             GlobalConfig.ExtensionFilter,
 		"IMAGES":                       GlobalConfig.Images,
+		"GDRIVE_ID":                    GlobalConfig.GDriveID,
+		"INDEX_URL":                    GlobalConfig.IndexURL,
+		"IS_TEAM_DRIVE":                strconv.FormatBool(GlobalConfig.IsTeamDrive),
+		"STOP_DUPLICATE":               strconv.FormatBool(GlobalConfig.StopDuplicate),
+		"DISABLE_DRIVE_LINK":           strconv.FormatBool(GlobalConfig.DisableDriveLink),
+		"DEFAULT_UPLOAD":               GlobalConfig.DefaultUpload,
 		"EXCEP_CHATS":                  GlobalConfig.ExcepChats,
 		"DELETE_LINKS":                 strconv.FormatBool(GlobalConfig.DeleteLinks),
 		"RICH_MESSAGES":                strconv.FormatBool(GlobalConfig.RichMessages),
@@ -897,4 +927,9 @@ func IsCoreKey(k string) bool {
 		}
 	}
 	return false
+}
+
+func isTrueVal(v string) bool {
+	v = strings.ToLower(strings.TrimSpace(v))
+	return v == "true" || v == "1" || v == "yes" || v == "on"
 }

@@ -47,6 +47,12 @@ func (m *BotSettingsModule) SetLeechModule(l *LeechModule) {
 
 var configVarKeys = []string{
 	"MIRROR_LOG_ID",
+	"DEFAULT_UPLOAD",
+	"GDRIVE_ID",
+	"INDEX_URL",
+	"IS_TEAM_DRIVE",
+	"STOP_DUPLICATE",
+	"DISABLE_DRIVE_LINK",
 	"LINKS_LOG_ID",
 	"GDRIVE_WORKER",
 	"MEDIA_STORE",

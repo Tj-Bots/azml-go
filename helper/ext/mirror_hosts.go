@@ -98,6 +98,12 @@ func AvailableMirrorHostsFor(userKeys map[string]string) []MirrorHost {
 	return out
 }
 
+// GDriveHostID: /mirror -up gd, TJ GDrive (not a DDL server: it has its own uploader).
+const GDriveHostID = "tjgd"
+
+// GDriveHostName: its name in the status, the finish message and the buttons.
+const GDriveHostName = "TJ GDrive"
+
 // MirrorSession keeps state between the files of one task (GoFile puts them in one folder).
 type MirrorSession struct {
 	// Keys are the user's own host keys (they win over the ones in /bs).

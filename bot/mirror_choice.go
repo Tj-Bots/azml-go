@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"azml-go/config"
 	"context"
 	"fmt"
 	"strconv"
@@ -31,6 +32,13 @@ func splitMirrorHost(text string) (string, string) {
 	fields := strings.Fields(text)
 	for i := 0; i+1 < len(fields); i++ {
 		if fields[i] == "-up" {
+			rest := append(append([]string{}, fields[:i]...), fields[i+2:]...)
+			switch strings.ToLower(fields[i+1]) {
+			case "gd", "gdrive", "tjgd": // like the Python bot: -up gd = Google Drive
+				return strings.Join(rest, " "), ext.GDriveHostID
+			case "ddl": // the DDL servers: the user's default one, else the question
+				return strings.Join(rest, " "), "ddl"
+			}
 			if h, ok := ext.FindMirrorHost(fields[i+1]); ok {
 				rest := append(append([]string{}, fields[:i]...), fields[i+2:]...)
 				return strings.Join(rest, " "), h.ID
@@ -48,6 +56,15 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	}
 	text, host := splitMirrorHost(msgCtx.Text)
 	msgCtx.Text = text
+	// no -up: DEFAULT_UPLOAD of /bs, like the Python bot (gd only when GDRIVE_ID is set)
+	if host == "" {
+		if cfg := config.Get(); cfg.DefaultUpload != "ddl" && cfg.GDriveID != "" {
+			host = ext.GDriveHostID
+		}
+	}
+	if host == "ddl" {
+		host = ""
+	}
 	if host == "" && b.userMap != nil {
 		if u := b.userMap.Get(msgCtx.UserID); u != nil && u.MirrorHost != "" {
 			for _, h := range ext.AvailableMirrorHostsFor(u.DDLKeys) {

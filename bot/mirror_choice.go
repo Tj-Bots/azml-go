@@ -33,9 +33,15 @@ func splitMirrorHost(text string) (string, string) {
 	for i := 0; i+1 < len(fields); i++ {
 		if fields[i] == "-up" {
 			rest := append(append([]string{}, fields[:i]...), fields[i+2:]...)
-			switch strings.ToLower(fields[i+1]) {
+			switch v := fields[i+1]; strings.ToLower(v) {
 			case "gd", "gdrive", "tjgd": // like the Python bot: -up gd = Google Drive
 				return strings.Join(rest, " "), ext.GDriveHostID
+			case "rc", "rcl", "rclone", "tjrc": // -up rc = RCLONE_PATH
+				return strings.Join(rest, " "), ext.RcloneHostID
+			default:
+				if strings.Contains(v, ":") && !strings.Contains(v, "://") { // -up remote:path
+					return strings.Join(rest, " "), ext.RcloneHostID + "=" + v
+				}
 			case "ddl": // the DDL servers: the user's default one, else the question
 				return strings.Join(rest, " "), "ddl"
 			}
@@ -56,14 +62,32 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	}
 	text, host := splitMirrorHost(msgCtx.Text)
 	msgCtx.Text = text
-	// no -up: DEFAULT_UPLOAD of /bs, like the Python bot (gd only when GDRIVE_ID is set)
+	// no -up: the user's Default Upload (/us), else DEFAULT_UPLOAD of /bs, like the Python bot
+	// (gd only with GDRIVE_ID, rc only with RCLONE_PATH; otherwise the DDL servers)
 	if host == "" {
-		if cfg := config.Get(); cfg.DefaultUpload != "ddl" && cfg.GDriveID != "" {
+		cfg := config.Get()
+		up := cfg.DefaultUpload
+		if b.userMap != nil {
+			if u := b.userMap.Get(msgCtx.UserID); u != nil && u.DefaultUpload != "" {
+				up = u.DefaultUpload
+			}
+		}
+		switch {
+		case up == "gd" && cfg.GDriveID != "":
 			host = ext.GDriveHostID
+		case up == "rc" && cfg.RclonePath != "":
+			host = ext.RcloneHostID
 		}
 	}
 	if host == "ddl" {
 		host = ""
+	}
+	if strings.HasPrefix(host, ext.RcloneHostID) {
+		dest := config.Get().RclonePath
+		if i := strings.Index(host, "="); i > 0 {
+			dest = host[i+1:]
+		}
+		host, msgCtx.RcloneDest = ext.RcloneHostID, dest
 	}
 	if host == "" && b.userMap != nil {
 		if u := b.userMap.Get(msgCtx.UserID); u != nil && u.MirrorHost != "" {

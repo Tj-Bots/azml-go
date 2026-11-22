@@ -2,7 +2,9 @@ package modules
 
 // varDescriptions: what every /bs variable does (like the Python bot).
 var varDescriptions = map[string]string{
-	"DEFAULT_UPLOAD":               "Where /mirror uploads without -up: gd (TJ GDrive) or ddl (GoFile and the other DDL servers). Default is gd; without GDRIVE_ID it is ddl. Str",
+	"DEFAULT_UPLOAD":               "Where /mirror uploads without -up: gd (TJ GDrive), rc (TJ RClone, RCLONE_PATH) or ddl (GoFile and the other DDL servers). Default is gd; without GDRIVE_ID / RCLONE_PATH it is ddl. Users can choose their own in /us. Str",
+	"RCLONE_PATH":                  "The default RClone path of -up rc, e.g. mydrive:Uploads (a remote of the rclone.conf you upload in Private Files). Str",
+	"RCLONE_FLAGS":                 "Extra rclone flags for every TJ RClone upload, e.g. --transfers 4 --drive-chunk-size 64M. Str",
 	"GDRIVE_ID":                    "The Drive folder ID or Team Drive ID where /mirror -up gd uploads (with token.pickle). Str",
 	"INDEX_URL":                    "Your index of that Drive (e.g. https://index.example.workers.dev/0:); the finish message gets the Index Link. Str",
 	"IS_TEAM_DRIVE":                "GDRIVE_ID is a Team Drive (Shared Drive): the files are not made public. Default is False. Bool",

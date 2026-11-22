@@ -52,6 +52,13 @@ RUN curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_
     chmod a+rx /usr/local/bin/deno && rm -f /tmp/deno.zip && \
     (yt-dlp --version && deno --version || true)
 
+# rclone for TJ RClone (/mirror -up rc), installed as tjrc
+RUN curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.zip -o /tmp/rc.zip && \
+    unzip -q /tmp/rc.zip -d /tmp/rc && \
+    mv /tmp/rc/rclone-*-linux-amd64/rclone /usr/local/bin/tjrc && \
+    chmod a+rx /usr/local/bin/tjrc && rm -rf /tmp/rc.zip /tmp/rc && \
+    tjrc version >/dev/null
+
 # Install HatchZip for in-place, space-saving archive extraction
 RUN (curl -fsSL https://raw.githubusercontent.com/xevrion/hatchzip/main/install.sh | HATCHZIP_INSTALL_DIR=/usr/local/bin sh) \
     || ( \

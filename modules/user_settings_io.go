@@ -53,6 +53,8 @@ type userPrefs struct {
 	MegaEmail      string            `json:"mega_email,omitempty"`
 	MegaPass       string            `json:"mega_pass,omitempty"`
 	DDLKeys        map[string]string `json:"ddl_keys,omitempty"`
+	DefaultUpload  string            `json:"default_upload,omitempty"`
+	RcloneConf     []byte            `json:"rclone_conf,omitempty"`
 	Thumb          []byte            `json:"thumb,omitempty"` // the thumbnail image itself
 }
 
@@ -73,7 +75,7 @@ func prefsOf(u *types.UserSettings) userPrefs {
 		ExcludedExts: u.ExcludedExts, MediaInfo: u.MediaInfo, MediaInfoSet: u.MediaInfoSet,
 		MediaStore: u.MediaStore, MediaStoreSet: u.MediaStoreSet, Screenshots: u.Screenshots,
 		SampleSec: u.SampleSec, YtOpt: u.YtOpt, YtCookies: u.YtCookies, MegaEmail: u.MegaEmail,
-		MegaPass: u.MegaPass, DDLKeys: u.DDLKeys,
+		MegaPass: u.MegaPass, DDLKeys: u.DDLKeys, DefaultUpload: u.DefaultUpload, RcloneConf: u.RcloneConf,
 	}
 	if u.CustomThumb != "" {
 		if b := u.ThumbData; len(b) > 0 {
@@ -94,6 +96,7 @@ func applyPrefs(u *types.UserSettings, p userPrefs) {
 	u.ExcludedExts, u.MediaInfo, u.MediaInfoSet = p.ExcludedExts, p.MediaInfo, p.MediaInfoSet
 	u.MediaStore, u.MediaStoreSet, u.Screenshots, u.SampleSec = p.MediaStore, p.MediaStoreSet, p.Screenshots, p.SampleSec
 	u.YtOpt, u.YtCookies, u.MegaEmail, u.MegaPass, u.DDLKeys = p.YtOpt, p.YtCookies, p.MegaEmail, p.MegaPass, p.DDLKeys
+	u.DefaultUpload, u.RcloneConf = p.DefaultUpload, p.RcloneConf
 	if len(p.Thumb) > 0 {
 		dest := fmt.Sprintf("Thumbnails/%d.jpg", u.UserID)
 		_ = os.MkdirAll(filepath.Dir(dest), 0o755)

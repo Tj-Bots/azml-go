@@ -667,7 +667,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	}
 
 	// Check if user is in an active pending setting prompt session (e.g. from /us)
-	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !((sess.Key == "ycookies" || sess.Key == "importset") && m.Media != nil) {
+	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !((sess.Key == "ycookies" || sess.Key == "importset" || sess.Key == "rcc") && m.Media != nil) {
 		inMsgID := m.ID
 		if telegram.IsCancelCommand(text, b.botUsername) {
 			ext.ClearPendingSettingSession(senderID)
@@ -1607,6 +1607,29 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 			}
 			lowerName := strings.ToLower(fileName)
 
+			// 0a. /us → Mirror Settings → RClone: his own rclone.conf
+			if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && sess.Key == "rcc" {
+				ext.ClearPendingSettingSession(senderID)
+				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // it has his cloud keys
+				u := b.userMap.GetOrCreate(senderID)
+				var buf bytes.Buffer
+				if doc.Size > 1<<20 {
+					ext.SetSettingNote(senderID, "× <i>The file is too big.</i>")
+				} else if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
+					ext.SetSettingNote(senderID, "× <i>Download failed: "+telegram.EscapeHTML(err.Error())+"</i>")
+				} else if !strings.Contains(buf.String(), "[") {
+					ext.SetSettingNote(senderID, "× <i>This is not an rclone.conf file.</i>")
+				} else {
+					u.RcloneConf = buf.Bytes()
+					_ = ext.DB.SaveUser(u)
+					ext.SetSettingNote(senderID, "✓ <i>rclone.conf saved.</i>")
+				}
+				if sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
+					b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, u, "rcc")
+				}
+				return true
+			}
+
 			// 0. /us → Import/Export Settings → Import: the azml_user_settings.json of Export
 			if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && sess.Key == "importset" {
 				if b.userSettingsImporter == nil {
@@ -1697,6 +1720,19 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				}
 				_, _ = config.LoadConfig("config.env")
 				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>config.env</b> received and saved! Configurations reloaded.", m.ID, nil)
+				return true
+
+			case "rclone.conf": // the bot's rclone.conf for TJ RClone (RCLONE_PATH), like the Python bot
+				if !telegram.IsOwner(senderID) && !telegram.IsSudo(senderID, b.userMap) {
+					_, _ = b.sender.SendMessage(ctx, peer, "Only Owner/Sudo can upload <code>rclone.conf</code>!", m.ID, nil)
+					return true
+				}
+				if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).ToPath(ctx, "rclone.conf"); err != nil {
+					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading <b>rclone.conf</b>: %v", err), m.ID, nil)
+					return true
+				}
+				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID})
+				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>rclone.conf</b> received and saved for "+ext.RcloneHostName+"!", 0, nil)
 				return true
 
 			case "cookies.txt":

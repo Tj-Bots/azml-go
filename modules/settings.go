@@ -809,6 +809,35 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildMirrorHostMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "dupload": // Default Upload: bot default → gd → rc → ddl → bot default
+		next := map[string]string{"": "gd", "gd": "rc", "rc": "ddl", "ddl": ""}
+		u.DefaultUpload = next[u.DefaultUpload]
+		_ = ext.DB.SaveUser(u)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		text, btn := m.buildMirrorHostMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "rcc":
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		text, btn := m.buildRcloneMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "edit_rcc":
+		ext.SetPendingSettingSession(targetUID, "rcc", 0, msgID, 60*time.Second)
+		text, _ := m.buildRcloneMenu(u, "")
+		btn := telegram.NewButtonMaker()
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d rcc", u.UserID))
+		btn.Row()
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n➲ <i>Send your <code>rclone.conf</code> file within 60 seconds.</i>", btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+	case "del_rcc":
+		u.RcloneConf = nil
+		_ = os.Remove(fmt.Sprintf("rclone/%d.conf", u.UserID))
+		_ = ext.DB.SaveUser(u)
+		text, btn := m.buildRcloneMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Deleted", false)
 	case "reset_all":
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		btn := telegram.NewButtonMaker()
@@ -1381,6 +1410,8 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 		text, btn = m.buildExtraMenu(u, key, ext.TakeSettingNote(u.UserID))
 	case "ytopt", "ycookies":
 		text, btn = m.buildYtdlSettingMenu(u, key, "")
+	case "rcc":
+		text, btn = m.buildRcloneMenu(u, ext.TakeSettingNote(u.UserID))
 	case "importset", "iesettings":
 		text, btn = m.buildIEMenu(u, ext.TakeSettingNote(u.UserID))
 	case "lexcluded":
@@ -1560,7 +1591,26 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		"<b>╰</b> <b>DDL Server(s) :</b> <i>%s</i></blockquote>\n\n"+
 		"➲ <b>Description :</b> <i>Tap a server to make it your default for /mirror or to add your own API key. 🔑 = your key is set.</i>",
 		u.UserID, telegram.EscapeHTML(name), mirrorHostText(u.MirrorHost), strings.Join(ready, ", "))
+	// like the Python bot: Default Upload (gd / rc / ddl) and his own rclone.conf
+	up := u.DefaultUpload
+	upText := map[string]string{"gd": ext.GDriveHostName, "rc": ext.RcloneHostName, "ddl": "DDL"}[up]
+	if upText == "" {
+		upText = "Default (" + map[string]string{"gd": ext.GDriveHostName, "rc": ext.RcloneHostName, "ddl": "DDL"}[config.Get().DefaultUpload] + ")"
+	}
+	rcc := "Not Exists"
+	if len(u.RcloneConf) > 0 {
+		rcc = "Exists"
+	}
+	text += fmt.Sprintf("\n\n<blockquote><b>╭</b> <b>Default Upload :</b> <i>%s</i>\n<b>╰</b> <b>RClone.conf :</b> <i>%s</i></blockquote>", upText, rcc)
 	btn := telegram.NewButtonMaker()
+	btn.IButton("Default Upload: "+upText, fmt.Sprintf("userset %d dupload", u.UserID))
+	btn.Row()
+	if len(u.RcloneConf) > 0 {
+		btn.IButtonStyled("✓ RClone", fmt.Sprintf("userset %d rcc", u.UserID), "success")
+	} else {
+		btn.IButton("RClone", fmt.Sprintf("userset %d rcc", u.UserID))
+	}
+	btn.Row()
 	if u.MirrorHost == "" {
 		btn.IButtonStyled("✓ Ask every time", fmt.Sprintf("userset %d sethost none", u.UserID), "success")
 	} else {
@@ -2023,4 +2073,29 @@ func languageName(code string) string {
 		return n
 	}
 	return code
+}
+
+// buildRcloneMenu: /us → Mirror Settings → RClone (his own rclone.conf, -up mrcc:remote:path).
+func (m *SettingsModule) buildRcloneMenu(u *types.UserSettings, note string) (string, *telegram.ButtonMaker) {
+	val := "Not Exists"
+	if len(u.RcloneConf) > 0 {
+		val = "Exists"
+	}
+	text := "㊂ <b><u>RClone Settings :</u></b>\n\n" +
+		"<blockquote><b>╭</b> <b>RClone.conf :</b> <i>" + val + "</i>\n" +
+		"<b>╰</b> <b>Use :</b> <code>" + telegram.Cmd("mirror") + " link -up mrcc:remote:path</code></blockquote>\n\n" +
+		"<i>Your own rclone.conf: upload to your own clouds with " + ext.RcloneHostName + ".</i>"
+	if note != "" {
+		text += "\n\n" + note
+	}
+	btn := telegram.NewButtonMaker()
+	btn.IButton(map[bool]string{true: "Change RClone.conf", false: "Set RClone.conf"}[len(u.RcloneConf) > 0], fmt.Sprintf("userset %d edit_rcc", u.UserID))
+	if len(u.RcloneConf) > 0 {
+		btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_rcc", u.UserID))
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
 }

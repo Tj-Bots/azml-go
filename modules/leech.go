@@ -90,6 +90,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 	opt, link := parseLeechArgs(msg.Text)
 	opt.IsMirror = msg.IsMirror
 	opt.MirrorHost = msg.MirrorHost
+	opt.RcloneDest = msg.RcloneDest
 	if isZip {
 		opt.IsZip = true
 	}
@@ -219,6 +220,7 @@ func (m *LeechModule) HandleLeech(ctx context.Context, peer tg.InputPeerClass, m
 					IsReply:    true,
 					IsMirror:   msg.IsMirror,
 					MirrorHost: msg.MirrorHost,
+					RcloneDest: msg.RcloneDest,
 				}
 
 				log.Printf("[LEECH -i] Sequentially triggering download for message ID %d (part %d/%d)", targetID, idx+1, multiCount)
@@ -523,6 +525,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var mirrorLinks []string
 	var gdIndexLinks []string // TJ GDrive: the INDEX_URL links next to mirrorLinks
 	gdSess := &downloader.GDSession{}
+	rcSess := &downloader.RcloneSession{}
+	var rcPaths []string   // TJ RClone: where each file is (when the remote gives no link)
 	var fileLinks []string // link to each uploaded file in the dump / log channel
 	mirrorSess := &ext.MirrorSession{}
 	if user != nil {
@@ -1652,6 +1656,50 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		uTask.SetSize(itemSize)
 		uTask.SetProgress(0, itemSize, 0, "-")
 
+		if opt.IsMirror && opt.MirrorHost == ext.RcloneHostID {
+			if len(filesToUpload) > 1 && rcSess.FolderName == "" {
+				rcSess.FolderName = displayName
+				if fi2, e2 := os.Stat(downloadedPath); e2 == nil && fi2.IsDir() {
+					rcSess.FolderName = filepath.Base(downloadedPath)
+				}
+			}
+			// -up mrcc:remote:path = the user's own rclone.conf (like the Python bot), else the bot's
+			dest, conf := opt.RcloneDest, "rclone.conf"
+			if strings.HasPrefix(dest, "mrcc:") {
+				dest = strings.TrimPrefix(dest, "mrcc:")
+				conf = ""
+				if user != nil && len(user.RcloneConf) > 0 {
+					conf = fmt.Sprintf("rclone/%d.conf", msg.UserID)
+					_ = os.MkdirAll("rclone", 0o755)
+					_ = os.WriteFile(conf, user.RcloneConf, 0o600)
+				}
+				if conf == "" {
+					m.sendDownloadError(ctx, peer, msg, notifyID, "Your rclone.conf is not set: /us → Mirror Settings → RClone", modeStr, taskStartTime)
+					return
+				}
+			}
+			uTask.SetStatus(types.StatusUploading, ext.RcloneHostName)
+			res, rErr := downloader.UploadToRclone(ctx, curFile, dest, conf, cfg.RcloneFlags, rcSess, func(sent, total int64, speed float64) {
+				eta := "-"
+				if speed > 0 && total > sent {
+					eta = ext.GetReadableTime(int64(float64(total-sent) / speed))
+				}
+				if speed > maxULSpeed {
+					maxULSpeed = speed
+				}
+				uTask.SetProgress(sent, total, speed, eta)
+			})
+			if rErr != nil {
+				log.Printf("[TJ RClone] upload error for %s: %v", curFile, rErr)
+				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("%s Upload Failed: %v", ext.RcloneHostName, rErr), modeStr, taskStartTime)
+				return
+			}
+			mirrorLinks = append(mirrorLinks, res.Link)
+			rcPaths = append(rcPaths, res.Path)
+			ext.RecordDailyUsage(msg.UserID, itemSize)
+			continue
+		}
+
 		if opt.IsMirror && opt.MirrorHost == ext.GDriveHostID {
 			// TJ GDrive: several files of one task go into one Drive folder (like the Python bot)
 			if len(filesToUpload) > 1 && gdSess.FolderName == "" {
@@ -1974,6 +2022,17 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	}
 	// the link buttons of a mirror (up to 3 different links)
 	addMirrorLinks := func(btn *telegram.ButtonMaker) {
+		if opt.MirrorHost == ext.RcloneHostID {
+			seen := map[string]bool{}
+			for _, link := range mirrorLinks {
+				if link != "" && !seen[link] && len(seen) < 3 {
+					seen[link] = true
+					btn.UButtonStyled("📎 "+ext.RcloneHostName+" Link", link, "primary")
+					btn.Row()
+				}
+			}
+			return
+		}
 		if opt.MirrorHost == ext.GDriveHostID { // Drive Link (unless DISABLE_DRIVE_LINK) and Index Link
 			seen := map[string]bool{}
 			for i, link := range mirrorLinks {
@@ -2015,6 +2074,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 			btn.UButtonStyled(label, link, "primary")
 			btn.Row()
+		}
+	}
+	if opt.IsMirror && opt.MirrorHost == ext.RcloneHostID && len(rcPaths) > 0 { // like the Python bot: the path
+		seenP := map[string]bool{}
+		for _, p := range rcPaths {
+			if !seenP[p] {
+				seenP[p] = true
+				sb.WriteString("➲ <b>Path:</b> <code>" + telegram.EscapeHTML(p) + "</code>\n")
+			}
 		}
 	}
 	showSource := cfg.SourceLink && !cfg.SafeMode && (ext.IsURL(sourceURL) || strings.HasPrefix(sourceURL, "https://t.me/")) && !ext.IsMagnet(sourceURL)
@@ -2332,6 +2400,9 @@ func parseLeechArgs(text string) (types.LeechOptions, string) {
 func mirrorHostName(id string) string {
 	if id == ext.GDriveHostID {
 		return ext.GDriveHostName
+	}
+	if id == ext.RcloneHostID {
+		return ext.RcloneHostName
 	}
 	if id == "" {
 		id = ext.MirrorHosts[0].ID
@@ -3155,6 +3226,8 @@ func pythonMode(modeStr string, opt types.LeechOptions) string {
 		kind = "#DDL"
 		if opt.MirrorHost == ext.GDriveHostID {
 			kind = "#tjgd"
+		} else if opt.MirrorHost == ext.RcloneHostID {
+			kind = "#tjrc"
 		}
 	}
 	if opt.IsZip {

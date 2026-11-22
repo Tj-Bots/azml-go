@@ -83,6 +83,8 @@ type Config struct {
 	StopDuplicate             bool
 	DisableDriveLink          bool
 	DefaultUpload             string
+	RclonePath                string
+	RcloneFlags               string
 	ExcepChats                string
 	DeleteLinks               bool
 	RichMessages              bool
@@ -257,6 +259,8 @@ func buildConfig() Config {
 		StopDuplicate:             getEnvBool("STOP_DUPLICATE", false),
 		DisableDriveLink:          getEnvBool("DISABLE_DRIVE_LINK", false),
 		DefaultUpload:             strings.ToLower(strings.TrimSpace(getEnv("DEFAULT_UPLOAD", "gd"))),
+		RclonePath:                strings.TrimSpace(getEnv("RCLONE_PATH", "")),
+		RcloneFlags:               strings.TrimSpace(getEnv("RCLONE_FLAGS", "")),
 		ExcepChats:                getEnv("EXCEP_CHATS", ""),
 		DeleteLinks:               getEnvBool("DELETE_LINKS", false),
 		RichMessages:              getEnvBool("RICH_MESSAGES", false),
@@ -543,6 +547,10 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.DisableDriveLink = isTrueVal(val)
 	case "DEFAULT_UPLOAD":
 		GlobalConfig.DefaultUpload = strings.ToLower(strings.TrimSpace(val))
+	case "RCLONE_PATH":
+		GlobalConfig.RclonePath = strings.TrimSpace(val)
+	case "RCLONE_FLAGS":
+		GlobalConfig.RcloneFlags = strings.TrimSpace(val)
 	case "LEECH_FILENAME_REMNAME":
 		GlobalConfig.LeechFilenameRemname = val
 	case "PLAYLIST_LIMIT":
@@ -772,6 +780,8 @@ func configMapLocked() map[string]string {
 		"STOP_DUPLICATE":               strconv.FormatBool(GlobalConfig.StopDuplicate),
 		"DISABLE_DRIVE_LINK":           strconv.FormatBool(GlobalConfig.DisableDriveLink),
 		"DEFAULT_UPLOAD":               GlobalConfig.DefaultUpload,
+		"RCLONE_PATH":                  GlobalConfig.RclonePath,
+		"RCLONE_FLAGS":                 GlobalConfig.RcloneFlags,
 		"EXCEP_CHATS":                  GlobalConfig.ExcepChats,
 		"DELETE_LINKS":                 strconv.FormatBool(GlobalConfig.DeleteLinks),
 		"RICH_MESSAGES":                strconv.FormatBool(GlobalConfig.RichMessages),

@@ -46,6 +46,8 @@ type UserSettings struct {
 	StartedInPM    bool              `json:"started_in_pm" bson:"started_in_pm"`
 	TopicIDs       []int             `json:"topic_ids" bson:"topic_ids"`
 	MirrorHost     string            `json:"mirror_host" bson:"mirror_host"`
+	DefaultUpload  string            `json:"default_upload,omitempty" bson:"default_upload,omitempty"` // gd / rc / ddl (else DEFAULT_UPLOAD)
+	RcloneConf     []byte            `json:"rclone_conf,omitempty" bson:"rclone_conf,omitempty"`       // his own rclone.conf (-up mrcc:remote:path)
 	ExcludedExts   string            `json:"excluded_exts" bson:"excluded_exts"`
 	CapFont        string            `json:"cap_font" bson:"cap_font"`
 	MediaInfo      bool              `json:"mediainfo" bson:"mediainfo"`                       // MediaInfo button under leeched files
@@ -131,6 +133,7 @@ type LeechOptions struct {
 	MediaGroup  bool
 	IsMirror    bool
 	MirrorHost  string
+	RcloneDest  string   // TJ RClone: remote:path (mrcc: = the user's rclone.conf)
 	Ytdl        bool     // download the link with yt-dlp
 	VT          bool     // -vt Video Tools menu
 	SameDir     string   // -m <folder name>
@@ -151,6 +154,7 @@ type MessageContext struct {
 	IsUnzip     bool
 	IsMirror    bool
 	MirrorHost  string
+	RcloneDest  string // TJ RClone: remote:path (mrcc: = the user's rclone.conf)
 	ChatID      int64
 	MessageID   int
 	UserID      int64

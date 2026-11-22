@@ -862,7 +862,11 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	}
 
 	// 5. Authorization check for leech, admin, settings, and task commands
-	if !telegram.IsAuthorized(chatID, senderID, b.userMap) {
+	// /us in PM, like the Python bot (authorized_usetting): a member of an authorized group may
+	// open his settings in private even when he is not authorized by himself
+	usInPM := chatID == senderID && telegram.MatchCommand(text, telegram.BotCommands.UserSetting, b.botUsername) &&
+		b.memberOfAuthorizedGroup(ctx, senderID)
+	if !usInPM && !telegram.IsAuthorized(chatID, senderID, b.userMap) {
 		log.Printf("[AZML-Go] Unauthorized command %q by user %d in chat %d", text, senderID, chatID)
 		sentID, _ := b.sender.SendMessage(ctx, peer, "⌬ <b>Access Denied!</b>\nYou are not authorized to use this bot.\nContact the bot owner to get authorization.", m.ID, nil)
 		if sentID > 0 {
@@ -2097,4 +2101,41 @@ func (b *BotApp) finishThumbPrompt(peer tg.InputPeerClass, sess *ext.PendingThum
 		defer dcancel()
 		_ = b.sender.DeleteMessage(dctx, peer, ids)
 	}()
+}
+
+var (
+	authMemberMu    sync.Mutex
+	authMemberCache = map[int64]time.Time{} // user -> until when he counts as a member
+)
+
+// memberOfAuthorizedGroup: the user is in one of the authorized groups (AUTHORIZED_CHATS and
+// /authorize); a positive answer is kept for 10 minutes.
+func (b *BotApp) memberOfAuthorizedGroup(ctx context.Context, userID int64) bool {
+	authMemberMu.Lock()
+	if t, ok := authMemberCache[userID]; ok && time.Now().Before(t) {
+		authMemberMu.Unlock()
+		return true
+	}
+	authMemberMu.Unlock()
+	hash := telegram.GetUserAccessHash(userID)
+	_, chats := b.commandAdminsAndChats()
+	for _, cid := range chats {
+		cp, ok := b.getPeerForChatID(cid).(*tg.InputPeerChannel)
+		if !ok || cp == nil {
+			continue
+		}
+		c, cancel := context.WithTimeout(ctx, 5*time.Second)
+		_, err := b.rawAPI.ChannelsGetParticipant(c, &tg.ChannelsGetParticipantRequest{
+			Channel:     &tg.InputChannel{ChannelID: cp.ChannelID, AccessHash: cp.AccessHash},
+			Participant: &tg.InputPeerUser{UserID: userID, AccessHash: hash},
+		})
+		cancel()
+		if err == nil {
+			authMemberMu.Lock()
+			authMemberCache[userID] = time.Now().Add(10 * time.Minute)
+			authMemberMu.Unlock()
+			return true
+		}
+	}
+	return false
 }

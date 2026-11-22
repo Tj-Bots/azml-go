@@ -2103,20 +2103,9 @@ func (b *BotApp) finishThumbPrompt(peer tg.InputPeerClass, sess *ext.PendingThum
 	}()
 }
 
-var (
-	authMemberMu    sync.Mutex
-	authMemberCache = map[int64]time.Time{} // user -> until when he counts as a member
-)
-
 // memberOfAuthorizedGroup: the user is in one of the authorized groups (AUTHORIZED_CHATS and
-// /authorize); a positive answer is kept for 10 minutes.
+// /authorize); asked from Telegram every time, like the Python bot.
 func (b *BotApp) memberOfAuthorizedGroup(ctx context.Context, userID int64) bool {
-	authMemberMu.Lock()
-	if t, ok := authMemberCache[userID]; ok && time.Now().Before(t) {
-		authMemberMu.Unlock()
-		return true
-	}
-	authMemberMu.Unlock()
 	hash := telegram.GetUserAccessHash(userID)
 	_, chats := b.commandAdminsAndChats()
 	for _, cid := range chats {
@@ -2131,9 +2120,6 @@ func (b *BotApp) memberOfAuthorizedGroup(ctx context.Context, userID int64) bool
 		})
 		cancel()
 		if err == nil {
-			authMemberMu.Lock()
-			authMemberCache[userID] = time.Now().Add(10 * time.Minute)
-			authMemberMu.Unlock()
 			return true
 		}
 	}

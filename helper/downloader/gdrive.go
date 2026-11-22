@@ -56,6 +56,10 @@ func (g *GDriveClient) LoadCredentials(tokenPath string) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
+	// a new file replaces everything of the old one
+	g.clientID, g.clientSecret, g.refreshToken, g.accessToken = "", "", "", ""
+	g.expiryTime = time.Time{}
+
 	data, err := os.ReadFile(tokenPath)
 	if err != nil {
 		// Fallback check in parent dir
@@ -111,8 +115,30 @@ func (g *GDriveClient) LoadCredentials(tokenPath string) error {
 		}
 	}
 
+	// 3. text (a printed credentials dict, e.g. copied from /shell of the Python bot):
+	// 'refresh_token': '...' or "refresh_token": "..."
+	if g.refreshToken == "" {
+		for _, k := range []struct {
+			names []string
+			dst   *string
+		}{
+			{[]string{"refresh_token", "_refresh_token"}, &g.refreshToken},
+			{[]string{"client_id", "_client_id"}, &g.clientID},
+			{[]string{"client_secret", "_client_secret"}, &g.clientSecret},
+			{[]string{"access_token", "token", "_token"}, &g.accessToken},
+		} {
+			for _, n := range k.names {
+				re := regexp.MustCompile(`['"]` + regexp.QuoteMeta(n) + `['"]\s*:\s*['"]([^'"]+)['"]`)
+				if m := re.FindSubmatch(data); m != nil && *k.dst == "" {
+					*k.dst = string(m[1])
+					break
+				}
+			}
+		}
+	}
+
 	if g.refreshToken != "" || g.accessToken != "" {
-		log.Println("[GDRIVE] Successfully loaded credentials from token.pickle")
+		log.Printf("[GDRIVE] Loaded credentials from %s (refresh token: %v, client id: %v)", tokenPath, g.refreshToken != "", g.clientID != "")
 		return nil
 	}
 	return fmt.Errorf("no valid credentials found in token.pickle")
@@ -203,6 +229,9 @@ func (g *GDriveClient) GetAccessToken() (string, error) {
 		return "", err
 	}
 	if res.Error != "" {
+		if res.Error == "invalid_grant" {
+			return "", fmt.Errorf("token refresh error: invalid_grant (this token.pickle is expired or revoked: send the current one again)")
+		}
 		return "", fmt.Errorf("token refresh error: %s", res.Error)
 	}
 

@@ -1656,6 +1656,9 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		uTask.SetSize(itemSize)
 		uTask.SetProgress(0, itemSize, 0, "-")
 
+		if opt.IsMirror && user != nil && (user.MPrefix != "" || user.MSuffix != "" || user.MRemname != "") {
+			curFile = mirrorRename(curFile, user) // Mirror Prefix / Suffix / Remname of /us
+		}
 		if opt.IsMirror && opt.MirrorHost == ext.RcloneHostID {
 			if len(filesToUpload) > 1 && rcSess.FolderName == "" {
 				rcSess.FolderName = displayName
@@ -1679,7 +1682,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				}
 			}
 			uTask.SetStatus(types.StatusUploading, ext.RcloneHostName)
-			res, rErr := downloader.UploadToRclone(ctx, curFile, dest, conf, cfg.RcloneFlags, rcSess, func(sent, total int64, speed float64) {
+			flags := cfg.RcloneFlags
+			if user != nil && user.RcloneFlags != "" {
+				flags += " " + user.RcloneFlags
+			}
+			res, rErr := downloader.UploadToRclone(ctx, curFile, dest, conf, flags, rcSess, func(sent, total int64, speed float64) {
 				eta := "-"
 				if speed > 0 && total > sent {
 					eta = ext.GetReadableTime(int64(float64(total-sent) / speed))
@@ -1713,7 +1720,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			uTask.SetStatus(types.StatusUploading, ext.GDriveHostName)
 			gdStart := time.Now()
 			res, gErr := downloader.UploadToGDrive(ctx, curFile, downloader.GDUploadOptions{
-				ParentID: cfg.GDriveID, IsTeamDrive: cfg.IsTeamDrive, Private: cfg.DisableDriveLink, StopDuplicate: cfg.StopDuplicate, IndexURL: cfg.IndexURL,
+				ParentID: cfg.GDriveID, IsTeamDrive: cfg.IsTeamDrive, Private: cfg.DisableDriveLink, StopDuplicate: user.StopDupOn(cfg.StopDuplicate), IndexURL: cfg.IndexURL,
 			}, gdSess, func(sent, total int64) {
 				secs := time.Since(gdStart).Seconds()
 				if secs < 0.5 {
@@ -3255,4 +3262,31 @@ func mimeOfName(name string) string {
 		return strings.SplitN(t, ";", 2)[0]
 	}
 	return "application/octet-stream"
+}
+
+// mirrorRename: the file gets the user's Mirror Remname (old:new|word), Prefix and Suffix
+// (before the extension), like the Python bot; the new path, or the old one when it fails.
+func mirrorRename(path string, u *types.UserSettings) string {
+	dir, base := filepath.Dir(path), filepath.Base(path)
+	ext0 := filepath.Ext(base)
+	stem := strings.TrimSuffix(base, ext0)
+	for _, item := range strings.Split(u.MRemname, "|") {
+		if item == "" {
+			continue
+		}
+		if old, nw, ok := strings.Cut(item, ":"); ok {
+			stem = strings.ReplaceAll(stem, old, nw)
+		} else {
+			stem = strings.ReplaceAll(stem, item, "")
+		}
+	}
+	name := strings.TrimSpace(u.MPrefix + stem + u.MSuffix + ext0)
+	if name == "" || name == base {
+		return path
+	}
+	np := filepath.Join(dir, name)
+	if err := os.Rename(path, np); err != nil {
+		return path
+	}
+	return np
 }

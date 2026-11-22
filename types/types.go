@@ -48,6 +48,12 @@ type UserSettings struct {
 	MirrorHost     string            `json:"mirror_host" bson:"mirror_host"`
 	DefaultUpload  string            `json:"default_upload,omitempty" bson:"default_upload,omitempty"` // gd / rc / ddl (else DEFAULT_UPLOAD)
 	RcloneConf     []byte            `json:"rclone_conf,omitempty" bson:"rclone_conf,omitempty"`       // his own rclone.conf (-up mrcc:remote:path)
+	MPrefix        string            `json:"mprefix,omitempty" bson:"mprefix,omitempty"`               // Mirror Prefix
+	MSuffix        string            `json:"msuffix,omitempty" bson:"msuffix,omitempty"`               // Mirror Suffix
+	MRemname       string            `json:"mremname,omitempty" bson:"mremname,omitempty"`             // Mirror Remname (a:b|c)
+	RclonePath     string            `json:"rclone_path,omitempty" bson:"rclone_path,omitempty"`       // his RClone Path (-up rc)
+	RcloneFlags    string            `json:"rclone_flags,omitempty" bson:"rclone_flags,omitempty"`     // his RClone Flags
+	StopDup        string            `json:"stop_dup,omitempty" bson:"stop_dup,omitempty"`             // on / off (else STOP_DUPLICATE)
 	ExcludedExts   string            `json:"excluded_exts" bson:"excluded_exts"`
 	CapFont        string            `json:"cap_font" bson:"cap_font"`
 	MediaInfo      bool              `json:"mediainfo" bson:"mediainfo"`                       // MediaInfo button under leeched files
@@ -255,4 +261,45 @@ func (u *UserSettings) MediaStoreOn(botDefault bool) bool {
 		return botDefault
 	}
 	return u.MediaStore
+}
+
+// MirrorText: the text values of /us → Mirror Settings (mprefix, msuffix, mremname, rcpath, rcflags).
+func (u *UserSettings) MirrorText(key string) string {
+	switch key {
+	case "mprefix":
+		return u.MPrefix
+	case "msuffix":
+		return u.MSuffix
+	case "mremname":
+		return u.MRemname
+	case "rcpath":
+		return u.RclonePath
+	case "rcflags":
+		return u.RcloneFlags
+	}
+	return ""
+}
+
+// SetMirrorText sets one of them ("" clears it).
+func (u *UserSettings) SetMirrorText(key, val string) {
+	switch key {
+	case "mprefix":
+		u.MPrefix = val
+	case "msuffix":
+		u.MSuffix = val
+	case "mremname":
+		u.MRemname = val
+	case "rcpath":
+		u.RclonePath = val
+	case "rcflags":
+		u.RcloneFlags = val
+	}
+}
+
+// StopDupOn: his Stop Duplicate, else the bot's STOP_DUPLICATE.
+func (u *UserSettings) StopDupOn(botDefault bool) bool {
+	if u != nil && u.StopDup != "" {
+		return u.StopDup == "on"
+	}
+	return botDefault
 }

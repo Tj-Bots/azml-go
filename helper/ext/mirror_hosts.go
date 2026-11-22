@@ -102,12 +102,12 @@ func AvailableMirrorHostsFor(userKeys map[string]string) []MirrorHost {
 const GDriveHostID = "tjgd"
 
 // GDriveHostName: its name in the status, the finish message and the buttons.
-const GDriveHostName = "TJ GDrive"
+const GDriveHostName = "tjgd"
 
 // RcloneHostID / RcloneHostName: /mirror -up rc, TJ RClone.
 const (
 	RcloneHostID   = "tjrc"
-	RcloneHostName = "TJ RClone"
+	RcloneHostName = "tjrc"
 )
 
 // MirrorSession keeps state between the files of one task (GoFile puts them in one folder).

@@ -388,7 +388,9 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.AsDoc != config.Get().AsDocument || u.CustomThumb != "" ||
 		u.CapFont != "" || u.ExcludedExts != "" || u.MirrorHost != "" ||
 		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet || u.MediaStoreSet ||
-		len(u.Metadata) > 0 || u.DumpChatID != 0 || len(u.FFmpegCommands) > 0 || u.YtOpt != ""
+		len(u.Metadata) > 0 || u.DumpChatID != 0 || len(u.FFmpegCommands) > 0 || u.YtOpt != "" ||
+		u.MPrefix != "" || u.MSuffix != "" || u.MRemname != "" || u.RclonePath != "" || u.RcloneFlags != "" ||
+		u.StopDup != "" || u.DefaultUpload != ""
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -765,6 +767,37 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		ext.ClearPendingThumbSession(targetUID)
 	}
 
+	// Mirror Settings text values: mt_<key> page, mte_<key> edit, mtd_<key> delete
+	if k := strings.TrimPrefix(action, "mte_"); k != action {
+		if _, ok := mirrorTexts[k]; ok {
+			ext.SetPendingSettingSession(targetUID, "mt_"+k, 0, msgID, 60*time.Second)
+			text, _ := m.buildMirrorTextMenu(u, k, "")
+			btn := telegram.NewButtonMaker()
+			btn.IButton("Stop Change", fmt.Sprintf("userset %d mt_%s", u.UserID, k))
+			btn.Row()
+			btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
+			btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+			btn.Row()
+			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n➲ <i>"+mirrorTexts[k].ask+"</i>\n<b>Timeout:</b> 60 sec", btn, 2)
+			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+			return
+		}
+	}
+	for _, pre := range []string{"mt_", "mtd_"} {
+		if k := strings.TrimPrefix(action, pre); k != action {
+			if _, ok := mirrorTexts[k]; ok {
+				if pre == "mtd_" {
+					u.SetMirrorText(k, "")
+					_ = ext.DB.SaveUser(u)
+				}
+				text, btn := m.buildMirrorTextMenu(u, k, "")
+				_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+				_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+				return
+			}
+		}
+	}
+
 	switch action {
 	// 1. Navigation
 	case "main", "back":
@@ -806,6 +839,16 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		text, btn := m.buildLeechMenu(u, "")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 	case "mirror":
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		text, btn := m.buildMirrorHostMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "stop_duplicate": // his Stop Duplicate: on / off
+		if u.StopDupOn(config.Get().StopDuplicate) {
+			u.StopDup = "off"
+		} else {
+			u.StopDup = "on"
+		}
+		_ = ext.DB.SaveUser(u)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildMirrorHostMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
@@ -879,6 +922,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.DumpChatID = 0
 		u.FFmpegCommands = nil
 		u.YtOpt = ""
+		u.MPrefix, u.MSuffix, u.MRemname, u.RclonePath, u.RcloneFlags, u.StopDup, u.DefaultUpload = "", "", "", "", "", "", ""
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1181,7 +1225,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 
 	case "mhost":
-		text, btn := m.buildMirrorHostMenu(u)
+		text, btn := m.buildDDLServersMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
@@ -1200,7 +1244,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		if u.MirrorHost != "" {
 			text, btn = m.buildDDLHostMenu(u, u.MirrorHost)
 		} else {
-			text, btn = m.buildMirrorHostMenu(u)
+			text, btn = m.buildDDLServersMenu(u)
 		}
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 
@@ -1318,7 +1362,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
 	case "ddlservers":
-		text, btn := m.buildMirrorHostMenu(u)
+		text, btn := m.buildDDLServersMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
@@ -1344,7 +1388,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		btn := telegram.NewButtonMaker()
 		btn.IButton("Stop Change", fmt.Sprintf("userset %d ddlhost %s", u.UserID, h.ID))
 		btn.Row()
-		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d ddlservers", u.UserID), "primary")
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n"+h.Prompt+"\n<b>Timeout:</b> 60 sec", btn, 2)
@@ -1400,6 +1444,11 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 	}
 	var text string
 	var btn *telegram.ButtonMaker
+	if k := strings.TrimPrefix(key, "mt_"); k != key {
+		text, btn = m.buildMirrorTextMenu(u, k, ext.TakeSettingNote(u.UserID))
+		_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
+		return
+	}
 	if hostID := strings.TrimPrefix(key, "ddlkey_"); hostID != key {
 		text, btn = m.buildDDLHostMenu(u, hostID)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, promptMsgID, text, btn, 2)
@@ -1577,7 +1626,7 @@ func (m *SettingsModule) buildCapFontMenu(u *types.UserSettings) (string, *teleg
 	return text, btn
 }
 
-func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+func (m *SettingsModule) buildDDLServersMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
 	name := u.Name
 	if name == "" {
 		name = fmt.Sprintf("%d", u.UserID)
@@ -1589,32 +1638,13 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 	text := fmt.Sprintf("㊂ <b><u>Mirror Settings for <a href=\"tg://user?id=%d\">%s</a></u></b>\n\n"+
 		"<blockquote><b>╭</b> <b>Upload To :</b> <i>%s</i>\n"+
 		"<b>╰</b> <b>DDL Server(s) :</b> <i>%s</i></blockquote>\n\n"+
-		"➲ <b>Description :</b> <i>Tap a server to make it your default for /mirror or to add your own API key. 🔑 = your key is set.</i>",
+		"➲ <b>Description :</b> <i>Your DDL server for /mirror -up ddl, and your own API keys. 🔑 = your key is set.</i>",
 		u.UserID, telegram.EscapeHTML(name), mirrorHostText(u.MirrorHost), strings.Join(ready, ", "))
-	// like the Python bot: Default Upload (gd / rc / ddl) and his own rclone.conf
-	up := u.DefaultUpload
-	upText := map[string]string{"gd": ext.GDriveHostName, "rc": ext.RcloneHostName, "ddl": "DDL"}[up]
-	if upText == "" {
-		upText = "Default (" + map[string]string{"gd": ext.GDriveHostName, "rc": ext.RcloneHostName, "ddl": "DDL"}[config.Get().DefaultUpload] + ")"
-	}
-	rcc := "Not Exists"
-	if len(u.RcloneConf) > 0 {
-		rcc = "Exists"
-	}
-	text += fmt.Sprintf("\n\n<blockquote><b>╭</b> <b>Default Upload :</b> <i>%s</i>\n<b>╰</b> <b>RClone.conf :</b> <i>%s</i></blockquote>", upText, rcc)
 	btn := telegram.NewButtonMaker()
-	btn.IButton("Default Upload: "+upText, fmt.Sprintf("userset %d dupload", u.UserID))
-	btn.Row()
-	if len(u.RcloneConf) > 0 {
-		btn.IButtonStyled("✓ RClone", fmt.Sprintf("userset %d rcc", u.UserID), "success")
-	} else {
-		btn.IButton("RClone", fmt.Sprintf("userset %d rcc", u.UserID))
-	}
-	btn.Row()
 	if u.MirrorHost == "" {
-		btn.IButtonStyled("✓ Ask every time", fmt.Sprintf("userset %d sethost none", u.UserID), "success")
+		btn.IButtonStyled("✓ First Available", fmt.Sprintf("userset %d sethost none", u.UserID), "success")
 	} else {
-		btn.IButton("Ask every time", fmt.Sprintf("userset %d sethost none", u.UserID))
+		btn.IButton("First Available", fmt.Sprintf("userset %d sethost none", u.UserID))
 	}
 	btn.Row()
 	for i, h := range ext.MirrorHosts {
@@ -1775,7 +1805,7 @@ func (m *SettingsModule) buildDDLHostMenu(u *types.UserSettings, hostID string) 
 		}
 		btn.Row()
 	}
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d ddlservers", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn
@@ -2092,6 +2122,109 @@ func (m *SettingsModule) buildRcloneMenu(u *types.UserSettings, note string) (st
 	btn.IButton(map[bool]string{true: "Change RClone.conf", false: "Set RClone.conf"}[len(u.RcloneConf) > 0], fmt.Sprintf("userset %d edit_rcc", u.UserID))
 	if len(u.RcloneConf) > 0 {
 		btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_rcc", u.UserID))
+	}
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+// uploadNames: gd / rc / ddl as the bot calls them.
+var uploadNames = map[string]string{"gd": ext.GDriveHostName, "rc": ext.RcloneHostName, "ddl": "DDL"}
+
+// mirrorTexts: the text settings of /us → Mirror Settings (like the Python bot).
+var mirrorTexts = map[string]struct{ title, desc, ask string }{
+	"mprefix":  {"Mirror Prefix", "Added before the name of your mirrored files.", "Send the Mirror Prefix."},
+	"msuffix":  {"Mirror Suffix", "Added at the end of the name of your mirrored files (before the extension).", "Send the Mirror Suffix."},
+	"mremname": {"Mirror Remname", "Words to change in the name of your mirrored files: <code>old:new|word</code> (a word alone is removed).", "Send the Mirror Remname, e.g. <code>[Old]:[TJ]|www.site.com</code>"},
+	"rcpath":   {"RClone Path", "Your path for -up rc (e.g. <code>mrcc:mydrive:Movies</code> with your rclone.conf). Without it RCLONE_PATH of the bot is used.", "Send your RClone Path."},
+	"rcflags":  {"RClone Flags", "Extra rclone flags for your uploads, e.g. <code>--transfers 4</code>.", "Send your RClone Flags."},
+}
+
+// buildMirrorHostMenu: /us → Mirror Settings, like the Python bot (MIRROR theme).
+func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *telegram.ButtonMaker) {
+	cfg := config.Get()
+	name := u.Name
+	if name == "" {
+		name = fmt.Sprintf("%d", u.UserID)
+	}
+	val := func(s string) string {
+		if s == "" {
+			return "Not Exists"
+		}
+		return telegram.EscapeHTML(s)
+	}
+	rcc := "Not Exists"
+	if len(u.RcloneConf) > 0 {
+		rcc = "Exists"
+	}
+	up := uploadNames[u.DefaultUpload]
+	if up == "" {
+		up = "Default (" + uploadNames[cfg.DefaultUpload] + ")"
+	}
+	ddl := mirrorHostText(u.MirrorHost)
+	stop := "Disabled"
+	if u.StopDupOn(cfg.StopDuplicate) {
+		stop = "Enabled"
+	}
+	text := fmt.Sprintf("㊂ <b><u>Mirror/Clone Settings : %s</u></b>\n\n"+
+		"<blockquote><b>╭</b> <b>RClone Config :</b> <i>%s</i>\n"+
+		"┠ <b>RClone Path :</b> <code>%s</code>\n"+
+		"┠ <b>RClone Flags :</b> <code>%s</code>\n"+
+		"┠ <b>Upload To :</b> <i>%s</i>\n"+
+		"┠ <b>Mirror Prefix :</b> <code>%s</code>\n"+
+		"┠ <b>Mirror Suffix :</b> <code>%s</code>\n"+
+		"┠ <b>Mirror Remname :</b> <code>%s</code>\n"+
+		"┠ <b>DDL Server :</b> <i>%s</i>\n"+
+		"<b>╰</b> <b>Stop Duplicate :</b> <i>%s</i></blockquote>",
+		telegram.EscapeHTML(name), rcc, val(u.RclonePath), val(u.RcloneFlags), up,
+		val(u.MPrefix), val(u.MSuffix), val(u.MRemname), ddl, stop)
+
+	btn := telegram.NewButtonMaker()
+	toggle := func(label string, on bool, data string) {
+		if on {
+			btn.IButtonStyled("✓ "+label, data, "success")
+		} else {
+			btn.IButton(label, data)
+		}
+	}
+	btn.IButton("Upload To: "+up, fmt.Sprintf("userset %d dupload", u.UserID))
+	btn.Row()
+	toggle("RClone", len(u.RcloneConf) > 0, fmt.Sprintf("userset %d rcc", u.UserID))
+	toggle("Mirror Prefix", u.MPrefix != "", fmt.Sprintf("userset %d mt_mprefix", u.UserID))
+	btn.Row()
+	toggle("Mirror Suffix", u.MSuffix != "", fmt.Sprintf("userset %d mt_msuffix", u.UserID))
+	toggle("Mirror Remname", u.MRemname != "", fmt.Sprintf("userset %d mt_mremname", u.UserID))
+	btn.Row()
+	toggle("DDL Servers", u.MirrorHost != "" || len(u.DDLKeys) > 0, fmt.Sprintf("userset %d ddlservers", u.UserID))
+	toggle("RClone Path", u.RclonePath != "", fmt.Sprintf("userset %d mt_rcpath", u.UserID))
+	btn.Row()
+	toggle("RClone Flags", u.RcloneFlags != "", fmt.Sprintf("userset %d mt_rcflags", u.UserID))
+	toggle("Stop Duplicate", u.StopDupOn(cfg.StopDuplicate), fmt.Sprintf("userset %d stop_duplicate", u.UserID))
+	btn.Row()
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+// buildMirrorTextMenu: one text setting of Mirror Settings (Set / Change, ↻ Delete).
+func (m *SettingsModule) buildMirrorTextMenu(u *types.UserSettings, key, note string) (string, *telegram.ButtonMaker) {
+	t := mirrorTexts[key]
+	v := u.MirrorText(key)
+	shown := "Not Exists"
+	if v != "" {
+		shown = "<code>" + telegram.EscapeHTML(v) + "</code>"
+	}
+	text := "㊂ <b><u>" + t.title + " Settings :</u></b>\n\n➲ <b>" + t.title + " :</b> " + shown + "\n\n➲ <b>Description :</b> <i>" + t.desc + "</i>"
+	if note != "" {
+		text += "\n\n" + note
+	}
+	btn := telegram.NewButtonMaker()
+	btn.IButton(map[bool]string{true: "Change ", false: "Set "}[v != ""]+t.title, fmt.Sprintf("userset %d mte_%s", u.UserID, key))
+	if v != "" {
+		btn.IButton("↻ Delete", fmt.Sprintf("userset %d mtd_%s", u.UserID, key))
 	}
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")

@@ -1896,6 +1896,17 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 	if val == "" {
 		return
 	}
+	if k := strings.TrimPrefix(key, "mt_"); k != key { // /us → Mirror Settings text values
+		if strings.EqualFold(val, "clear") || strings.EqualFold(val, "none") {
+			val = ""
+		}
+		u.SetMirrorText(k, val)
+		_ = ext.DB.SaveUser(u)
+		if promptMsgID > 0 && b.settingsUpdateHandler != nil {
+			b.settingsUpdateHandler(ctx, peer, promptMsgID, u, key)
+		}
+		return
+	}
 	var fieldName string
 	switch key {
 	case "ytopt":

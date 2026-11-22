@@ -72,10 +72,16 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 				up = u.DefaultUpload
 			}
 		}
+		userPath := ""
+		if b.userMap != nil {
+			if u := b.userMap.Get(msgCtx.UserID); u != nil {
+				userPath = u.RclonePath
+			}
+		}
 		switch {
 		case up == "gd" && cfg.GDriveID != "":
 			host = ext.GDriveHostID
-		case up == "rc" && cfg.RclonePath != "":
+		case up == "rc" && (cfg.RclonePath != "" || userPath != ""):
 			host = ext.RcloneHostID
 		}
 	}
@@ -83,7 +89,12 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 		host = ""
 	}
 	if strings.HasPrefix(host, ext.RcloneHostID) {
-		dest := config.Get().RclonePath
+		dest := config.Get().RclonePath // -up rc: his RClone Path (/us), else RCLONE_PATH
+		if b.userMap != nil {
+			if u := b.userMap.Get(msgCtx.UserID); u != nil && u.RclonePath != "" {
+				dest = u.RclonePath
+			}
+		}
 		if i := strings.Index(host, "="); i > 0 {
 			dest = host[i+1:]
 		}
@@ -112,35 +123,15 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	if b.gateHandler != nil && !b.gateHandler(ctx, peer, msgCtx, func() { b.handleMirrorCommand(context.Background(), peer, msgCtx) }) {
 		return // before the host question
 	}
+	// DDL without a server of his own: the first DDL server, like the Python bot (no question)
 	var userKeys map[string]string
 	if b.userMap != nil {
 		if u := b.userMap.Get(msgCtx.UserID); u != nil {
 			userKeys = u.DDLKeys
 		}
 	}
-	hosts := ext.AvailableMirrorHostsFor(userKeys)
-	btn := telegram.NewButtonMaker()
-	for i, h := range hosts {
-		btn.IButton(h.Name, fmt.Sprintf("mirror %d %s", msgCtx.UserID, h.ID))
-		if i%2 == 1 {
-			btn.Row()
-		}
-	}
-	btn.Row()
-	btn.IButtonStyled("Cancel", fmt.Sprintf("mirror %d cancel", msgCtx.UserID), "danger")
-	btn.Row()
-
-	prompt := "⌬ <b><u>Mirror</u></b>\n\n<blockquote><b>╭</b> <b>Choose where to upload</b>\n<b>╰</b> <i>Or use</i> <code>-up gofile</code></blockquote>"
-	promptID, err := b.sender.SendMessageWithButtons(ctx, peer, prompt, msgCtx.MessageID, btn, 2)
-	if err != nil || promptID == 0 {
-		// no buttons possible: fall back to the first host
-		msgCtx.MirrorHost = hosts[0].ID
-		b.leechHandler(ctx, peer, msgCtx, false, false)
-		return
-	}
-	pendingMirrors.Store(mirrorKey(telegram.PeerToChatID(peer), promptID), pendingMirror{peer: peer, msg: msgCtx, at: time.Now()})
-	promptChat := telegram.PeerToChatID(peer)
-	time.AfterFunc(5*time.Minute, func() { pendingMirrors.Delete(mirrorKey(promptChat, promptID)) })
+	msgCtx.MirrorHost = ext.AvailableMirrorHostsFor(userKeys)[0].ID
+	b.leechHandler(ctx, peer, msgCtx, false, false)
 }
 
 // handleMirrorCallback handles the buttons of the host choice: "mirror <userID> <host|cancel>".

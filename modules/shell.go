@@ -25,7 +25,7 @@ func HandleShell(sender *telegram.MessageSender) func(ctx context.Context, peer 
 			cmdLine = strings.TrimSpace(parts[1])
 		}
 		if cmdLine == "" {
-			_, _ = sender.SendMessage(ctx, peer, "<i>Usage:</i> <code>/shell ls -la</code>", msg.MessageID, telegram.CloseMarkup(msg.UserID))
+			_, _ = sender.SendMessage(ctx, peer, "<i>Usage:</i> <code>"+telegram.Cmd("shell")+" ls -la</code>", msg.MessageID, telegram.CloseMarkup(msg.UserID))
 			return
 		}
 		go func() {

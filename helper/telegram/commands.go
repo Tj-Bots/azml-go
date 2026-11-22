@@ -78,7 +78,7 @@ func InitCommands() {
 		Status: []string{
 			"status" + suffix,
 			"s" + suffix,
-			"statusall" + suffix,
+			"statusall", // all the bots, like the Python bot
 		},
 		Cancel: []string{
 			"cancel" + suffix,
@@ -88,7 +88,7 @@ func InitCommands() {
 		CancelAll: []string{
 			"cancelall" + suffix,
 			"ca" + suffix,
-			"cancelallbot" + suffix,
+			"cancelallbot", // all the bots
 		},
 		Authorize: []string{
 			"authorize" + suffix,
@@ -150,7 +150,7 @@ func InitCommands() {
 		Restart: []string{
 			"restart" + suffix,
 			"r" + suffix,
-			"restartall" + suffix,
+			"restartall", // all the bots
 		},
 		Help: []string{
 			"help" + suffix,
@@ -381,4 +381,9 @@ func IsThumbCommand(text, botUsername string) bool {
 // IsCancelCommand: /cancel of this bot (with CMD_SUFFIX /cancel2 for the second bot).
 func IsCancelCommand(text, botUsername string) bool {
 	return MatchCommand(strings.TrimSpace(text), []string{"cancel" + config.Get().CmdSuffix}, botUsername)
+}
+
+// Cmd: "/name" with this bot's CMD_SUFFIX, for texts that show a command (/log2 clear ...).
+func Cmd(name string) string {
+	return "/" + name + config.Get().CmdSuffix
 }

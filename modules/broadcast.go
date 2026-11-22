@@ -42,14 +42,16 @@ var (
 	bcBusy  bool
 )
 
-const bcUsage = "㊂ <b><u>Broadcast :</u></b>\n\n" +
-	"<blockquote><b>Reply to a message:</b> <code>/broadcast</code> — copy it to every user\n" +
-	"<code>-f</code> / <code>-forward</code> — forward it (with its tag)\n" +
-	"<code>-q</code> / <code>-quiet</code> — without notification\n\n" +
-	"<b>Edit:</b> reply to the new text with <code>/broadcast ID -e</code>\n" +
-	"<b>Delete:</b> <code>/broadcast ID -d</code>\n\n" +
-	"<b>Text:</b> <code>/broadcast your message</code></blockquote>\n\n" +
-	"<i>Broadcasts can be edited or deleted only until the next restart. Forwarded ones can only be deleted.</i>"
+func bcUsage() string {
+	return "㊂ <b><u>Broadcast :</u></b>\n\n" +
+		"<blockquote><b>Reply to a message:</b> <code>" + telegram.Cmd("broadcast") + "</code> — copy it to every user\n" +
+		"<code>-f</code> / <code>-forward</code> — forward it (with its tag)\n" +
+		"<code>-q</code> / <code>-quiet</code> — without notification\n\n" +
+		"<b>Edit:</b> reply to the new text with <code>" + telegram.Cmd("broadcast") + " ID -e</code>\n" +
+		"<b>Delete:</b> <code>" + telegram.Cmd("broadcast") + " ID -d</code>\n\n" +
+		"<b>Text:</b> <code>" + telegram.Cmd("broadcast") + " your message</code></blockquote>\n\n" +
+		"<i>Broadcasts can be edited or deleted only until the next restart. Forwarded ones can only be deleted.</i>"
+}
 
 func (m *BroadcastModule) HandleBroadcast(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	if !telegram.IsSudo(msg.UserID, m.userMap) {
@@ -90,7 +92,7 @@ func (m *BroadcastModule) HandleBroadcast(ctx context.Context, peer tg.InputPeer
 			return
 		}
 		if edit && (!msg.IsReply || msg.ReplyToID <= 0) {
-			reply("<i>Reply to the new message with</i> <code>/broadcast ID -e</code>")
+			reply("<i>Reply to the new message with</i> <code>" + telegram.Cmd("broadcast") + " ID -e</code>")
 			return
 		}
 		go m.editOrDelete(peer, msg, bcID[0], del)
@@ -100,7 +102,7 @@ func (m *BroadcastModule) HandleBroadcast(ctx context.Context, peer tg.InputPeer
 	hasReply := msg.IsReply && msg.ReplyToID > 0
 	text := strings.Join(textArgs, " ")
 	if !hasReply && text == "" {
-		reply(bcUsage)
+		reply(bcUsage())
 		return
 	}
 	if !hasReply && forward {

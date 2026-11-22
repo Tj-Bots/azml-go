@@ -71,14 +71,14 @@ func (m *HelpModule) getHelpGuideText() string {
 		"┠ <code>/ar%s [template]</code> — Quick AutoRename template set/clear\n"+
 		"┠ <code>/setthumb%s</code> (reply) — Set custom leech thumbnail\n"+
 		"┠ <code>/status%s</code> — Live download & upload speed and progress\n"+
-		"<b>╰</b> <code>/history</code> — Your last 10 finished tasks</blockquote>\n\n"+
+		"<b>╰</b> <code>"+telegram.Cmd("history")+"</code> — Your last 10 finished tasks</blockquote>\n\n"+
 		"<blockquote><b>╭</b> <b>Admin & Control:</b>\n"+
 		"┠ <code>/bs%s</code> — Bot Settings (Config vars, Aria2c, Private files)\n"+
 		"┠ <code>/cancel%s [GID]</code> — Cancel specific task\n"+
-		"┠ <code>/a</code> <code>/ua</code> — Authorize / unauthorize a user or this chat (reply or ID)\n"+
-		"┠ <code>/addsudo</code> <code>/rmsudo</code> — Add / remove a Sudo user (owner)\n"+
-		"┠ <code>/bl</code> <code>/rbl</code> — Blacklist / unblacklist a user\n"+
-		"┠ <code>/users</code> <code>/authlist</code> <code>/sudolist</code> — Lists of users\n"+
+		"┠ <code>"+telegram.Cmd("a")+"</code> <code>"+telegram.Cmd("ua")+"</code> — Authorize / unauthorize a user or this chat (reply or ID)\n"+
+		"┠ <code>"+telegram.Cmd("addsudo")+"</code> <code>"+telegram.Cmd("rmsudo")+"</code> — Add / remove a Sudo user (owner)\n"+
+		"┠ <code>"+telegram.Cmd("bl")+"</code> <code>"+telegram.Cmd("rbl")+"</code> — Blacklist / unblacklist a user\n"+
+		"┠ <code>"+telegram.Cmd("users")+"</code> <code>"+telegram.Cmd("authlist")+"</code> <code>"+telegram.Cmd("sudolist")+"</code> — Lists of users\n"+
 		"<b>╰</b> <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>",
 		telegram.ToSmallCaps("Commands Guide"),
 		sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx)
@@ -271,7 +271,7 @@ func (m *HelpModule) HandleLog(ctx context.Context, peer tg.InputPeerClass, msg 
 	btn.Row()
 	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", msg.UserID), "danger")
 	btn.Row()
-	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, logCaption, msg.MessageID, btn.BuildMenu(1)); err != nil {
+	if _, err := m.sender.SendDocumentBytes(ctx, peer, "log.txt", data, logCaption(), msg.MessageID, btn.BuildMenu(1)); err != nil {
 		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Could not send the log:</b> <code>%s</code>", telegram.EscapeHTML(err.Error())), msg.MessageID, nil)
 	}
 }
@@ -324,7 +324,9 @@ func sendWithImage(ctx context.Context, sender *telegram.MessageSender, peer tg.
 	_, _ = sender.SendMessageWithButtons(ctx, peer, text, replyTo, btn, cols)
 }
 
-const logCaption = "⌬ <b>Latest logs</b>\n<i>Clear with</i> <code>/log clear</code>"
+func logCaption() string {
+	return "⌬ <b>Latest logs</b>\n<i>Clear with</i> <code>" + telegram.Cmd("log") + " clear</code>"
+}
 
 // pasteAPI: the TJ Files paste of the Python bot (web_paste).
 const pasteAPI = "https://tjfiles.tjbots.chatgpt.site/api/"
@@ -359,7 +361,7 @@ func (m *HelpModule) logButton(ctx context.Context, peer tg.InputPeerClass, quer
 	btn.Row()
 	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", uid), "danger")
 	btn.Row()
-	_ = m.sender.EditMessage(ctx, peer, msgID, logCaption, btn.BuildMenu(1))
+	_ = m.sender.EditMessage(ctx, peer, msgID, logCaption(), btn.BuildMenu(1))
 }
 
 // webPaste: the text to the paste site; the newest part when it is too big (like the Python bot).

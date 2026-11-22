@@ -136,8 +136,8 @@ func (m *MediaInfoModule) HandleMediaInfo(ctx context.Context, peer tg.InputPeer
 
 	if link == "" {
 		helpMsg := "㊂ <b><u>MediaInfo Usage :</u></b>\n\n" +
-			"<blockquote><b>╭</b> <code>/mediainfo [download link]</code>\n" +
-			"<b>╰</b> Reply to a file or a link with <code>/mediainfo</code></blockquote>"
+			"<blockquote><b>╭</b> <code>" + telegram.Cmd("mediainfo") + " [download link]</code>\n" +
+			"<b>╰</b> Reply to a file or a link with <code>" + telegram.Cmd("mediainfo") + "</code></blockquote>"
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}

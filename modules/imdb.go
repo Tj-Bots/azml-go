@@ -43,8 +43,8 @@ func (m *ImdbModule) HandleImdb(ctx context.Context, peer tg.InputPeerClass, msg
 	parts := strings.Fields(msg.Text)
 	if len(parts) < 2 {
 		helpMsg := "㊂ <b><u>IMDb Search Usage :</u></b>\n\n" +
-			"• <code>/imdb [movie or series name]</code>\n" +
-			"• <code>/imdb tt1234567</code>"
+			"• <code>" + telegram.Cmd("imdb") + " [movie or series name]</code>\n" +
+			"• <code>" + telegram.Cmd("imdb") + " tt1234567</code>"
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}

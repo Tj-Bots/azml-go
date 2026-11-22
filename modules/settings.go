@@ -1402,15 +1402,15 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 		if current != "" {
 			text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 				"<code>%s</code>\n\n"+
-				"<b>Usage:</b> <code>/ar [template]</code>\n"+
-				"<b>Clear:</b> <code>/ar off</code>",
+				"<b>Usage:</b> <code>"+telegram.Cmd("ar")+" [template]</code>\n"+
+				"<b>Clear:</b> <code>"+telegram.Cmd("ar")+" off</code>",
 				telegram.ToSmallCaps("Current AutoRename Template"),
 				telegram.EscapeHTML(current))
 			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		} else {
 			text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n"+
 				"<b>No AutoRename template set.</b>\n\n"+
-				"<b>Usage:</b> <code>/ar [animeshrine.xyz] S0{season}E{episode} Dr. Stone {quality}.mkv</code>\n\n"+
+				"<b>Usage:</b> <code>"+telegram.Cmd("ar")+" [animeshrine.xyz] S0{season}E{episode} Dr. Stone {quality}.mkv</code>\n\n"+
 				"<b>Available tags:</b>\n"+
 				"  • <code>{title}</code> — parsed title\n"+
 				"  • <code>{season}</code> — season number\n"+
@@ -1420,7 +1420,7 @@ func (m *SettingsModule) HandleAutoRename(ctx context.Context, peer tg.InputPeer
 				"  • <code>{audio}</code> — audio codec\n"+
 				"  • <code>{chapter}</code> — chapter number\n"+
 				"  • <code>{episode:+N}</code> — episode with offset\n\n"+
-				"<b>Clear:</b> <code>/ar off</code>",
+				"<b>Clear:</b> <code>"+telegram.Cmd("ar")+" off</code>",
 				telegram.ToSmallCaps("AutoRename Guide"))
 			_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		}
@@ -1876,7 +1876,7 @@ func (m *SettingsModule) buildExtraMenu(u *types.UserSettings, key, note string)
 			list = strings.Join(lines, "\n")
 		}
 		text = "㊂ <b><u>FFmpeg Cmds :</u></b>\n\n<blockquote><b>╭</b> <b>Saved :</b>\n" + list + "\n" +
-			"<b>╰</b> <b>Use :</b> <code>/l link -ff name</code></blockquote>"
+			"<b>╰</b> <b>Use :</b> <code>" + telegram.Cmd("l") + " link -ff name</code></blockquote>"
 		btn.IButton("Add Command", fmt.Sprintf("userset %d edit_ffcmds", u.UserID))
 		if len(names) > 0 {
 			btn.IButton("↻ Delete All", fmt.Sprintf("userset %d del_ffcmds", u.UserID))

@@ -144,7 +144,7 @@ func (m *AuthorizeModule) HandleAddPremium(ctx context.Context, peer tg.InputPee
 
 	targetID, durationSec := parsePremiumArgs(msg)
 	if targetID == 0 {
-		_, _ = m.sender.SendMessage(ctx, peer, "<b>Usage:</b> <code>/addpremium [user_id] [duration]</code> (e.g. <code>/addpremium 12345 30d</code>)", msg.MessageID, nil)
+		_, _ = m.sender.SendMessage(ctx, peer, "<b>Usage:</b> <code>"+telegram.Cmd("addpremium")+" [user_id] [duration]</code> (e.g. <code>"+telegram.Cmd("addpremium")+" 12345 30d</code>)", msg.MessageID, nil)
 		return
 	}
 

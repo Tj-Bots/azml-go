@@ -78,8 +78,8 @@ func (m *AnimeModule) HandleAnime(ctx context.Context, peer tg.InputPeerClass, m
 	parts := strings.Fields(msg.Text)
 	if len(parts) < 2 {
 		helpMsg := "㊂ <b><u>Anime Search Usage :</u></b>\n\n" +
-			"• <code>/anime [anime title]</code>\n" +
-			"• <code>/anilist [anime title]</code>"
+			"• <code>" + telegram.Cmd("anime") + " [anime title]</code>\n" +
+			"• <code>" + telegram.Cmd("anilist") + " [anime title]</code>"
 		_, _ = m.sender.SendMessage(ctx, peer, helpMsg, msg.MessageID, telegram.CloseMarkup(msg.UserID))
 		return
 	}

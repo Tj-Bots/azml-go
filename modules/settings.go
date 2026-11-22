@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"azml-go/config"
@@ -36,6 +37,7 @@ func NewSettingsModule(rawAPI *tg.Client, sender *telegram.MessageSender, userMa
 
 func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	u := m.userMap.GetOrCreate(msg.UserID)
+	rememberUserInfo(msg.UserID, msg.Username, msg.LangCode)
 	parts := strings.Fields(msg.Text)
 
 	// Check if this was a thumbnail command (/setthumb, /t, /thumb, or /us thumb)
@@ -341,10 +343,24 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 	if name == "" {
 		name = fmt.Sprintf("%d", u.UserID)
 	}
+	// like the Python bot (USER_SETTING): name and ID, username, Telegram DC, language
+	info := m.userInfo(u.UserID)
+	uname, dc, lang := "N/A", "N/A", "N/A"
+	if info.username != "" {
+		uname = "@" + info.username
+	}
+	if info.dc > 0 {
+		dc = fmt.Sprintf("%d", info.dc)
+	}
+	if info.lang != "" {
+		lang = languageName(info.lang)
+	}
 	text := fmt.Sprintf("㊂ <b><u>User Settings :</u></b>\n\n"+
-		"<blockquote><b>╭</b> <b>Name :</b> <a href=\"tg://user?id=%d\">%s</a>\n"+
-		"<b>╰</b> <b>User ID :</b> <code>%d</code></blockquote>",
-		u.UserID, telegram.EscapeHTML(name), u.UserID)
+		"<blockquote><b>╭</b> <b>Name :</b> <a href=\"tg://user?id=%d\">%s</a> ( <code>%d</code> )\n"+
+		"┠ <b>Username :</b> %s\n"+
+		"┠ <b>Telegram DC :</b> %s\n"+
+		"<b>╰</b> <b>Language :</b> %s</blockquote>",
+		u.UserID, telegram.EscapeHTML(name), u.UserID, telegram.EscapeHTML(uname), dc, telegram.EscapeHTML(lang))
 
 	btn := telegram.NewButtonMaker()
 	btn.IButton("Universal Settings", fmt.Sprintf("userset %d universal", u.UserID))
@@ -1918,4 +1934,81 @@ func isImageFile(path string) bool {
 	h = h[:n]
 	return bytes.HasPrefix(h, []byte{0xFF, 0xD8, 0xFF}) || bytes.HasPrefix(h, []byte("\x89PNG")) ||
 		(len(h) >= 12 && string(h[:4]) == "RIFF" && string(h[8:12]) == "WEBP")
+}
+
+// ---- the /us header: username, language (from his messages) and DC (from Telegram) ----
+
+type usInfo struct {
+	username, lang string
+	dc             int
+}
+
+var (
+	usInfoMu    sync.Mutex
+	usInfoCache = map[int64]usInfo{}
+)
+
+func rememberUserInfo(uid int64, username, lang string) {
+	usInfoMu.Lock()
+	i := usInfoCache[uid]
+	if username != "" {
+		i.username = username
+	}
+	if lang != "" {
+		i.lang = lang
+	}
+	usInfoCache[uid] = i
+	usInfoMu.Unlock()
+}
+
+// userInfo: what is known; the DC (and a missing username) is asked from Telegram once.
+func (m *SettingsModule) userInfo(uid int64) usInfo {
+	usInfoMu.Lock()
+	i, ok := usInfoCache[uid]
+	usInfoMu.Unlock()
+	if ok && i.dc > 0 {
+		return i
+	}
+	if m.rawAPI != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if res, err := m.rawAPI.UsersGetUsers(ctx, []tg.InputUserClass{&tg.InputUser{UserID: uid, AccessHash: telegram.GetUserAccessHash(uid)}}); err == nil && len(res) > 0 {
+			if tu, ok := res[0].(*tg.User); ok {
+				if p, ok := tu.Photo.(*tg.UserProfilePhoto); ok {
+					i.dc = p.DCID
+				}
+				if i.username == "" {
+					i.username = tu.Username
+				}
+				if i.lang == "" {
+					i.lang = tu.LangCode
+				}
+			}
+		}
+	}
+	usInfoMu.Lock()
+	usInfoCache[uid] = i
+	usInfoMu.Unlock()
+	return i
+}
+
+// languageName: the English name of a Telegram language code (he -> Hebrew).
+func languageName(code string) string {
+	names := map[string]string{
+		"en": "English", "he": "Hebrew", "iw": "Hebrew", "ar": "Arabic", "ru": "Russian", "uk": "Ukrainian",
+		"hi": "Hindi", "bn": "Bangla", "ta": "Tamil", "te": "Telugu", "ml": "Malayalam", "ur": "Urdu",
+		"fa": "Persian", "tr": "Turkish", "es": "Spanish", "pt": "Portuguese", "fr": "French",
+		"de": "German", "it": "Italian", "nl": "Dutch", "pl": "Polish", "id": "Indonesian", "ms": "Malay",
+		"vi": "Vietnamese", "th": "Thai", "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
+		"uz": "Uzbek", "kk": "Kazakh", "az": "Azerbaijani", "ro": "Romanian", "cs": "Czech",
+		"el": "Greek", "hu": "Hungarian", "sv": "Swedish", "fi": "Finnish", "no": "Norwegian", "da": "Danish",
+	}
+	c := strings.ToLower(code)
+	if i := strings.IndexAny(c, "-_"); i > 0 {
+		c = c[:i]
+	}
+	if n, ok := names[c]; ok {
+		return n
+	}
+	return code
 }

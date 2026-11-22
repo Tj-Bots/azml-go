@@ -1291,7 +1291,7 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	// the same commands as the Python bot (Leech-TJ), in its order; the others still work,
 	// they are only not in the list
 	if len(bc.Mirror) > 1 {
-		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Upload to GoFile, PixelDrain and more", bc.Mirror[1]))
+		addCmd(bc.Mirror[0], fmt.Sprintf("or /%s Mirror [links/media/rclone_path]", bc.Mirror[1]))
 	}
 
 	if len(bc.Leech) > 1 {
@@ -1306,7 +1306,7 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	if len(bc.Ytdl) > 1 {
-		addCmd(bc.Ytdl[0], fmt.Sprintf("or /%s Leech yt-dlp supported links", bc.Ytdl[1]))
+		addCmd(bc.Ytdl[0], fmt.Sprintf("or /%s Leech yt-dlp supported links via bot", bc.Ytdl[1]))
 	}
 
 	if len(bc.Status) > 1 {
@@ -1318,11 +1318,11 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	if len(bc.History) > 0 {
-		addCmd(bc.History[0], "Your last finished tasks")
+		addCmd(bc.History[0], "Your last 10 finished tasks")
 	}
 
 	if len(bc.Cover) > 0 {
-		addCmd(bc.Cover[0], "Reply to a video: send it again with your thumbnail as cover")
+		addCmd(bc.Cover[0], "Reply to a video to set your thumbnail/TMDB poster as cover")
 	}
 
 	if len(bc.Cancel) > 0 {
@@ -1334,7 +1334,7 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	if len(bc.Help) > 0 {
-		addCmd(bc.Help[0], "Get detailed help about the Bot")
+		addCmd(bc.Help[0], "Get detailed help about the WZML-X Bot")
 	}
 
 	if len(bc.UserSetting) > 1 {
@@ -1342,37 +1342,38 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 	}
 
 	if len(bc.Imdb) > 0 {
-		addCmd(bc.Imdb[0], "Search Movies/Series on IMDB.com")
+		addCmd(bc.Imdb[0], "Search Movies/Series on IMDB.com and fetch details")
 	}
 
 	if len(bc.Anime) > 1 {
-		addCmd(bc.Anime[0], fmt.Sprintf("or /%s Search Animes on AniList.com", bc.Anime[1]))
+		addCmd(bc.Anime[0], "Search Animes on AniList.com and fetch details")
 	}
 
 	if len(bc.Speedtest) > 1 {
-		addCmd(bc.Speedtest[0], fmt.Sprintf("or /%s Check Server Up & Down Speed", bc.Speedtest[1]))
+		addCmd(bc.Speedtest[0], fmt.Sprintf("or /%s Check Server Up & Down Speed & Details", bc.Speedtest[1]))
 	}
 
 	if len(bc.MediaInfo) > 1 {
-		addCmd(bc.MediaInfo[0], fmt.Sprintf("or /%s Generate Mediainfo for Media or DL links", bc.MediaInfo[1]))
+		addCmd(bc.MediaInfo[0], fmt.Sprintf("or /%s Generate Mediainfo for Replied Media or DL links", bc.MediaInfo[1]))
 	}
 
 	userCount := len(cmds)
 	// Owner / Sudo only, at the end (users ~ authlist/sudolist, log); /bs and /restart last
-	if len(bc.Users) > 0 {
-		addCmd(bc.Users[0], "Users, Sudo and Blacklist lists (Owner/Sudo)")
+	if len(bc.Users) > 2 {
+		addCmd(bc.Users[1], "List the authorized users")
+		addCmd(bc.Users[2], "List the sudo users")
 	}
 
 	if len(bc.Log) > 0 {
-		addCmd(bc.Log[0], "Get Bot Log (Owner/Sudo)")
+		addCmd(bc.Log[0], "Get the Bot Log (Owner or Sudo Only)")
 	}
 
 	if len(bc.BotSetting) > 1 {
-		addCmd(bc.BotSetting[0], fmt.Sprintf("or /%s Bot Settings (Owner/Sudo)", bc.BotSetting[1]))
+		addCmd(bc.BotSetting[0], fmt.Sprintf("or /%s Bot's Personal Settings (Owner or Sudo Only)", bc.BotSetting[1]))
 	}
 
 	if len(bc.Restart) > 1 {
-		addCmd(bc.Restart[0], fmt.Sprintf("or /%s Restart the Bot (Owner/Sudo)", bc.Restart[1]))
+		addCmd(bc.Restart[0], fmt.Sprintf("or /%s Restart & Update the Bot (Owner or Sudo Only)", bc.Restart[1]))
 	}
 
 	userCmds := cmds[:userCount]

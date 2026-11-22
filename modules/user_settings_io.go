@@ -131,7 +131,7 @@ func (m *SettingsModule) buildIEMenu(u *types.UserSettings, note string) (string
 	btn.IButton("📤 Export", fmt.Sprintf("userset %d export", u.UserID))
 	btn.IButton("📥 Import", fmt.Sprintf("userset %d edit_importset", u.UserID))
 	btn.Row()
-	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d back", u.UserID), "primary")
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d universal", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 	btn.Row()
 	return text, btn

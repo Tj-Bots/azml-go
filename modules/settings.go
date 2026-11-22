@@ -353,8 +353,6 @@ func (m *SettingsModule) buildMainMenu(u *types.UserSettings, name string) (stri
 	btn.Row()
 	btn.IButton("Leech Settings", fmt.Sprintf("userset %d leech", u.UserID))
 	btn.Row()
-	btn.IButton("Import/Export Settings", fmt.Sprintf("userset %d iesettings", u.UserID))
-	btn.Row()
 	if m.settingsChanged(u) {
 		btn.IButtonStyled("Reset Setting", fmt.Sprintf("userset %d reset_all", u.UserID), "danger")
 		btn.Row()
@@ -779,7 +777,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		btn := telegram.NewButtonMaker()
 		btn.IButton("Stop Change", fmt.Sprintf("userset %d iesettings", u.UserID))
 		btn.Row()
-		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d back", u.UserID), "primary")
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d universal", u.UserID), "primary")
 		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
 		btn.Row()
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n➲ <i>Send the file <code>"+UserSettingsFileName+"</code> (from Export of any bot) within 60 seconds.</i>", btn, 2)
@@ -1792,6 +1790,7 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 	} else {
 		btn.IButton("MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID))
 	}
+	btn.IButton("Import/Export", fmt.Sprintf("userset %d iesettings", u.UserID))
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")

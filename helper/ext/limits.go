@@ -1,10 +1,8 @@
 package ext
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,31 +78,82 @@ func CheckStorageThreshold(size int64, isArchive bool) bool {
 	return (freeBytes - needed) >= thresholdBytes
 }
 
-// GetFreeDiskSpace returns free bytes available on the partition containing dirPath
+// GetFreeDiskSpace returns free bytes on the disk of dirPath (it was RAM before, so
+// STORAGE_THRESHOLD looked at the wrong number).
 func GetFreeDiskSpace(dirPath string) int64 {
-	// In Linux, we can read /proc/meminfo or execute df -B1
-	// Using /proc/meminfo or fallback estimation
-	f, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return 10 * 1024 * 1024 * 1024 // fallback 10GB
+	if dirPath == "" {
+		dirPath = "."
 	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	var memAvail int64
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Fields(line)
-		if len(parts) >= 2 && strings.HasPrefix(parts[0], "MemAvailable") {
-			val, _ := strconv.ParseInt(parts[1], 10, 64)
-			memAvail = val * 1024
-			break
-		}
+	if _, err := os.Stat(dirPath); err != nil {
+		dirPath = "."
 	}
-	if memAvail > 0 {
-		return memAvail * 2
+	if _, _, free, _ := GetDiskUsage(dirPath); free > 0 {
+		return int64(free)
 	}
 	return 10 * 1024 * 1024 * 1024
+}
+
+// LimitExempt: the owner and the sudo users have no limits (like the Python bot).
+func LimitExempt(userID int64) bool {
+	cfg := config.Get()
+	if userID != 0 && userID == cfg.OwnerID {
+		return true
+	}
+	for _, sudo := range cfg.SudoUsers {
+		if sudo == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// CheckSizeLimits: like limit_checker of the Python bot, once the size of the task is known:
+// the limit of its source (torrent / mega / ytdlp / direct), then LEECH_LIMIT (leech
+// only), extract / archive, STORAGE_THRESHOLD and DAILY_LEECH_LIMIT. "" = fine.
+func CheckSizeLimits(userID, size int64, kind string, isExtract, isCompress, isLeech bool) string {
+	if size <= 0 || LimitExempt(userID) {
+		return ""
+	}
+	cfg := config.Get()
+	gb := int64(1024 * 1024 * 1024)
+	over := func(limit int64, name string) string {
+		if limit > 0 && size > limit*gb {
+			return fmt.Sprintf("%s limit is %s.\nYour task size is %s.", name, GetReadableFileSize(limit*gb), GetReadableFileSize(size))
+		}
+		return ""
+	}
+	var e string
+	switch kind {
+	case "torrent":
+		e = over(cfg.TorrentLimit, "Torrent")
+	case "mega":
+		e = over(cfg.MegaLimit, "Mega")
+	case "ytdlp":
+		e = over(cfg.YtdlpLimit, "YT-DLP")
+	case "gdrive": // no GDRIVE_LIMIT in this bot: only the limits below
+	default:
+		e = over(cfg.DirectLimit, "Direct")
+	}
+	if e == "" && isLeech {
+		e = over(cfg.LeechLimit, "Leech")
+	}
+	if e == "" && isExtract {
+		e = over(cfg.ExtractLimit, "Extraction")
+	}
+	if e == "" && isCompress {
+		e = over(cfg.ArchiveLimit, "Archive")
+	}
+	if e == "" && cfg.StorageThreshold > 0 && !CheckStorageThreshold(size, isExtract || isCompress) {
+		e = fmt.Sprintf("You must leave %s free storage.", GetReadableFileSize(cfg.StorageThreshold*gb))
+	}
+	if e == "" && cfg.DailyLeechLimit > 0 {
+		_, used := GetUserDailyStats(userID)
+		if used+size > cfg.DailyLeechLimit*gb {
+			e = fmt.Sprintf("Daily Leech Limit is %s.\nYou have used %s today. This task would exceed your daily limit.",
+				GetReadableFileSize(cfg.DailyLeechLimit*gb), GetReadableFileSize(used))
+		}
+	}
+	return e
 }
 
 // CheckTaskLimits verifies all user limits: single task, daily tasks, daily bandwidth, storage threshold
@@ -112,10 +161,8 @@ func CheckTaskLimits(userID int64, size int64, taskType string, isExtract, isCom
 	cfg := config.Get()
 
 	// Sudo users and Bot Owner are exempt from all limits
-	for _, sudo := range cfg.SudoUsers {
-		if sudo == userID {
-			return ""
-		}
+	if LimitExempt(userID) {
+		return ""
 	}
 
 	// 1. Task-Specific Size Limits (in GB)

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"azml-go/config"
@@ -600,6 +601,47 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		modeStr = "#Leech | #Folder"
 	}
 	uTask.SetInputMode(pythonMode(modeStr, opt)) // /status Mode, like the Python bot
+
+	// like limit_checker of the Python bot: the size limits as soon as the size is known
+	// (aria2, Mega, GDrive, Telegram, yt-dlp); over a limit the download is stopped
+	var limitHit atomic.Pointer[string]
+	dlDone := make(chan struct{})
+	if !ext.LimitExempt(msg.UserID) {
+		kind := "direct"
+		switch {
+		case opt.Ytdl:
+			kind = "ytdlp"
+		case isTorrentInput(link, msg):
+			kind = "torrent"
+		case ext.IsMegaLink(link):
+			kind = "mega"
+		case downloader.IsGDriveLink(link):
+			kind = "gdrive"
+		}
+		go func() {
+			t := time.NewTicker(time.Second)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-dlDone:
+					return
+				case <-t.C:
+				}
+				size := uTask.Size()
+				if size <= 0 {
+					continue
+				}
+				if e := ext.CheckSizeLimits(msg.UserID, size, kind, opt.IsExtract, opt.IsZip, !opt.IsMirror); e != "" {
+					log.Printf("[LIMIT] %s stopped for user %d: %s", displayName, msg.UserID, strings.ReplaceAll(e, "\n", " "))
+					limitHit.Store(&e)
+					cancel()
+				}
+				return
+			}
+		}()
+	}
 
 	// 1. Download Phase
 	if link == "" && (msg.IsReply || msg.HasMedia) {
@@ -1231,6 +1273,12 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 
+	close(dlDone)
+	if e := limitHit.Load(); e != nil { // stopped by a size limit, not by the user
+		ext.ReleaseDownload(taskUID)
+		m.sendDownloadError(context.Background(), peer, msg, notifyID, "Limit Exceeded: "+*e, modeStr, taskStartTime)
+		return
+	}
 	if dlErr != nil {
 		ext.ReleaseDownload(taskUID)
 		if errors.Is(dlErr, context.Canceled) || strings.Contains(strings.ToLower(dlErr.Error()), "cancel") {

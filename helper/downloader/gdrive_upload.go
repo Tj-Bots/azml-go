@@ -20,11 +20,19 @@ import (
 
 // GDUploadOptions: what the bot settings say.
 type GDUploadOptions struct {
-	ParentID      string // GDRIVE_ID
-	IsTeamDrive   bool   // IS_TEAM_DRIVE: no public permission
-	Private       bool   // DISABLE_DRIVE_LINK: the files stay private (only the index reads them)
-	StopDuplicate bool   // STOP_DUPLICATE
-	IndexURL      string // INDEX_URL
+	ParentID      string        // GDRIVE_ID
+	IsTeamDrive   bool          // IS_TEAM_DRIVE: no public permission
+	Private       bool          // DISABLE_DRIVE_LINK: the files stay private (only the index reads them)
+	StopDuplicate bool          // STOP_DUPLICATE
+	IndexURL      string        // INDEX_URL
+	Client        *GDriveClient // a user's own token.pickle; nil = the bot's token.pickle
+}
+
+func (o GDUploadOptions) client() *GDriveClient {
+	if o.Client != nil {
+		return o.Client
+	}
+	return GetGDriveClient()
 }
 
 // GDSession: one task. With a folder name, all its files go into one new Drive folder.
@@ -52,8 +60,8 @@ type gdFile struct {
 	MimeType string `json:"mimeType"`
 }
 
-func gdDo(ctx context.Context, method, endpoint string, body interface{}, out interface{}) error {
-	token, err := GetGDriveClient().GetAccessToken()
+func gdDo(ctx context.Context, gc *GDriveClient, method, endpoint string, body interface{}, out interface{}) error {
+	token, err := gc.GetAccessToken()
 	if err != nil {
 		return fmt.Errorf("token.pickle: %v", err)
 	}
@@ -104,7 +112,7 @@ func gdErrText(b []byte) string {
 func gdQuote(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, `\`, `\\`), `'`, `\'`) }
 
 // gdFind: a file / folder of that name in the parent (STOP_DUPLICATE).
-func gdFind(ctx context.Context, parent, name string) (*gdFile, error) {
+func gdFind(ctx context.Context, gc *GDriveClient, parent, name string) (*gdFile, error) {
 	q := url.Values{}
 	q.Set("q", fmt.Sprintf("name = '%s' and '%s' in parents and trashed = false", gdQuote(name), gdQuote(parent)))
 	q.Set("fields", "files(id,name,mimeType)")
@@ -113,7 +121,7 @@ func gdFind(ctx context.Context, parent, name string) (*gdFile, error) {
 	var res struct {
 		Files []gdFile `json:"files"`
 	}
-	if err := gdDo(ctx, http.MethodGet, gdAPI+"?"+q.Encode(), nil, &res); err != nil {
+	if err := gdDo(ctx, gc, http.MethodGet, gdAPI+"?"+q.Encode(), nil, &res); err != nil {
 		return nil, err
 	}
 	if len(res.Files) == 0 {
@@ -122,15 +130,15 @@ func gdFind(ctx context.Context, parent, name string) (*gdFile, error) {
 	return &res.Files[0], nil
 }
 
-func gdCreateFolder(ctx context.Context, parent, name string) (string, error) {
+func gdCreateFolder(ctx context.Context, gc *GDriveClient, parent, name string) (string, error) {
 	var f gdFile
-	err := gdDo(ctx, http.MethodPost, gdAPI+"?supportsAllDrives=true&fields=id",
+	err := gdDo(ctx, gc, http.MethodPost, gdAPI+"?supportsAllDrives=true&fields=id",
 		map[string]interface{}{"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": []string{parent}}, &f)
 	return f.ID, err
 }
 
-func gdSetPublic(ctx context.Context, id string) {
-	_ = gdDo(ctx, http.MethodPost, gdAPI+"/"+id+"/permissions?supportsAllDrives=true",
+func gdSetPublic(ctx context.Context, gc *GDriveClient, id string) {
+	_ = gdDo(ctx, gc, http.MethodPost, gdAPI+"/"+id+"/permissions?supportsAllDrives=true",
 		map[string]string{"role": "reader", "type": "anyone"}, nil)
 }
 
@@ -166,27 +174,27 @@ func UploadToGDrive(ctx context.Context, path string, o GDUploadOptions, sess *G
 	if sess.FolderName != "" {
 		if sess.folderID == "" {
 			if o.StopDuplicate {
-				if f, err := gdFind(ctx, o.ParentID, sess.FolderName); err == nil && f != nil {
+				if f, err := gdFind(ctx, o.client(), o.ParentID, sess.FolderName); err == nil && f != nil {
 					return GDResult{}, fmt.Errorf("already in Drive: %s", sess.FolderName)
 				}
 			}
-			id, err := gdCreateFolder(ctx, o.ParentID, sess.FolderName)
+			id, err := gdCreateFolder(ctx, o.client(), o.ParentID, sess.FolderName)
 			if err != nil {
 				return GDResult{}, err
 			}
 			if !o.IsTeamDrive && !o.Private {
-				gdSetPublic(ctx, id)
+				gdSetPublic(ctx, o.client(), id)
 			}
 			sess.folderID = id
 		}
 		parent = sess.folderID
 	} else if o.StopDuplicate {
-		if f, err := gdFind(ctx, parent, name); err == nil && f != nil {
+		if f, err := gdFind(ctx, o.client(), parent, name); err == nil && f != nil {
 			return GDResult{}, fmt.Errorf("already in Drive: %s", name)
 		}
 	}
 
-	id, err := gdUploadFile(ctx, path, name, parent, onProgress)
+	id, err := gdUploadFile(ctx, o.client(), path, name, parent, onProgress)
 	if err != nil {
 		return GDResult{}, err
 	}
@@ -194,14 +202,14 @@ func UploadToGDrive(ctx context.Context, path string, o GDUploadOptions, sess *G
 		return gdLinks(o, sess.folderID, true, sess.FolderName), nil
 	}
 	if !o.IsTeamDrive && !o.Private {
-		gdSetPublic(ctx, id)
+		gdSetPublic(ctx, o.client(), id)
 	}
 	return gdLinks(o, id, false, name), nil
 }
 
 // gdUploadFile: a resumable upload, sent in parts (each part is retried; the access token is
 // renewed while a long upload runs).
-func gdUploadFile(ctx context.Context, path, name, parent string, onProgress func(sent, total int64)) (string, error) {
+func gdUploadFile(ctx context.Context, gc *GDriveClient, path, name, parent string, onProgress func(sent, total int64)) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -213,7 +221,7 @@ func gdUploadFile(ctx context.Context, path, name, parent string, onProgress fun
 	}
 	size := fi.Size()
 
-	token, err := GetGDriveClient().GetAccessToken()
+	token, err := gc.GetAccessToken()
 	if err != nil {
 		return "", fmt.Errorf("token.pickle: %v", err)
 	}

@@ -525,6 +525,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	var mirrorLinks []string
 	var gdIndexLinks []string // TJ GDrive: the INDEX_URL links next to mirrorLinks
 	gdSess := &downloader.GDSession{}
+	gdUserToken := false // uploaded with the user's own token.pickle: his links stay private
 	rcSess := &downloader.RcloneSession{}
 	var rcPaths []string   // TJ RClone: where each file is (when the remote gives no link)
 	var fileLinks []string // link to each uploaded file in the dump / log channel
@@ -1679,6 +1680,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			}
 			// -up mrcc:remote:path = the user's own rclone.conf (like the Python bot), else the bot's
 			dest, conf := opt.RcloneDest, "rclone.conf"
+			if user != nil && user.UserTokens && len(user.RcloneConf) > 0 && !strings.HasPrefix(dest, "mrcc:") {
+				// USER mode (like WZML-X): his rclone.conf, with his RClone Path
+				if p := strings.TrimPrefix(user.RclonePath, "mrcc:"); p != "" {
+					dest = p
+				}
+				dest = "mrcc:" + dest
+			}
 			if strings.HasPrefix(dest, "mrcc:") {
 				dest = strings.TrimPrefix(dest, "mrcc:")
 				conf = ""
@@ -1728,11 +1736,17 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					}
 				}
 			}
+			// like WZML-X: mtp:<id> or USER mode = his own token.pickle (and his Drive folder),
+			// otherwise the bot's token.pickle; his GDrive ID / Index URL win over the bot's
+			gdOpt, gdErr := gdriveTarget(cfg, user, opt.RcloneDest)
+			if gdErr != nil {
+				m.sendDownloadError(ctx, peer, msg, notifyID, fmt.Sprintf("%s Upload Failed: %v", ext.GDriveHostName, gdErr), modeStr, taskStartTime)
+				return
+			}
+			gdUserToken = gdOpt.Client != nil
 			uTask.SetStatus(types.StatusUploading, ext.GDriveHostName)
 			gdStart := time.Now()
-			res, gErr := downloader.UploadToGDrive(ctx, curFile, downloader.GDUploadOptions{
-				ParentID: cfg.GDriveID, IsTeamDrive: cfg.IsTeamDrive, Private: cfg.DisableDriveLink, StopDuplicate: user.StopDupOn(cfg.StopDuplicate), IndexURL: cfg.IndexURL,
-			}, gdSess, func(sent, total int64) {
+			res, gErr := downloader.UploadToGDrive(ctx, curFile, gdOpt, gdSess, func(sent, total int64) {
 				secs := time.Since(gdStart).Seconds()
 				if secs < 0.5 {
 					return
@@ -1753,7 +1767,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				return
 			}
 			primary := res.DriveLink
-			if cfg.DisableDriveLink && res.IndexLink != "" {
+			if cfg.DisableDriveLink && !gdUserToken && res.IndexLink != "" {
 				primary = res.IndexLink
 			}
 			mirrorLinks = append(mirrorLinks, primary)
@@ -2058,7 +2072,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 				if i < len(gdIndexLinks) {
 					idx = gdIndexLinks[i]
 				}
-				if !cfg.DisableDriveLink && link != "" && link != idx && !seen[link] {
+				if (!cfg.DisableDriveLink || gdUserToken) && link != "" && link != idx && !seen[link] {
 					seen[link] = true
 					btn.UButtonStyled("☁️ Drive Link", link, "primary")
 					btn.Row()
@@ -2160,7 +2174,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, groupText, msg.MessageID, finishBtn, 1)
 
 	// MIRROR_LOG_ID: the mirror finish message with its buttons (like the Python bot)
-	if opt.IsMirror && cfg.MirrorLogID != 0 && !isExcepChat(msg.ChatID) {
+	if opt.IsMirror && cfg.MirrorLogID != 0 && !isExcepChat(msg.ChatID) && !gdUserToken {
 		if lp := m.logPeerFor(ctx, cfg.MirrorLogID); lp != nil {
 			logBtn := telegram.NewButtonMaker()
 			addMirrorLinks(logBtn)
@@ -3307,4 +3321,68 @@ func mirrorRename(path string, u *types.UserSettings) string {
 		return path
 	}
 	return np
+}
+
+// userGDClients: the users' own token.pickle clients (the access token is kept between tasks).
+var (
+	userGDMu      sync.Mutex
+	userGDClients = map[int64]struct {
+		data   string
+		client *downloader.GDriveClient
+	}{}
+)
+
+// gdriveTarget: token, folder and index of a tjgd upload (like WZML-X):
+// mtp:<id> = his token.pickle to that folder; tp:<id> = the bot's token to that folder;
+// USER mode (/us) = his token.pickle to his GDrive ID; else the bot's token to his GDrive ID
+// or GDRIVE_ID. The index: his Index URL with his folder, INDEX_URL with the bot's.
+func gdriveTarget(cfg *config.Config, u *types.UserSettings, dest string) (downloader.GDUploadOptions, error) {
+	o := downloader.GDUploadOptions{IsTeamDrive: cfg.IsTeamDrive, StopDuplicate: u.StopDupOn(cfg.StopDuplicate)}
+	useUser, folder := false, ""
+	switch low := strings.ToLower(dest); {
+	case strings.HasPrefix(low, "mtp:"):
+		useUser, folder = true, dest[4:]
+	case strings.HasPrefix(low, "tp:"):
+		folder = dest[3:]
+	default:
+		useUser = u != nil && u.UserTokens
+	}
+	if useUser {
+		if u == nil || len(u.TokenPickle) == 0 {
+			return o, fmt.Errorf("your token.pickle is not set: /us → Mirror Settings → GDrive Tools")
+		}
+		userGDMu.Lock()
+		c, ok := userGDClients[u.UserID]
+		if !ok || c.data != string(u.TokenPickle) {
+			cl, err := downloader.NewGDriveClientFromBytes(u.TokenPickle)
+			if err != nil {
+				userGDMu.Unlock()
+				return o, fmt.Errorf("your token.pickle: %v", err)
+			}
+			c.data, c.client = string(u.TokenPickle), cl
+			userGDClients[u.UserID] = c
+		}
+		userGDMu.Unlock()
+		o.Client = c.client
+		o.IsTeamDrive = false
+	} else {
+		o.Private = cfg.DisableDriveLink // the bot's account: no public files when its link is hidden
+	}
+	switch {
+	case folder != "":
+		o.ParentID = folder
+		if u != nil && folder == u.GDriveID {
+			o.IndexURL = u.IndexURL
+		} else if folder == cfg.GDriveID {
+			o.IndexURL = cfg.IndexURL
+		}
+	case u != nil && u.GDriveID != "":
+		o.ParentID, o.IndexURL = u.GDriveID, u.IndexURL
+	case !useUser:
+		o.ParentID, o.IndexURL = cfg.GDriveID, cfg.IndexURL
+	}
+	if o.ParentID == "" {
+		return o, fmt.Errorf("no GDrive ID: set yours in /us → Mirror Settings → GDrive Tools")
+	}
+	return o, nil
 }

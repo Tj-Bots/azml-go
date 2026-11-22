@@ -667,7 +667,7 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	}
 
 	// Check if user is in an active pending setting prompt session (e.g. from /us)
-	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !((sess.Key == "ycookies" || sess.Key == "importset" || sess.Key == "rcc") && m.Media != nil) {
+	if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && !((sess.Key == "ycookies" || sess.Key == "importset" || sess.Key == "rcc" || sess.Key == "utp") && m.Media != nil) {
 		inMsgID := m.ID
 		if telegram.IsCancelCommand(text, b.botUsername) {
 			ext.ClearPendingSettingSession(senderID)
@@ -1606,6 +1606,31 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				}
 			}
 			lowerName := strings.ToLower(fileName)
+
+			// 0b. /us → Mirror Settings → GDrive Tools: his own token.pickle
+			if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && sess.Key == "utp" {
+				ext.ClearPendingSettingSession(senderID)
+				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // it has his Google account
+				u := b.userMap.GetOrCreate(senderID)
+				var buf bytes.Buffer
+				if doc.Size > 1<<20 {
+					ext.SetSettingNote(senderID, "× <i>The file is too big.</i>")
+				} else if _, err := tdDownloader.NewDownloader().Download(b.rawAPI, doc.AsInputDocumentFileLocation("")).Stream(ctx, &buf); err != nil {
+					ext.SetSettingNote(senderID, "× <i>Download failed: "+telegram.EscapeHTML(err.Error())+"</i>")
+				} else if c, err := downloader.NewGDriveClientFromBytes(buf.Bytes()); err != nil {
+					ext.SetSettingNote(senderID, "× <i>This is not a token.pickle: "+telegram.EscapeHTML(err.Error())+"</i>")
+				} else if _, err := c.GetAccessToken(); err != nil {
+					ext.SetSettingNote(senderID, "× <i>"+telegram.EscapeHTML(err.Error())+"</i>")
+				} else {
+					u.TokenPickle = buf.Bytes()
+					_ = ext.DB.SaveUser(u)
+					ext.SetSettingNote(senderID, "✓ <i>token.pickle saved and working.</i>")
+				}
+				if sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
+					b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, u, "utp")
+				}
+				return true
+			}
 
 			// 0a. /us → Mirror Settings → RClone: his own rclone.conf
 			if sess, ok := ext.GetPendingSettingSession(senderID, chatID); ok && sess != nil && sess.Key == "rcc" {

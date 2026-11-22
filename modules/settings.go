@@ -390,7 +390,7 @@ func (m *SettingsModule) settingsChanged(u *types.UserSettings) bool {
 		u.Screenshots != 0 || u.SampleSec != 0 || u.MediaInfoSet || u.MediaStoreSet ||
 		len(u.Metadata) > 0 || u.DumpChatID != 0 || len(u.FFmpegCommands) > 0 || u.YtOpt != "" ||
 		u.MPrefix != "" || u.MSuffix != "" || u.MRemname != "" || u.RclonePath != "" || u.RcloneFlags != "" ||
-		u.StopDup != "" || u.DefaultUpload != ""
+		u.StopDup != "" || u.DefaultUpload != "" || u.GDriveID != "" || u.IndexURL != "" || u.UserTokens
 }
 
 func (m *SettingsModule) buildLeechMenu(u *types.UserSettings, userName string) (string, *telegram.ButtonMaker) {
@@ -842,7 +842,34 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildMirrorHostMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
-	case "notyet": // User TDs / Upload Paths of the Python bot: not in this bot yet
+	case "usertokens":
+		u.UserTokens = !u.UserTokens
+		_ = ext.DB.SaveUser(u)
+		_ = m.sender.AnswerCallback(ctx, queryID, map[bool]string{true: "USER mode: your token.pickle / rclone.conf", false: "OWNER mode: the bot's token.pickle / rclone.conf"}[u.UserTokens], false)
+		text, btn := m.buildMirrorHostMenu(u)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "gdtools":
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		text, btn := m.buildGDToolsMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "edit_utp":
+		ext.SetPendingSettingSession(targetUID, "utp", 0, msgID, 60*time.Second)
+		text, _ := m.buildGDToolsMenu(u, "")
+		btn := telegram.NewButtonMaker()
+		btn.IButton("Stop Change", fmt.Sprintf("userset %d gdtools", u.UserID))
+		btn.Row()
+		btn.IButtonStyled("◀️", fmt.Sprintf("userset %d gdtools", u.UserID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n➲ <i>Send your <code>token.pickle</code> within 60 seconds.</i>", btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+	case "del_utp":
+		u.TokenPickle = nil
+		_ = ext.DB.SaveUser(u)
+		text, btn := m.buildGDToolsMenu(u, "")
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Deleted", false)
+	case "notyet": // Upload Paths of the Python bot: not in this bot yet
 		_ = m.sender.AnswerCallback(ctx, queryID, "Not available in this bot yet.", true)
 	case "stop_duplicate": // his Stop Duplicate: on / off
 		if u.StopDupOn(config.Get().StopDuplicate) {
@@ -925,6 +952,7 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		u.FFmpegCommands = nil
 		u.YtOpt = ""
 		u.MPrefix, u.MSuffix, u.MRemname, u.RclonePath, u.RcloneFlags, u.StopDup, u.DefaultUpload = "", "", "", "", "", "", ""
+		u.GDriveID, u.IndexURL, u.UserTokens = "", "", false
 		if u.CustomThumb != "" {
 			_ = os.Remove(u.CustomThumb)
 			u.CustomThumb = ""
@@ -1463,6 +1491,8 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 		text, btn = m.buildYtdlSettingMenu(u, key, "")
 	case "rcc":
 		text, btn = m.buildRcloneMenu(u, ext.TakeSettingNote(u.UserID))
+	case "utp":
+		text, btn = m.buildGDToolsMenu(u, ext.TakeSettingNote(u.UserID))
 	case "importset", "iesettings":
 		text, btn = m.buildIEMenu(u, ext.TakeSettingNote(u.UserID))
 	case "lexcluded":
@@ -2141,6 +2171,8 @@ var mirrorTexts = map[string]struct{ title, desc, ask string }{
 	"msuffix":  {"Mirror Suffix", "Added at the end of the name of your mirrored files (before the extension).", "Send the Mirror Suffix."},
 	"mremname": {"Mirror Remname", "Words to change in the name of your mirrored files: <code>old:new|word</code> (a word alone is removed).", "Send the Mirror Remname, e.g. <code>[Old]:[TJ]|www.site.com</code>"},
 	"rcpath":   {"RClone Path", "Your path for -up rc (e.g. <code>mrcc:mydrive:Movies</code> with your rclone.conf). Without it RCLONE_PATH of the bot is used.", "Send your RClone Path."},
+	"gdid":     {"GDrive ID", "Your Drive folder ID (or Team Drive ID) for -up gd. With your token.pickle (USER mode) it is required; with the bot's token the folder must be shared with the bot's account.", "Send your GDrive folder ID."},
+	"gdindex":  {"Index URL", "Your index of that folder: the finish message gets its Index Link.", "Send your Index URL."},
 	"rcflags":  {"RClone Flags", "Extra rclone flags for your uploads, e.g. <code>--transfers 4</code>.", "Send your RClone Flags."},
 }
 
@@ -2171,6 +2203,13 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		stop = "Enabled"
 	}
 	ddlCount := 1 // his DDL server (or the first one) is used
+	tokMode, tok := "OWNER", "Not Exists"
+	if u.UserTokens {
+		tokMode = "USER"
+	}
+	if len(u.TokenPickle) > 0 {
+		tok = "Exists"
+	}
 	_ = ddl
 	text := fmt.Sprintf("㊂ <b><u>Mirror/Clone Settings : %s</u></b>\n\n"+
 		"<blockquote><b>╭</b> <b>Upload To :</b> <i>%s</i>\n"+
@@ -2182,12 +2221,13 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 		"┠ <b>Mirror Suffix :</b> <code>%s</code>\n"+
 		"┠ <b>Mirror Remname :</b> <code>%s</code>\n"+
 		"┠ <b>DDL Server(s) :</b> <i>%d</i>\n"+
-		"┠ <b>User TD Mode :</b> <i>Force Disabled</i>\n"+
-		"┠ <b>Total User TD(s) :</b> <i>0</i>\n"+
+		"┠ <b>Token Mode :</b> <i>%s</i>\n"+
+		"┠ <b>GDrive token.pickle :</b> <i>%s</i>\n"+
+		"┠ <b>GDrive ID :</b> <code>%s</code>\n"+
 		"┠ <b>Stop Duplicate :</b> <i>%s</i>\n"+
 		"<b>╰</b> <b>Daily Mirror :</b> <code>∞ / ∞</code> per day</blockquote>",
 		telegram.EscapeHTML(name), up, rcc, val(u.RclonePath), val(u.RcloneFlags),
-		val(u.MPrefix), val(u.MSuffix), val(u.MRemname), ddlCount, stop)
+		val(u.MPrefix), val(u.MSuffix), val(u.MRemname), ddlCount, tokMode, tok, val(u.GDriveID), stop)
 
 	btn := telegram.NewButtonMaker()
 	toggle := func(label string, on bool, data string) {
@@ -2211,13 +2251,17 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 	toggle("Mirror Remname", u.MRemname != "", fmt.Sprintf("userset %d mt_mremname", u.UserID))
 	btn.Row()
 	toggle("DDL Servers", u.MirrorHost != "" || len(u.DDLKeys) > 0, fmt.Sprintf("userset %d ddlservers", u.UserID))
-	btn.IButton("User TDs", fmt.Sprintf("userset %d notyet", u.UserID))
+	toggle("GDrive Tools", len(u.TokenPickle) > 0 || u.GDriveID != "", fmt.Sprintf("userset %d gdtools", u.UserID))
 	btn.Row()
 	toggle("Rclone Path", u.RclonePath != "", fmt.Sprintf("userset %d mt_rcpath", u.UserID))
 	toggle("Rclone Flags", u.RcloneFlags != "", fmt.Sprintf("userset %d mt_rcflags", u.UserID))
 	btn.Row()
 	btn.IButton("Upload Paths", fmt.Sprintf("userset %d notyet", u.UserID))
 	toggle("Stop Duplicate", u.StopDupOn(cfg.StopDuplicate), fmt.Sprintf("userset %d stop_duplicate", u.UserID))
+	btn.Row()
+	// like WZML-X: whose token.pickle / rclone.conf the uploads use
+	swap := map[bool]string{true: "Swap to OWNER token/config", false: "Swap to USER token/config"}[u.UserTokens]
+	btn.IButton(swap, fmt.Sprintf("userset %d usertokens", u.UserID))
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
@@ -2242,6 +2286,65 @@ func (m *SettingsModule) buildMirrorTextMenu(u *types.UserSettings, key, note st
 	if v != "" {
 		btn.IButton("↻ Delete", fmt.Sprintf("userset %d mtd_%s", u.UserID, key))
 	}
+	btn.Row()
+	back := "mirror"
+	if key == "gdid" || key == "gdindex" {
+		back = "gdtools"
+	}
+	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d %s", u.UserID, back), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
+	btn.Row()
+	return text, btn
+}
+
+// buildGDToolsMenu: /us → Mirror Settings → GDrive Tools (like WZML-X): his token.pickle,
+// GDrive ID and Index URL.
+func (m *SettingsModule) buildGDToolsMenu(u *types.UserSettings, note string) (string, *telegram.ButtonMaker) {
+	cfg := config.Get()
+	tok := "Not Exists"
+	if len(u.TokenPickle) > 0 {
+		tok = "Exists"
+	}
+	gd, idx := u.GDriveID, u.IndexURL
+	gdNote, idxNote := "", ""
+	if gd == "" {
+		gd, gdNote = cfg.GDriveID, " <i>(Default)</i>"
+		if idx == "" {
+			idx, idxNote = cfg.IndexURL, " <i>(Default)</i>"
+		}
+	}
+	if gd == "" {
+		gd = "None"
+	}
+	if idx == "" {
+		idx = "None"
+	}
+	mode := map[bool]string{true: "USER", false: "OWNER"}[u.UserTokens]
+	text := "⌬ <b><u>GDrive Tools Settings :</u></b>\n\n" +
+		"<blockquote><b>╭</b> <b>Gdrive ID :</b> <code>" + telegram.EscapeHTML(gd) + "</code>" + gdNote + "\n" +
+		"┠ <b>Index URL :</b> <code>" + telegram.EscapeHTML(idx) + "</code>" + idxNote + "\n" +
+		"┠ <b>GDrive token.pickle :</b> <i>" + tok + "</i>\n" +
+		"<b>╰</b> <b>Token Mode :</b> <i>" + mode + "</i></blockquote>\n\n" +
+		"<i>USER mode (Mirror Settings) uploads with your token.pickle to your GDrive ID. Or once: <code>" +
+		telegram.Cmd("mirror") + " link -up mtp:folder_id</code></i>"
+	if note != "" {
+		text += "\n\n" + note
+	}
+	btn := telegram.NewButtonMaker()
+	toggle := func(label string, on bool, data string) {
+		if on {
+			btn.IButtonStyled("✓ "+label, data, "success")
+		} else {
+			btn.IButton(label, data)
+		}
+	}
+	toggle("token.pickle", len(u.TokenPickle) > 0, fmt.Sprintf("userset %d edit_utp", u.UserID))
+	if len(u.TokenPickle) > 0 {
+		btn.IButton("↻ Delete token", fmt.Sprintf("userset %d del_utp", u.UserID))
+	}
+	btn.Row()
+	toggle("GDrive ID", u.GDriveID != "", fmt.Sprintf("userset %d mt_gdid", u.UserID))
+	toggle("Index URL", u.IndexURL != "", fmt.Sprintf("userset %d mt_gdindex", u.UserID))
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d mirror", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")

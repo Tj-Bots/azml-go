@@ -68,6 +68,22 @@ func (g *GDriveClient) LoadCredentials(tokenPath string) error {
 			return err
 		}
 	}
+	return g.parseCredentials(data, tokenPath)
+}
+
+// NewGDriveClientFromBytes: a client of a user's own token.pickle (/us → GDrive Tools).
+func NewGDriveClientFromBytes(data []byte) (*GDriveClient, error) {
+	g := &GDriveClient{}
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if err := g.parseCredentials(data, "the user's token.pickle"); err != nil {
+		return nil, err
+	}
+	return g, nil
+}
+
+// parseCredentials: JSON, a Python pickle or a printed credentials dict (called with g.lock held).
+func (g *GDriveClient) parseCredentials(data []byte, tokenPath string) error {
 
 	// 1. Try JSON
 	trimmed := bytes.TrimSpace(data)

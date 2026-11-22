@@ -39,6 +39,10 @@ func splitMirrorHost(text string) (string, string) {
 			case "rc", "rcl", "rclone", "tjrc": // -up rc = RCLONE_PATH
 				return strings.Join(rest, " "), ext.RcloneHostID
 			default:
+				low := strings.ToLower(v)
+				if strings.HasPrefix(low, "mtp:") || strings.HasPrefix(low, "tp:") { // -up mtp:<folder id> (his token) / tp:<id>
+					return strings.Join(rest, " "), ext.GDriveHostID + "=" + v
+				}
 				if strings.Contains(v, ":") && !strings.Contains(v, "://") { // -up remote:path
 					return strings.Join(rest, " "), ext.RcloneHostID + "=" + v
 				}
@@ -72,14 +76,15 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 				up = u.DefaultUpload
 			}
 		}
-		userPath := ""
+		userPath, userGD := "", false
 		if b.userMap != nil {
 			if u := b.userMap.Get(msgCtx.UserID); u != nil {
 				userPath = u.RclonePath
+				userGD = u.GDriveID != "" || (u.UserTokens && len(u.TokenPickle) > 0)
 			}
 		}
 		switch {
-		case up == "gd" && cfg.GDriveID != "":
+		case up == "gd" && (cfg.GDriveID != "" || userGD):
 			host = ext.GDriveHostID
 		case up == "rc" && (cfg.RclonePath != "" || userPath != ""):
 			host = ext.RcloneHostID
@@ -87,6 +92,9 @@ func (b *BotApp) handleMirrorCommand(ctx context.Context, peer tg.InputPeerClass
 	}
 	if host == "ddl" {
 		host = ""
+	}
+	if strings.HasPrefix(host, ext.GDriveHostID+"=") { // the folder of -up mtp:<id> / tp:<id>
+		host, msgCtx.RcloneDest = ext.GDriveHostID, host[len(ext.GDriveHostID)+1:]
 	}
 	if strings.HasPrefix(host, ext.RcloneHostID) {
 		dest := config.Get().RclonePath // -up rc: his RClone Path (/us), else RCLONE_PATH

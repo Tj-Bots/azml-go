@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,6 +55,10 @@ type UserSettings struct {
 	RclonePath     string            `json:"rclone_path,omitempty" bson:"rclone_path,omitempty"`       // his RClone Path (-up rc)
 	RcloneFlags    string            `json:"rclone_flags,omitempty" bson:"rclone_flags,omitempty"`     // his RClone Flags
 	StopDup        string            `json:"stop_dup,omitempty" bson:"stop_dup,omitempty"`             // on / off (else STOP_DUPLICATE)
+	TokenPickle    []byte            `json:"token_pickle,omitempty" bson:"token_pickle,omitempty"`     // his own token.pickle (GDrive Tools)
+	GDriveID       string            `json:"gdrive_id,omitempty" bson:"gdrive_id,omitempty"`           // his Drive folder
+	IndexURL       string            `json:"index_url,omitempty" bson:"index_url,omitempty"`           // his index of it
+	UserTokens     bool              `json:"user_tokens,omitempty" bson:"user_tokens,omitempty"`       // USER mode: his token / config, else the OWNER's
 	ExcludedExts   string            `json:"excluded_exts" bson:"excluded_exts"`
 	CapFont        string            `json:"cap_font" bson:"cap_font"`
 	MediaInfo      bool              `json:"mediainfo" bson:"mediainfo"`                       // MediaInfo button under leeched files
@@ -276,6 +281,10 @@ func (u *UserSettings) MirrorText(key string) string {
 		return u.RclonePath
 	case "rcflags":
 		return u.RcloneFlags
+	case "gdid":
+		return u.GDriveID
+	case "gdindex":
+		return u.IndexURL
 	}
 	return ""
 }
@@ -293,6 +302,10 @@ func (u *UserSettings) SetMirrorText(key, val string) {
 		u.RclonePath = val
 	case "rcflags":
 		u.RcloneFlags = val
+	case "gdid":
+		u.GDriveID = val
+	case "gdindex":
+		u.IndexURL = strings.TrimRight(val, "/")
 	}
 }
 

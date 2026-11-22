@@ -7,7 +7,7 @@ var varDescriptions = map[string]string{
 	"INDEX_URL":                    "Your index of that Drive (e.g. https://index.example.workers.dev/0:); the finish message gets the Index Link. Str",
 	"IS_TEAM_DRIVE":                "GDRIVE_ID is a Team Drive (Shared Drive): the files are not made public. Default is False. Bool",
 	"STOP_DUPLICATE":               "Don't upload to Drive a file or folder that is already there with the same name. Default is False. Bool",
-	"DISABLE_DRIVE_LINK":           "Hide the Drive link: only the Index Link is shown, so the Google account is not exposed. Default is False. Bool",
+	"DISABLE_DRIVE_LINK":           "Hide the Drive link: only the Index Link is shown and the uploaded files stay private (not shared), so the Google account is not exposed. Default is False. Bool",
 	"MIRROR_LOG_ID":                "Chat ID where the finish message of /mirror tasks is also sent, with its buttons. Int. Add -100 before the id.",
 	"LINKS_LOG_ID":                 "Chat ID where every task's link/source is logged when it starts (Task Started + Source). Int. Add -100 before the id.",
 	"GDRIVE_WORKER":                "Worker that downloads PUBLIC Google Drive files and folders when there is no token.pickle (or the token can't open the link). Empty = off.",

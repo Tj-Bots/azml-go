@@ -22,6 +22,7 @@ import (
 type GDUploadOptions struct {
 	ParentID      string // GDRIVE_ID
 	IsTeamDrive   bool   // IS_TEAM_DRIVE: no public permission
+	Private       bool   // DISABLE_DRIVE_LINK: the files stay private (only the index reads them)
 	StopDuplicate bool   // STOP_DUPLICATE
 	IndexURL      string // INDEX_URL
 }
@@ -173,7 +174,7 @@ func UploadToGDrive(ctx context.Context, path string, o GDUploadOptions, sess *G
 			if err != nil {
 				return GDResult{}, err
 			}
-			if !o.IsTeamDrive {
+			if !o.IsTeamDrive && !o.Private {
 				gdSetPublic(ctx, id)
 			}
 			sess.folderID = id
@@ -192,7 +193,7 @@ func UploadToGDrive(ctx context.Context, path string, o GDUploadOptions, sess *G
 	if sess.FolderName != "" {
 		return gdLinks(o, sess.folderID, true, sess.FolderName), nil
 	}
-	if !o.IsTeamDrive {
+	if !o.IsTeamDrive && !o.Private {
 		gdSetPublic(ctx, id)
 	}
 	return gdLinks(o, id, false, name), nil

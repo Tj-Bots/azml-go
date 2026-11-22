@@ -1665,7 +1665,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			uTask.SetStatus(types.StatusUploading, ext.GDriveHostName)
 			gdStart := time.Now()
 			res, gErr := downloader.UploadToGDrive(ctx, curFile, downloader.GDUploadOptions{
-				ParentID: cfg.GDriveID, IsTeamDrive: cfg.IsTeamDrive, StopDuplicate: cfg.StopDuplicate, IndexURL: cfg.IndexURL,
+				ParentID: cfg.GDriveID, IsTeamDrive: cfg.IsTeamDrive, Private: cfg.DisableDriveLink, StopDuplicate: cfg.StopDuplicate, IndexURL: cfg.IndexURL,
 			}, gdSess, func(sent, total int64) {
 				secs := time.Since(gdStart).Seconds()
 				if secs < 0.5 {

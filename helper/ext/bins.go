@@ -7,12 +7,14 @@ import (
 )
 
 // TJ names of the tools: the Dockerfile installs yt-dlp as tjdl, ffmpeg as tjff,
-// ffprobe as tjprobe and aria2c as tjurl, so the processes and the logs show them.
+// ffprobe as tjprobe, 7z as tjzip, mediainfo as tjinfo and aria2c as tjurl, so the processes and the logs show them.
 // Without them (local run, old image) the usual names are used.
 const (
 	YtdlBinName    = "tjdl"
 	FFmpegBinName  = "tjff"
 	FFprobeBinName = "tjprobe"
+	ZipBinName     = "tjzip"
+	InfoBinName    = "tjinfo"
 	// YtdlFFmpegDir holds tiny ffmpeg / ffprobe scripts that exec tjff / tjprobe:
 	// yt-dlp looks for ffprobe next to ffmpeg by name, so it gets this folder
 	// (--ffmpeg-location) and the running processes are still tjff / tjprobe.
@@ -41,6 +43,12 @@ func FFmpegBin() string { return pickBin(FFmpegBinName, "ffmpeg") }
 
 // FFprobeBin is tjprobe (ffprobe).
 func FFprobeBin() string { return pickBin(FFprobeBinName, "ffprobe") }
+
+// ZipBin is tjzip (7z).
+func ZipBin() string { return pickBin(ZipBinName, "7z") }
+
+// InfoBin is tjinfo (mediainfo).
+func InfoBin() string { return pickBin(InfoBinName, "mediainfo") }
 
 // YtdlFFmpegArgs: --ffmpeg-location for yt-dlp when the TJ folder is there.
 func YtdlFFmpegArgs() []string {

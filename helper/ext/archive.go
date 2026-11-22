@@ -194,7 +194,7 @@ func InspectArchiveSafety(archivePath, password string) (uncompressedSize int64,
 		args = append(args, "-p-")
 	}
 	args = append(args, archivePath)
-	cmd := exec.Command("7z", args...)
+	cmd := exec.Command(ZipBin(), args...)
 	output, lErr := cmd.Output()
 	if lErr != nil {
 		// If listing fails (e.g. encrypted headers or unknown format), proceed with caution
@@ -306,17 +306,17 @@ func ForceExtractArchive(archivePath, targetDir, password string) (string, error
 		args = append(args, "-p-") // Do not prompt for password
 	}
 
-	log.Printf("[ARCHIVE] Falling back to 7z extraction for %s (uncompressed: %s, %d files) -> %s...",
+	log.Printf("[ARCHIVE] Falling back to tjzip extraction for %s (uncompressed: %s, %d files) -> %s...",
 		archivePath, GetReadableFileSize(uncompressedSize), count, targetDir)
-	cmd := exec.Command("7z", args...)
+	cmd := exec.Command(ZipBin(), args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("[ARCHIVE] 7z error: %v, output: %s", err, string(output))
+		log.Printf("[ARCHIVE] tjzip error: %v, output: %s", err, string(output))
 		return "", fmt.Errorf("extraction failed: %v (%s)", err, strings.TrimSpace(string(output)))
 	}
 
 	cleanHatchZipMeta(archivePath)
-	log.Printf("[ARCHIVE] 7z extraction successful for %s", archivePath)
+	log.Printf("[ARCHIVE] tjzip extraction successful for %s", archivePath)
 	return targetDir, nil
 }
 
@@ -330,10 +330,10 @@ func CompressToZip(sourcePath, targetZipPath, password string) error {
 	}
 
 	log.Printf("[ARCHIVE] Compressing %s -> %s...", sourcePath, targetZipPath)
-	cmd := exec.Command("7z", args...)
+	cmd := exec.Command(ZipBin(), args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("[ARCHIVE] 7z zip error: %v, output: %s", err, string(output))
+		log.Printf("[ARCHIVE] tjzip zip error: %v, output: %s", err, string(output))
 		return fmt.Errorf("compression failed: %v (%s)", err, strings.TrimSpace(string(output)))
 	}
 	return nil

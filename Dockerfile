@@ -37,7 +37,8 @@ ENV CGO_ENABLED=0
 ENV GOFLAGS="-p=1"
 
 # TJ names: aria2c of the base image (named studymaterial / dlurl there) runs as tjurl,
-# ffmpeg as tjff and ffprobe as tjprobe
+# ffmpeg as tjff, ffprobe as tjprobe, mediainfo as tjinfo and 7z as tjzip
+# (7z next to its 7z.so, which it loads from its own folder)
 RUN B="$(command -v tjurl || command -v dlurl || command -v studymaterial || command -v aria2c)" && \
     if [ "$B" != "/usr/local/bin/tjurl" ]; then mv "$B" /usr/local/bin/tjurl; fi && \
     chmod a+rx /usr/local/bin/tjurl && \
@@ -51,7 +52,15 @@ RUN B="$(command -v tjurl || command -v dlurl || command -v studymaterial || com
     mkdir -p /usr/local/lib/tjdl && \
     printf '#!/bin/sh\nexec /usr/local/bin/tjff "$@"\n' > /usr/local/lib/tjdl/ffmpeg && \
     printf '#!/bin/sh\nexec /usr/local/bin/tjprobe "$@"\n' > /usr/local/lib/tjdl/ffprobe && \
-    chmod a+rx /usr/local/lib/tjdl/ffmpeg /usr/local/lib/tjdl/ffprobe
+    chmod a+rx /usr/local/lib/tjdl/ffmpeg /usr/local/lib/tjdl/ffprobe && \
+    I="$(command -v tjinfo || command -v mediainfo)" && \
+    if [ "$I" != "/usr/local/bin/tjinfo" ]; then mv "$I" /usr/local/bin/tjinfo; fi && \
+    tjinfo --Version >/dev/null && \
+    if [ -x /usr/lib/p7zip/7z ]; then mv /usr/lib/p7zip/7z /usr/lib/p7zip/tjzip; fi && \
+    rm -f /usr/bin/7z /usr/bin/7za /usr/bin/7zr /usr/lib/p7zip/7za /usr/lib/p7zip/7zr && \
+    printf '#!/bin/sh\nexec /usr/lib/p7zip/tjzip "$@"\n' > /usr/local/bin/tjzip && \
+    chmod a+rx /usr/local/bin/tjzip && \
+    tjzip i >/dev/null
 
 RUN mkdir -p /usr/src/app/downloads /usr/src/app/Thumbnails
 

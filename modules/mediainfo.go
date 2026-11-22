@@ -211,8 +211,8 @@ func (m *MediaInfoModule) sendMediaInfo(ctx context.Context, peer tg.InputPeerCl
 }
 
 func runMediaInfo(filePath string) string {
-	if _, err := exec.LookPath("mediainfo"); err == nil {
-		cmd := exec.Command("mediainfo", filePath)
+	if _, err := exec.LookPath(ext.InfoBin()); err == nil {
+		cmd := exec.Command(ext.InfoBin(), filePath)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		if err := cmd.Run(); err == nil && out.Len() > 0 {

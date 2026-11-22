@@ -842,6 +842,8 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		text, btn := m.buildMirrorHostMenu(u)
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
+	case "notyet": // User TDs / Upload Paths of the Python bot: not in this bot yet
+		_ = m.sender.AnswerCallback(ctx, queryID, "Not available in this bot yet.", true)
 	case "stop_duplicate": // his Stop Duplicate: on / off
 		if u.StopDupOn(config.Get().StopDuplicate) {
 			u.StopDup = "off"
@@ -2168,18 +2170,24 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 	if u.StopDupOn(cfg.StopDuplicate) {
 		stop = "Enabled"
 	}
+	ddlCount := 1 // his DDL server (or the first one) is used
+	_ = ddl
 	text := fmt.Sprintf("㊂ <b><u>Mirror/Clone Settings : %s</u></b>\n\n"+
 		"<blockquote><b>╭</b> <b>RClone Config :</b> <i>%s</i>\n"+
 		"┠ <b>RClone Path :</b> <code>%s</code>\n"+
 		"┠ <b>RClone Flags :</b> <code>%s</code>\n"+
+		"┠ <b>Upload Paths :</b> <i>0</i>\n"+
 		"┠ <b>Upload To :</b> <i>%s</i>\n"+
 		"┠ <b>Mirror Prefix :</b> <code>%s</code>\n"+
 		"┠ <b>Mirror Suffix :</b> <code>%s</code>\n"+
 		"┠ <b>Mirror Remname :</b> <code>%s</code>\n"+
-		"┠ <b>DDL Server :</b> <i>%s</i>\n"+
-		"<b>╰</b> <b>Stop Duplicate :</b> <i>%s</i></blockquote>",
+		"┠ <b>DDL Server(s) :</b> <i>%d</i>\n"+
+		"┠ <b>User TD Mode :</b> <i>Force Disabled</i>\n"+
+		"┠ <b>Total User TD(s) :</b> <i>0</i>\n"+
+		"┠ <b>Stop Duplicate :</b> <i>%s</i>\n"+
+		"<b>╰</b> <b>Daily Mirror :</b> <code>∞ / ∞</code> per day</blockquote>",
 		telegram.EscapeHTML(name), rcc, val(u.RclonePath), val(u.RcloneFlags), up,
-		val(u.MPrefix), val(u.MSuffix), val(u.MRemname), ddl, stop)
+		val(u.MPrefix), val(u.MSuffix), val(u.MRemname), ddlCount, stop)
 
 	btn := telegram.NewButtonMaker()
 	toggle := func(label string, on bool, data string) {
@@ -2189,8 +2197,13 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 			btn.IButton(label, data)
 		}
 	}
-	btn.IButton("Upload To: "+up, fmt.Sprintf("userset %d dupload", u.UserID))
+	btnUp := uploadNames[u.DefaultUpload]
+	if btnUp == "" {
+		btnUp = "Default"
+	}
+	btn.IButton("Upload To: "+btnUp, fmt.Sprintf("userset %d dupload", u.UserID))
 	btn.Row()
+	// the buttons of the Python bot, in its order
 	toggle("RClone", len(u.RcloneConf) > 0, fmt.Sprintf("userset %d rcc", u.UserID))
 	toggle("Mirror Prefix", u.MPrefix != "", fmt.Sprintf("userset %d mt_mprefix", u.UserID))
 	btn.Row()
@@ -2198,9 +2211,12 @@ func (m *SettingsModule) buildMirrorHostMenu(u *types.UserSettings) (string, *te
 	toggle("Mirror Remname", u.MRemname != "", fmt.Sprintf("userset %d mt_mremname", u.UserID))
 	btn.Row()
 	toggle("DDL Servers", u.MirrorHost != "" || len(u.DDLKeys) > 0, fmt.Sprintf("userset %d ddlservers", u.UserID))
-	toggle("RClone Path", u.RclonePath != "", fmt.Sprintf("userset %d mt_rcpath", u.UserID))
+	btn.IButton("User TDs", fmt.Sprintf("userset %d notyet", u.UserID))
 	btn.Row()
-	toggle("RClone Flags", u.RcloneFlags != "", fmt.Sprintf("userset %d mt_rcflags", u.UserID))
+	toggle("Rclone Path", u.RclonePath != "", fmt.Sprintf("userset %d mt_rcpath", u.UserID))
+	toggle("Rclone Flags", u.RcloneFlags != "", fmt.Sprintf("userset %d mt_rcflags", u.UserID))
+	btn.Row()
+	btn.IButton("Upload Paths", fmt.Sprintf("userset %d notyet", u.UserID))
 	toggle("Stop Duplicate", u.StopDupOn(cfg.StopDuplicate), fmt.Sprintf("userset %d stop_duplicate", u.UserID))
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")

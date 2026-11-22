@@ -3,6 +3,7 @@ package ext
 import (
 	"bufio"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"runtime"
@@ -495,9 +496,11 @@ func RenderRepoStats() string {
 		lastCommit = strings.TrimSpace(string(out))
 	}
 
-	cmdLog := exec.Command("git", "log", "-1", "--pretty=format:<code>%s</code> <b>By</b> %an")
+	// the commit text is escaped: a "<" in it broke the whole message
+	cmdLog := exec.Command("git", "log", "-1", "--pretty=format:%s%x00%an")
 	if out, err := cmdLog.Output(); err == nil && len(out) > 0 {
-		changeLog = strings.TrimSpace(string(out))
+		subj, author, _ := strings.Cut(strings.TrimSpace(string(out)), "\x00")
+		changeLog = "<code>" + html.EscapeString(subj) + "</code> <b>By</b> " + html.EscapeString(author)
 	}
 
 	if lastCommit == "N/A" {

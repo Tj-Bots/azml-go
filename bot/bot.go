@@ -25,6 +25,7 @@ import (
 	tdDownloader "github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/telegram/updates"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 )
 
 var (
@@ -212,7 +213,8 @@ func NewBotApp() *BotApp {
 	}
 
 	client := td.NewClient(cfg.TelegramAPI, cfg.TelegramHash, td.Options{
-		UpdateHandler: handler,
+		UpdateHandler:  handler,
+		SessionStorage: newDBSession(cfg.BotToken), // no new login (and FLOOD_WAIT) on every restart
 	})
 	app.client = client
 	app.rawAPI = client.API()
@@ -1113,7 +1115,23 @@ func (b *BotApp) Start(ctx context.Context) error {
 		}
 
 		if !status.Authorized {
-			if _, err := b.client.Auth().Bot(ctx, cfg.BotToken); err != nil {
+			_, err := b.client.Auth().Bot(ctx, cfg.BotToken)
+			// too many logins: wait for Telegram instead of crashing (a crash restarts the dyno,
+			// logs in again and makes the wait longer)
+			for i := 0; err != nil && i < 3; i++ {
+				d, ok := tgerr.AsFloodWait(err)
+				if !ok {
+					break
+				}
+				log.Printf("[AZML-Go Bot Client] Telegram asks to wait %s before the next login (FLOOD_WAIT), waiting...", d)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(d + 2*time.Second):
+				}
+				_, err = b.client.Auth().Bot(ctx, cfg.BotToken)
+			}
+			if err != nil {
 				return fmt.Errorf("bot authentication failed: %v", err)
 			}
 		}
@@ -1720,12 +1738,21 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading <b>token.pickle</b>: %v", err), m.ID, nil)
 					return true
 				}
-				// Reload Google Drive OAuth credentials immediately
+				// Reload Google Drive OAuth credentials immediately, and check them with Google
+				savePrivateFile("token.pickle")
+				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID}) // it has the Google account
 				gClient := downloader.GetGDriveClient()
 				if gClient != nil {
-					_ = gClient.LoadCredentials("token.pickle")
+					if lErr := gClient.LoadCredentials("token.pickle"); lErr != nil {
+						_, _ = b.sender.SendMessage(ctx, peer, "× <b>token.pickle</b> saved but not readable: "+telegram.EscapeHTML(lErr.Error()), 0, nil)
+						return true
+					}
+					if _, tErr := gClient.GetAccessToken(); tErr != nil {
+						_, _ = b.sender.SendMessage(ctx, peer, "× <b>token.pickle</b> saved but Google refuses it: "+telegram.EscapeHTML(tErr.Error()), 0, nil)
+						return true
+					}
 				}
-				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>token.pickle</b> received and saved! Google Drive OAuth credentials successfully reloaded.", m.ID, nil)
+				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>token.pickle</b> received, saved and checked with Google: it works.", 0, nil)
 				return true
 
 			case "config.env":
@@ -1756,6 +1783,7 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 					_, _ = b.sender.SendMessage(ctx, peer, fmt.Sprintf("× Error downloading <b>rclone.conf</b>: %v", err), m.ID, nil)
 					return true
 				}
+				savePrivateFile("rclone.conf")
 				_ = b.sender.DeleteMessage(ctx, peer, []int{m.ID})
 				_, _ = b.sender.SendMessage(ctx, peer, "✓ <b>rclone.conf</b> received and saved for "+ext.RcloneHostName+"!", 0, nil)
 				return true

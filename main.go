@@ -117,6 +117,7 @@ func main() {
 
 	// Initialize Database (MongoDB or local JSON fallback)
 	ext.InitDB()
+	bot.RestorePrivateFiles() // token.pickle / rclone.conf: the disk of a new dyno is empty
 	if db := ext.GetDB(); db != nil {
 		// access hashes saved in the database: channels and users resolve right after a restart
 		peers := db.LoadPeers()

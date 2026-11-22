@@ -76,7 +76,6 @@ type Config struct {
 	UserTasksLimit            int
 	PlaylistLimit             int
 	ExtensionFilter           string
-	Images                    string
 	GDriveID                  string
 	IndexURL                  string
 	IsTeamDrive               bool
@@ -252,7 +251,6 @@ func buildConfig() Config {
 		UserTasksLimit:            getEnvInt("USER_TASKS_LIMIT", 0),
 		PlaylistLimit:             getEnvInt("PLAYLIST_LIMIT", 0),
 		ExtensionFilter:           getEnv("EXTENSION_FILTER", ""),
-		Images:                    getEnv("IMAGES", ""),
 		GDriveID:                  strings.TrimSpace(getEnv("GDRIVE_ID", "")),
 		IndexURL:                  strings.TrimRight(strings.TrimSpace(getEnv("INDEX_URL", "")), "/"),
 		IsTeamDrive:               getEnvBool("IS_TEAM_DRIVE", false),
@@ -533,8 +531,6 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.ExcepChats = val
 	case "EXTENSION_FILTER":
 		GlobalConfig.ExtensionFilter = val
-	case "IMAGES":
-		GlobalConfig.Images = strings.TrimSpace(val)
 	case "GDRIVE_ID":
 		GlobalConfig.GDriveID = strings.TrimSpace(val)
 	case "INDEX_URL":
@@ -773,7 +769,6 @@ func configMapLocked() map[string]string {
 		"PLAYLIST_LIMIT":               strconv.Itoa(GlobalConfig.PlaylistLimit),
 		"LEECH_FILENAME_REMNAME":       GlobalConfig.LeechFilenameRemname,
 		"EXTENSION_FILTER":             GlobalConfig.ExtensionFilter,
-		"IMAGES":                       GlobalConfig.Images,
 		"GDRIVE_ID":                    GlobalConfig.GDriveID,
 		"INDEX_URL":                    GlobalConfig.IndexURL,
 		"IS_TEAM_DRIVE":                strconv.FormatBool(GlobalConfig.IsTeamDrive),

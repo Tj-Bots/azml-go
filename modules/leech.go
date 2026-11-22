@@ -475,7 +475,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	displayName = filepath.Base(displayName)
 
 	uTask := ext.NewUnifiedTask(taskUID, displayName, msg.FileSize, msg.ChatID, msg.UserID, notifyID, cancel)
-	uTask.SetStatusDisplay(msg.Username, msg.SenderName, "#leech")
+	uTask.SetStatusDisplay(msg.Username, msg.SenderName, pythonMode("", opt))
 	m.taskMgr.AddTask(uTask)
 	// INCOMPLETE_TASK_NOTIFIER: remembered until the task ends (a restart leaves it in the DB)
 	ext.DB.SaveRunningTask(ext.RunningTask{ID: taskUID, ChatID: msg.ChatID, MessageID: msg.MessageID, UserID: msg.UserID, User: msg.SenderName, Name: displayName})
@@ -599,6 +599,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		msg.IsReply, msg.HasMedia, msg.RawMedia = false, false, nil
 		modeStr = "#Leech | #Folder"
 	}
+	uTask.SetInputMode(pythonMode(modeStr, opt)) // /status Mode, like the Python bot
 
 	// 1. Download Phase
 	if link == "" && (msg.IsReply || msg.HasMedia) {
@@ -896,6 +897,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	} else if downloader.IsGDriveLink(link) {
 		modeStr = "#Leech | #GDrive"
+		uTask.SetInputMode(pythonMode(modeStr, opt))
 		gdrive := downloader.GetGDriveClient()
 		fileID := downloader.ExtractGDriveID(link)
 		if fileID == "" {
@@ -989,6 +991,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	} else if downloader.IsGofileLink(link) {
 		modeStr = "#Leech | #GoFile"
+		uTask.SetInputMode(pythonMode(modeStr, opt))
 		uTask.SetStatus(types.StatusDownloading, ext.EngineName("aria2"))
 		downloadedPath, dlErr = m.downloadGofile(ctx, peer, msg, opt, link, taskDir, uTask)
 		if dlErr == errSelectionCancelled {

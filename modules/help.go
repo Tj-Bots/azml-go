@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	mathrand "math/rand"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -109,7 +108,7 @@ func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, ms
 	}
 
 	startText := m.getStartText()
-	sendWithImage(ctx, m.sender, peer, startText, msg.MessageID, m.getStartButtons(), 2)
+	_, _ = m.sender.SendMessageWithButtons(ctx, peer, startText, msg.MessageID, m.getStartButtons(), 2)
 }
 
 func (m *HelpModule) HandleHelp(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
@@ -165,7 +164,7 @@ func (m *HelpModule) getStatsView(key string, targetUID int64) (string, *telegra
 
 func (m *HelpModule) HandleStats(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	text, btn := m.getStatsView("home", msg.UserID)
-	sendWithImage(ctx, m.sender, peer, text, msg.MessageID, btn, 2)
+	_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 2)
 }
 
 func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64) {
@@ -309,19 +308,6 @@ func leechSources() string {
 		return "Direct, Mega, Google Drive, TG media"
 	}
 	return "Direct, Magnet, Torrent, Mega, TG media"
-}
-
-// sendWithImage: like the Python bot (IMAGES): with images set, a random one with the text as
-// its caption; without them (default) or when it fails, the text alone.
-func sendWithImage(ctx context.Context, sender *telegram.MessageSender, peer tg.InputPeerClass, text string, replyTo int, btn *telegram.ButtonMaker, cols int) {
-	if imgs := strings.Fields(config.Get().Images); len(imgs) > 0 {
-		if plain, _ := telegram.ParseFormatting(text); len([]rune(plain)) <= 1000 {
-			if id, err := sender.SendPhotoFromURLWithButtons(ctx, peer, imgs[mathrand.Intn(len(imgs))], text, replyTo, btn, cols); err == nil && id > 0 {
-				return
-			}
-		}
-	}
-	_, _ = sender.SendMessageWithButtons(ctx, peer, text, replyTo, btn, cols)
 }
 
 func logCaption() string {

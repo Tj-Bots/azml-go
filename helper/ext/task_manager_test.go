@@ -23,7 +23,6 @@ func TestBuildStatusMessageUsesLeechStatusLayout(t *testing.T) {
 		"Engine:</b> Aria2c",
 		"User:</b> <code>@xyzasa44</code>",
 		"Mode:</b> #leech",
-		"Out:</b> telegram",
 		"/cancel_8861026839_ccb0ca",
 		"⌬ <b><i>Bot Stats</i></b>\n<blockquote><b>╭</b> <b>Active Tasks:</b> 1",
 		"<b>Ram:</b>",

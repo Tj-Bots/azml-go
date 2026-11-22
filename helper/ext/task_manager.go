@@ -233,7 +233,7 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 		bar := makeProgressBar(pct)
 		elapsed := TimeSinceFormatted(t.StartTime())
 		user := fmt.Sprintf("User %d", t.UserID())
-		inMode := "#leech"
+		inMode := "#Leech | #Aria2"
 		if displayTask, ok := t.(interface {
 			StatusUsername() string
 			StatusSenderName() string
@@ -248,7 +248,7 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 				inMode = mode
 			}
 		} else if strings.HasPrefix(t.GID(), "yt_") {
-			inMode = "#ytdl"
+			inMode = "#Leech | #ytdlp"
 		}
 		engine := strings.SplitN(t.Engine(), " [", 2)[0]
 
@@ -268,7 +268,7 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 			}
 		}
 		sb.WriteString(fmt.Sprintf("┠ <b>Engine:</b> %s\n", telegram.EscapeHTML(engine)))
-		sb.WriteString(fmt.Sprintf("┠ <b>Mode:</b> %s | <b>Out:</b> telegram\n", telegram.EscapeHTML(inMode)))
+		sb.WriteString(fmt.Sprintf("┠ <b>Mode:</b> %s\n", telegram.EscapeHTML(inMode))) // like the Python bot: #Leech | #Aria2
 		sb.WriteString(fmt.Sprintf("┠ <b>User:</b> <code>%s</code>\n", telegram.EscapeHTML(user)))
 		sb.WriteString(fmt.Sprintf("<b>╰</b> /cancel%s_%s</blockquote>\n\n", telegram.EscapeHTML(config.Get().CmdSuffix), telegram.EscapeHTML(t.GID())))
 	}
@@ -469,6 +469,13 @@ func (u *UnifiedTask) SetStatusDisplay(username, senderName, inputMode string) {
 	u.username = username
 	u.senderName = senderName
 	u.inputMode = inputMode
+}
+
+// SetInputMode: the Mode line of /status (" #tjgd (Zip) | #Aria2"), set again when the source is known.
+func (u *UnifiedTask) SetInputMode(mode string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.inputMode = mode
 }
 func (u *UnifiedTask) Name() string {
 	u.mu.RLock()

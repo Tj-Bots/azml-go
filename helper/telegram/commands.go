@@ -142,7 +142,6 @@ func InitCommands() {
 		},
 		Ping: []string{
 			"ping" + suffix,
-			"p" + suffix,
 		},
 		Stats: []string{
 			"stats" + suffix,
@@ -165,6 +164,7 @@ func InitCommands() {
 		},
 		Poster: []string{
 			"poster" + suffix,
+			"p" + suffix,
 		},
 		Shell: []string{
 			"shell" + suffix,

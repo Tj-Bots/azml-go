@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"html"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -159,44 +160,117 @@ func BuildTorrentHTMLTree(files []downloader.Aria2File) string {
 	return sb.String()
 }
 
-func renderHTMLTree(node *TreeNode, sb *strings.Builder, depth int, folderCounter int) int {
-	if depth > 0 && node.IsDir {
-		sb.WriteString(`<div class="ml-2 sm:ml-4 md:ml-6 pl-1.5 sm:pl-2 md:pl-3 border-l border-outline-variant/30 flex flex-col gap-1 mt-1">`)
-	}
-
-	for _, child := range node.Children {
-		if child.IsDir {
-			sb.WriteString(`<div class="flex flex-col mt-2 mb-1">`)
-			folderCounter++
-			sb.WriteString(fmt.Sprintf(`<div class="file-row flex items-center justify-between px-2 sm:px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 group/row">
-    <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-        <input class="neon-checkbox folder-checkbox shrink-0" type="checkbox" name="foldernode_%d">
-        <span class="material-symbols-outlined text-secondary-dim group-hover/row:text-secondary shrink-0 transition-colors" style="font-variation-settings: 'FILL' 1;">folder_open</span>
-        <span class="font-body text-xs sm:text-sm text-on-surface font-medium truncate" title="%s">%s</span>
-    </div>
-</div>`, folderCounter, child.Name, child.Name))
-			folderCounter = renderHTMLTree(child, sb, depth+1, folderCounter)
-			sb.WriteString(`</div>`)
-		} else {
-			checked := ""
-			if child.Selected {
-				checked = "checked"
+// natLess: natural order, like a file manager: "E2" before "E10", case-insensitive.
+func natLess(a, b string) bool {
+	a, b = strings.ToLower(a), strings.ToLower(b)
+	for a != "" && b != "" {
+		ca, cb := a[0], b[0]
+		if isDigit(ca) && isDigit(cb) {
+			na, ra := leadingDigits(a)
+			nb, rb := leadingDigits(b)
+			ta, tb := strings.TrimLeft(na, "0"), strings.TrimLeft(nb, "0")
+			if len(ta) != len(tb) {
+				return len(ta) < len(tb)
 			}
-			sizeStr := ext.GetReadableFileSize(child.Size)
-			sb.WriteString(fmt.Sprintf(`<div class="file-row flex items-center justify-between gap-2 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-white/5">
-    <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-        <input %s class="neon-checkbox shrink-0" type="checkbox" name="filenode_%s" data-size="%d">
-        <span class="material-symbols-outlined text-on-surface-variant text-base shrink-0" style="font-variation-settings: 'FILL' 0;">movie</span>
-        <span class="font-body text-xs sm:text-sm text-on-surface/90 font-normal truncate" data-size="%d" title="%s">%s</span>
-    </div>
-    <span class="font-body text-[11px] sm:text-xs text-on-surface-variant shrink-0 font-mono whitespace-nowrap">%s</span>
-    <input type="hidden" value="off" name="filenode_%s">
-</div>`, checked, child.FileID, child.Size, child.Size, child.Name, child.Name, sizeStr, child.FileID))
+			if ta != tb {
+				return ta < tb
+			}
+			if len(na) != len(nb) {
+				return len(na) < len(nb)
+			}
+			a, b = ra, rb
+			continue
+		}
+		if ca != cb {
+			return ca < cb
+		}
+		a, b = a[1:], b[1:]
+	}
+	return len(a) < len(b)
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+
+func leadingDigits(s string) (string, string) {
+	i := 0
+	for i < len(s) && isDigit(s[i]) {
+		i++
+	}
+	return s[:i], s[i:]
+}
+
+// sortTree: folders first, then files, each in natural order (the web page shows them in order).
+func sortTree(n *TreeNode) {
+	sort.SliceStable(n.Children, func(i, j int) bool {
+		a, b := n.Children[i], n.Children[j]
+		if a.IsDir != b.IsDir {
+			return a.IsDir
+		}
+		return natLess(a.Name, b.Name)
+	})
+	for _, c := range n.Children {
+		if c.IsDir {
+			sortTree(c)
 		}
 	}
+}
 
-	if depth > 0 && node.IsDir {
-		sb.WriteString(`</div>`)
+// treeStats: the number of files and their size under a folder.
+func treeStats(n *TreeNode) (int, int64) {
+	files, size := 0, int64(0)
+	for _, c := range n.Children {
+		if c.IsDir {
+			f, s := treeStats(c)
+			files, size = files+f, size+s
+		} else {
+			files++
+			size += c.Size
+		}
+	}
+	return files, size
+}
+
+// fileKind: the icon of a file by its extension (video, audio, image, archive, subtitle, other).
+func fileKind(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".mkv", ".mp4", ".avi", ".mov", ".webm", ".m4v", ".ts", ".wmv", ".flv", ".mpg", ".mpeg", ".3gp", ".m2ts":
+		return "video"
+	case ".mp3", ".flac", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".wma", ".ac3", ".dts", ".eac3":
+		return "audio"
+	case ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff":
+		return "image"
+	case ".zip", ".rar", ".7z", ".tar", ".gz", ".xz", ".bz2", ".iso", ".zst":
+		return "archive"
+	case ".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx", ".sup":
+		return "sub"
+	}
+	return "file"
+}
+
+var kindIcon = map[string]string{"video": "🎬", "audio": "🎵", "image": "🖼️", "archive": "🗜️", "sub": "💬", "file": "📄"}
+
+func renderHTMLTree(node *TreeNode, sb *strings.Builder, depth int, folderCounter int) int {
+	if depth == 0 {
+		sortTree(node)
+	}
+	for _, child := range node.Children {
+		name := html.EscapeString(child.Name)
+		if child.IsDir {
+			folderCounter++
+			files, size := treeStats(child)
+			sb.WriteString(fmt.Sprintf(`<div class="folder open"><div class="row frow"><button type="button" class="chev" aria-label="open">▸</button><input class="cb fcb" type="checkbox" name="foldernode_%d"><span class="ico">📁</span><span class="name" title="%s">%s</span><span class="meta">%d · %s</span></div><div class="kids">`,
+				folderCounter, name, name, files, ext.GetReadableFileSize(size)))
+			folderCounter = renderHTMLTree(child, sb, depth+1, folderCounter)
+			sb.WriteString(`</div></div>`)
+			continue
+		}
+		checked := ""
+		if child.Selected {
+			checked = " checked"
+		}
+		kind := fileKind(child.Name)
+		sb.WriteString(fmt.Sprintf(`<label class="row file" data-kind="%s"><input class="cb fileb" type="checkbox" name="filenode_%s" data-size="%d"%s><span class="ico">%s</span><span class="name" title="%s">%s</span><span class="meta">%s</span></label><input type="hidden" value="off" name="filenode_%s">`,
+			kind, html.EscapeString(child.FileID), child.Size, checked, kindIcon[kind], name, name, ext.GetReadableFileSize(child.Size), html.EscapeString(child.FileID)))
 	}
 	return folderCounter
 }

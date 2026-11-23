@@ -90,7 +90,7 @@ func (m *LeechModule) HandlePoster(ctx context.Context, peer tg.InputPeerClass, 
 		query = m.repliedName(ctx, peer, msg.ReplyToID)
 	}
 	if query == "" {
-		c := telegram.Cmd("poster")
+		c := telegram.Cmd("p")
 		fail("<blockquote><b>╭</b> <code>" + c + " Oppenheimer 2023</code>\n" +
 			"<b>╰</b> or reply to a video / file with <code>" + c + "</code></blockquote>\n" +
 			"<i>Browse the posters, backdrops and logos of a movie or show (TMDB).</i>")

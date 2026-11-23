@@ -3,6 +3,10 @@ package modules
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,20 +19,25 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-// /poster <name> (or a reply to a file): the TMDB images of a movie / show, like the poster command
-// of TJ-Rename-Bot: a preview with its title (year), size, type and language, ⫷ ⫸ to browse,
-// Poster / Backdrop / Logo, a language filter and the original image.
+// /p (/poster) <name>, or a reply to a video / file: the TMDB posters and backdrops of a movie or
+// show, the same look and buttons as the poster command of TJ-Rename-Bot (MinimalTheme): one text
+// message (a reply to the command) with the image as a large preview above it.
+
+const posterPerPage = 8
 
 type posterSession struct {
 	uid    int64
-	titles []ext.TMDBTitle
-	title  ext.TMDBTitle
-	images map[string][]ext.TMDBImage // poster / backdrop / logo
-	kind   string
-	lang   string // "*" = all languages
-	idx    int
 	query  string
+	userL  string // the user's Telegram language (its images come right after English)
+	titles []ext.TMDBTitle
+	page   int
+	sel    int
+	images map[string][]ext.TMDBImage // "p" posters, "b" backdrops
+	kind   string
+	lang   string // "all", a language code, or "xx" = no text
+	idx    int
 	at     time.Time
+	busy   bool
 }
 
 var (
@@ -37,16 +46,8 @@ var (
 	posterSeq      int
 )
 
-var posterKinds = []struct{ key, name string }{{"poster", "Poster"}, {"backdrop", "Backdrop"}, {"logo", "Logo"}}
-
-func posterKindName(k string) string {
-	for _, x := range posterKinds {
-		if x.key == k {
-			return x.name
-		}
-	}
-	return k
-}
+var posterKindName = map[string]string{"p": "Poster", "b": "Backdrop"}
+var posterKindPlural = map[string]string{"p": "Posters", "b": "Backdrops"}
 
 func newPosterSession(s *posterSession) string {
 	posterMu.Lock()
@@ -63,7 +64,36 @@ func newPosterSession(s *posterSession) string {
 	return id
 }
 
-// HandlePoster: /poster <name>, or a reply to a video / file with /poster (its name is searched).
+// pagerRow: ⏮ ◀️ x/y ▶️ ⏭ (like pager() of the rename bot); nothing for one page.
+func pagerRow(btn *telegram.ButtonMaker, prefix string, page, pages int) {
+	if pages <= 1 {
+		return
+	}
+	btn.IButtonStyled("⏮", fmt.Sprintf("%s%d", prefix, 0), "primary")
+	btn.IButtonStyled("◀️", fmt.Sprintf("%s%d", prefix, (page-1+pages)%pages), "primary")
+	btn.IButtonStyled(fmt.Sprintf("%d/%d", page+1, pages), fmt.Sprintf("%s%d", prefix, page), "primary")
+	btn.IButtonStyled("▶️", fmt.Sprintf("%s%d", prefix, (page+1)%pages), "primary")
+	btn.IButtonStyled("⏭", fmt.Sprintf("%s%d", prefix, pages-1), "primary")
+	btn.Row()
+}
+
+// markBtn: "✓ label" in green when active.
+func markBtn(btn *telegram.ButtonMaker, on bool, label, data string) {
+	if on {
+		btn.IButtonStyled("✓ "+label, data, "success")
+	} else {
+		btn.IButton(label, data)
+	}
+}
+
+func posterYear(y string) string {
+	if y == "" {
+		return "????"
+	}
+	return y
+}
+
+// HandlePoster: /p <name>, or a reply to a video / file with /p (its name is searched).
 func (m *LeechModule) HandlePoster(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	if msgText, btn := ext.CheckingAccess(msg.UserID, false, telegram.CurrentBotUsername, m.userMap); msgText != "" {
 		var markup tg.ReplyMarkupClass
@@ -78,10 +108,9 @@ func (m *LeechModule) HandlePoster(ctx context.Context, peer tg.InputPeerClass, 
 	}
 	fail := func(text string) { m.replyTemp(ctx, peer, msg, text) }
 	if !ext.TMDBEnabled() {
-		fail("<i>Posters need TMDB_ACCESS_TOKEN (Bot Settings).</i>")
+		fail("<b>TMDB_ACCESS_TOKEN is not configured.</b>")
 		return
 	}
-
 	query := ""
 	if parts := strings.SplitN(strings.TrimSpace(msg.Text), " ", 2); len(parts) == 2 {
 		query = strings.TrimSpace(parts[1])
@@ -91,29 +120,49 @@ func (m *LeechModule) HandlePoster(ctx context.Context, peer tg.InputPeerClass, 
 	}
 	if query == "" {
 		c := telegram.Cmd("p")
-		fail("<blockquote><b>╭</b> <code>" + c + " Oppenheimer 2023</code>\n" +
-			"<b>╰</b> or reply to a video / file with <code>" + c + "</code></blockquote>\n" +
-			"<i>Browse the posters, backdrops and logos of a movie or show (TMDB).</i>")
+		fail("㊂ <b><u>Poster Search :</u></b>\n\n<blockquote><b>╭</b> <code>" + c + " Oppenheimer 2023</code>\n" +
+			"┠ or reply to a video / file with <code>" + c + "</code>\n" +
+			"<b>╰</b> browse posters & backdrops by language or get the original</blockquote>")
 		return
 	}
 	title, _, year := ext.FormatCleanPosterTitle(query, "")
 	if strings.TrimSpace(title) == "" {
 		title = query
 	}
-	titles, err := ext.SearchTMDBTitles(ctx, title, year, msg.LangCode, 8)
+	waitID, _ := m.sender.SendWithPreview(ctx, peer, "<i>Searching TMDB for</i> <code>"+telegram.EscapeHTML(query)+"</code><i>...</i>", "", msg.MessageID, nil, 1)
+	titles, err := ext.SearchTMDBTitles(ctx, title, year, msg.LangCode, 20)
 	if err != nil || len(titles) == 0 {
-		fail("<i>Nothing found on TMDB for</i> <code>" + telegram.EscapeHTML(query) + "</code>")
+		text := "<b>Nothing found on TMDB.</b>"
+		if err != nil {
+			text = "<b>TMDB search failed, try again later.</b>"
+		}
+		if waitID > 0 {
+			_ = m.sender.EditWithPreview(ctx, peer, waitID, text, "", nil, 1)
+			autoDeletePair(m.sender, peer, waitID, msg.MessageID)
+		} else {
+			fail(text)
+		}
 		return
 	}
-	s := &posterSession{uid: msg.UserID, titles: titles, kind: "poster", lang: "*", query: query}
+	s := &posterSession{uid: msg.UserID, query: query, userL: shortCode(msg.LangCode), titles: titles, sel: -1, lang: "all"}
 	sid := newPosterSession(s)
-	if len(titles) == 1 {
-		s.query = query
-		m.posterOpen(ctx, peer, sid, s, 0, msg.MessageID, 0)
+	text, btn := posterResultsView(sid, s)
+	if waitID > 0 {
+		_ = m.sender.EditWithPreview(ctx, peer, waitID, text, "", btn, 1)
+		if len(titles) == 1 { // one result: straight to its images
+			m.posterOpen(ctx, peer, sid, s, 0, waitID, 0)
+		}
 		return
 	}
-	text, btn := posterTitlesView(sid, s, query)
 	_, _ = m.sender.SendWithPreview(ctx, peer, text, "", msg.MessageID, btn, 1)
+}
+
+func shortCode(l string) string {
+	l = strings.ToLower(strings.TrimSpace(l))
+	if i := strings.IndexAny(l, "-_"); i > 0 {
+		l = l[:i]
+	}
+	return l
 }
 
 // repliedName: the file name (or the caption / text) of the replied message.
@@ -134,164 +183,233 @@ func (m *LeechModule) repliedName(ctx context.Context, peer tg.InputPeerClass, i
 	return strings.SplitN(strings.TrimSpace(src.Message), "\n", 2)[0]
 }
 
-func posterTitlesView(sid string, s *posterSession, query string) (string, *telegram.ButtonMaker) {
-	text := "⌬ <b><u>TMDB Search :</u></b>\n\n<blockquote><b>╰</b> <code>" + telegram.EscapeHTML(query) +
-		"</code></blockquote>\n\n<i>Tap a title to browse its images 👇</i>"
+func posterShort(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n-1]) + "…"
+}
+
+func posterResultsView(sid string, s *posterSession) (string, *telegram.ButtonMaker) {
+	pages := (len(s.titles) + posterPerPage - 1) / posterPerPage
+	if pages < 1 {
+		pages = 1
+	}
+	s.page = (s.page%pages + pages) % pages
+	start := s.page * posterPerPage
+	end := start + posterPerPage
+	if end > len(s.titles) {
+		end = len(s.titles)
+	}
+	text := fmt.Sprintf("㊂ <b><u>Poster Search :</u></b>\n\n"+
+		"<blockquote><b>╭</b> <b>Query :</b> <code>%s</code>\n"+
+		"┠ <b>Results :</b> <code>%d</code>\n"+
+		"<b>╰</b> <b>Page :</b> <code>%d/%d</code></blockquote>\n\n"+
+		"<blockquote>➲ Press a title to browse its posters & backdrops</blockquote>",
+		telegram.EscapeHTML(posterShort(s.query, 80)), len(s.titles), s.page+1, pages)
 	btn := telegram.NewButtonMaker()
-	for i, t := range s.titles {
-		icon := "🎬"
-		if t.MediaType == "tv" {
-			icon = "📺"
-		}
-		label := icon + " " + t.Name
-		if t.Year != "" {
-			label += " (" + t.Year + ")"
-		}
-		btn.IButton(label, fmt.Sprintf("pstr %s t %d", sid, i))
+	for i := start; i < end; i++ {
+		t := s.titles[i]
+		btn.IButtonStyled(fmt.Sprintf("%s (%s)", posterShort(t.Name, 48), posterYear(t.Year)), fmt.Sprintf("pstr %s o %d", sid, i), "primary")
 		btn.Row()
 	}
-	btn.IButtonStyled("❌", fmt.Sprintf("pstr %s x", sid), "danger")
+	pagerRow(btn, "pstr "+sid+" r ", s.page, pages)
+	btn.IButton("❌", fmt.Sprintf("pstr %s x", sid))
 	btn.Row()
 	return text, btn
 }
 
-// posterOpen loads the images of title i and shows the first one: the list message (a reply to
-// the command) becomes the preview, or a new reply when there was no list.
-func (m *LeechModule) posterOpen(ctx context.Context, peer tg.InputPeerClass, sid string, s *posterSession, i, replyTo, listMsg int) {
+// posterOpen loads the images of title i and edits msgID into the image view.
+func (m *LeechModule) posterOpen(ctx context.Context, peer tg.InputPeerClass, sid string, s *posterSession, i, msgID int, queryID int64) {
 	t := s.titles[i]
-	p, b, l, err := ext.TMDBTitleImages(ctx, t.MediaType, t.ID)
-	if err != nil || len(p)+len(b)+len(l) == 0 {
-		text := "<i>No images on TMDB for</i> <b>" + telegram.EscapeHTML(t.Name) + "</b>"
-		_, _ = m.sender.SendMessage(ctx, peer, text, replyTo, telegram.CloseMarkup(s.uid))
+	p, b, _, err := ext.TMDBTitleImages(ctx, t.MediaType, t.ID)
+	if err != nil {
+		if queryID != 0 {
+			_ = m.sender.AnswerCallback(ctx, queryID, "Could not load this image, try another one.", true)
+		}
+		return
+	}
+	if len(p)+len(b) == 0 {
+		if queryID != 0 {
+			_ = m.sender.AnswerCallback(ctx, queryID, "No images on TMDB for this title.", true)
+		}
 		return
 	}
 	posterMu.Lock()
-	s.title, s.images, s.idx, s.lang = t, map[string][]ext.TMDBImage{"poster": p, "backdrop": b, "logo": l}, 0, "*"
-	s.kind = "poster"
-	for _, k := range posterKinds { // the first kind that has images
-		if len(s.images[k.key]) > 0 {
-			s.kind = k.key
-			break
-		}
+	s.sel, s.images, s.idx = i, map[string][]ext.TMDBImage{"p": p, "b": b}, 0
+	s.kind = "p"
+	if len(p) == 0 {
+		s.kind = "b"
 	}
-	text, url, btn := posterView(sid, s)
+	if s.lang != "all" && posterLangCount(s)[s.lang] == 0 {
+		s.lang = "all"
+	}
+	text, url, btn := posterImageView(sid, s)
 	posterMu.Unlock()
-	if listMsg > 0 {
-		_ = m.sender.EditWithPreview(ctx, peer, listMsg, text, url, btn, 5)
-		return
+	if queryID != 0 {
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	}
-	_, _ = m.sender.SendWithPreview(ctx, peer, text, url, replyTo, btn, 5)
+	_ = m.sender.EditWithPreview(ctx, peer, msgID, text, url, btn, 5)
 }
 
-// posterShown: the images of the current kind and language.
-func posterShown(s *posterSession) []ext.TMDBImage {
+func langKey(code string) string {
+	if code == "" {
+		return "xx"
+	}
+	return code
+}
+
+func posterLangCount(s *posterSession) map[string]int {
+	c := map[string]int{}
+	for _, im := range s.images[s.kind] {
+		c[langKey(im.Lang)]++
+	}
+	return c
+}
+
+// posterLangs: the languages of the current kind, English first, then his language, then no
+// text, then by count (like poster_lang_counts of the rename bot).
+func posterLangs(s *posterSession) []string {
+	c := posterLangCount(s)
+	var out []string
+	for k := range c {
+		out = append(out, k)
+	}
+	rank := func(k string) int {
+		switch {
+		case k == "en":
+			return 0
+		case k == s.userL && k != "":
+			return 1
+		case k == "xx":
+			return 2
+		}
+		return 3
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if rank(out[i]) != rank(out[j]) {
+			return rank(out[i]) < rank(out[j])
+		}
+		if c[out[i]] != c[out[j]] {
+			return c[out[i]] > c[out[j]]
+		}
+		return out[i] < out[j]
+	})
+	return out
+}
+
+func posterFiltered(s *posterSession) []ext.TMDBImage {
 	all := s.images[s.kind]
-	if s.lang == "*" {
+	if s.lang == "all" {
 		return all
 	}
 	var out []ext.TMDBImage
 	for _, im := range all {
-		if im.Lang == s.lang {
+		if langKey(im.Lang) == s.lang {
 			out = append(out, im)
 		}
 	}
 	return out
 }
 
-// posterView: the caption, the preview URL and the buttons of the current image.
-func posterView(sid string, s *posterSession) (string, string, *telegram.ButtonMaker) {
-	shown := posterShown(s)
-	if s.idx >= len(shown) {
-		s.idx = 0
+// posterImageView: the text, the preview URL and the buttons of the current image.
+func posterImageView(sid string, s *posterSession) (string, string, *telegram.ButtonMaker) {
+	t := s.titles[s.sel]
+	list := posterFiltered(s)
+	n := len(list)
+	if n == 0 {
+		s.lang, list = "all", s.images[s.kind]
+		n = len(list)
 	}
-	im := shown[s.idx]
-	name := s.title.Name
-	if s.title.Year != "" {
-		name += " (" + s.title.Year + ")"
+	s.idx = (s.idx%n + n) % n
+	im := list[s.idx]
+	orient := "Portrait"
+	if im.Width >= im.Height {
+		orient = "Landscape"
 	}
-	caption := "⌬ <b>" + telegram.EscapeHTML(name) + "</b>\n\n" +
-		"<blockquote><b>╭</b> <b>Type:</b> " + posterKindName(s.kind) + "\n" +
-		fmt.Sprintf("┠ <b>Quality:</b> %d × %d\n", im.Width, im.Height) +
-		"┠ <b>Language:</b> " + ext.TMDBLangName(im.Lang) + "\n" +
-		fmt.Sprintf("<b>╰</b> <b>Image:</b> %d / %d</blockquote>", s.idx+1, len(shown))
+	tmdbURL := fmt.Sprintf("https://www.themoviedb.org/%s/%d", t.MediaType, t.ID)
+	text := fmt.Sprintf("<b>%s (%s)</b>\n\n"+
+		"<blockquote><b>╭</b> <b>TMDB :</b> <a href='%s'>tmdb.org/%s/%d</a>\n"+
+		"┠ <b>Type :</b> <i>%s · %s</i>\n"+
+		"┠ <b>Language :</b> <i>%s</i>\n"+
+		"┠ <b>Size :</b> <code>%d x %d</code>\n"+
+		"<b>╰</b> <b>Image :</b> <code>%d/%d</code></blockquote>",
+		telegram.EscapeHTML(t.Name), posterYear(t.Year), tmdbURL, t.MediaType, t.ID,
+		posterKindName[s.kind], orient, ext.TMDBLangName(im.Lang), im.Width, im.Height, s.idx+1, n)
 
-	size := "w780"
-	switch s.kind {
-	case "backdrop":
-		size = "w1280"
-	case "logo":
-		size = "w500"
-	}
 	btn := telegram.NewButtonMaker()
-	if len(shown) > 1 {
-		btn.IButtonStyled("⫷", fmt.Sprintf("pstr %s p", sid), "primary")
-		btn.IButton(fmt.Sprintf("%d / %d", s.idx+1, len(shown)), fmt.Sprintf("pstr %s noop", sid))
-		btn.IButtonStyled("⫸", fmt.Sprintf("pstr %s n", sid), "primary")
-		btn.Row()
-	}
-	for _, k := range posterKinds {
-		n := len(s.images[k.key])
-		if n == 0 {
-			continue
-		}
-		label := fmt.Sprintf("%s (%d)", k.name, n)
-		if k.key == s.kind {
-			btn.IButtonStyled("✓ "+label, fmt.Sprintf("pstr %s noop", sid), "success")
-		} else {
-			btn.IButton(label, fmt.Sprintf("pstr %s k %s", sid, k.key))
+	for _, k := range []string{"p", "b"} {
+		if c := len(s.images[k]); c > 0 {
+			markBtn(btn, s.kind == k, fmt.Sprintf("%s (%d)", posterKindPlural[k], c), fmt.Sprintf("pstr %s k %s", sid, k))
 		}
 	}
 	btn.Row()
-	langLabel := "All"
-	if s.lang != "*" {
-		langLabel = ext.TMDBLangName(s.lang)
+	counts := posterLangCount(s)
+	langs := append([]string{"all"}, posterLangs(s)...)
+	shown := langs
+	if len(shown) > 4 {
+		shown = langs[:4]
+		in := false
+		for _, l := range shown {
+			if l == s.lang {
+				in = true
+			}
+		}
+		if !in {
+			shown = append(append([]string{}, langs[:3]...), s.lang)
+		}
 	}
-	btn.IButton("🌐 Language: "+langLabel, fmt.Sprintf("pstr %s l", sid))
-	btn.UButton("📥 Original", ext.TMDBImageURL(im.Path, "original"))
-	btn.Row()
-	if len(s.titles) > 1 {
-		btn.IButtonStyled("◀️", fmt.Sprintf("pstr %s b", sid), "primary")
+	for _, l := range shown {
+		label := strings.ToUpper(l)
+		c := counts[l]
+		switch l {
+		case "all":
+			label, c = "All", len(s.images[s.kind])
+		case "xx":
+			label = "No Text"
+		}
+		markBtn(btn, s.lang == l, fmt.Sprintf("%s (%d)", label, c), fmt.Sprintf("pstr %s l %s", sid, l))
 	}
-	btn.IButtonStyled("❌", fmt.Sprintf("pstr %s x", sid), "danger")
+	if len(langs) > len(shown) {
+		btn.IButton("More", fmt.Sprintf("pstr %s L", sid))
+	}
 	btn.Row()
-	return caption, ext.TMDBImageURL(im.Path, size), btn
+	pagerRow(btn, "pstr "+sid+" i ", s.idx, n)
+	btn.IButtonStyled("Send Original", fmt.Sprintf("pstr %s g", sid), "primary")
+	btn.Row()
+	btn.IButton("◀️", fmt.Sprintf("pstr %s b", sid))
+	btn.IButton("❌", fmt.Sprintf("pstr %s x", sid))
+	btn.Row()
+	return text, ext.TMDBImageURL(im.Path, "original"), btn
 }
 
-// posterLangMenu: the languages of the current kind, with how many images each has.
-func posterLangMenu(sid string, s *posterSession) *telegram.ButtonMaker {
-	counts, order := map[string]int{}, []string{}
-	for _, im := range s.images[s.kind] {
-		if counts[im.Lang] == 0 {
-			order = append(order, im.Lang)
-		}
-		counts[im.Lang]++
-	}
+func posterLangView(sid string, s *posterSession) (string, *telegram.ButtonMaker) {
+	counts := posterLangCount(s)
 	btn := telegram.NewButtonMaker()
-	label := fmt.Sprintf("All (%d)", len(s.images[s.kind]))
-	if s.lang == "*" {
-		label = "✓ " + label
-	}
-	btn.IButton(label, fmt.Sprintf("pstr %s L *", sid))
-	btn.Row()
-	for i, l := range order {
-		label := fmt.Sprintf("%s (%d)", ext.TMDBLangName(l), counts[l])
-		if l == s.lang {
-			label = "✓ " + label
+	markBtn(btn, s.lang == "all", fmt.Sprintf("All (%d)", len(s.images[s.kind])), fmt.Sprintf("pstr %s l all", sid))
+	n := 1
+	for _, l := range posterLangs(s) {
+		name := ext.TMDBLangName(l)
+		if l == "xx" {
+			name = "No Text"
 		}
-		code := l
-		if code == "" {
-			code = "-"
-		}
-		btn.IButton(label, fmt.Sprintf("pstr %s L %s", sid, code))
-		if i%2 == 1 {
+		markBtn(btn, s.lang == l, fmt.Sprintf("%s (%d)", name, counts[l]), fmt.Sprintf("pstr %s l %s", sid, l))
+		n++
+		if n%3 == 0 {
 			btn.Row()
 		}
 	}
 	btn.Row()
-	btn.IButtonStyled("◀️", fmt.Sprintf("pstr %s v", sid), "primary")
+	btn.IButton("◀️", fmt.Sprintf("pstr %s v", sid))
+	btn.IButton("❌", fmt.Sprintf("pstr %s x", sid))
 	btn.Row()
-	return btn
+	text := "㊂ <b><u>Poster Language : " + telegram.EscapeHTML(s.titles[s.sel].Name) + "</u></b>\n\n" +
+		"<blockquote>➲ Choose which images to show. The number is how many images exist in that language.</blockquote>"
+	return text, btn
 }
+
+var posterSafeName = regexp.MustCompile(`[^\w.-]+`)
 
 // HandlePosterCallback: "pstr <session> <action> [arg]".
 func (m *LeechModule) HandlePosterCallback(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64) {
@@ -300,7 +418,7 @@ func (m *LeechModule) HandlePosterCallback(ctx context.Context, peer tg.InputPee
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		return
 	}
-	sid, action, arg := parts[1], parts[2], ""
+	sid, act, arg := parts[1], parts[2], ""
 	if len(parts) > 3 {
 		arg = parts[3]
 	}
@@ -311,81 +429,155 @@ func (m *LeechModule) HandlePosterCallback(ctx context.Context, peer tg.InputPee
 	}
 	posterMu.Unlock()
 	if s == nil {
-		_ = m.sender.AnswerCallback(ctx, queryID, "This search expired, send the command again.", true)
+		_ = m.sender.AnswerCallback(ctx, queryID, "This search expired. Run /p again.", true)
 		return
 	}
 	if fromUID != s.uid {
-		_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+		_ = m.sender.AnswerCallback(ctx, queryID, "Only the user who searched can use these buttons!", true)
 		return
 	}
-	refresh := func() {
-		posterMu.Lock()
-		caption, url, btn := posterView(sid, s)
-		posterMu.Unlock()
-		if err := m.sender.EditWithPreview(ctx, peer, msgID, caption, url, btn, 5); err != nil {
-			_ = m.sender.AnswerCallback(ctx, queryID, "Can't load this image, try the next one.", true)
-			return
-		}
+	if act == "x" {
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
-	}
-	switch action {
-	case "noop":
-		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
-	case "x":
-		_ = m.sender.AnswerCallback(ctx, queryID, "Closed!", false)
 		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
 		posterMu.Lock()
 		delete(posterSessions, sid)
 		posterMu.Unlock()
-	case "t": // a title of the list
-		i, err := strconv.Atoi(arg)
-		if err != nil || i < 0 || i >= len(s.titles) {
+		return
+	}
+	posterMu.Lock()
+	if s.busy {
+		posterMu.Unlock()
+		_ = m.sender.AnswerCallback(ctx, queryID, "⏳", false)
+		return
+	}
+	s.busy = true
+	posterMu.Unlock()
+	defer func() {
+		posterMu.Lock()
+		s.busy = false
+		posterMu.Unlock()
+	}()
+
+	show := func() {
+		posterMu.Lock()
+		text, url, btn := posterImageView(sid, s)
+		posterMu.Unlock()
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		_ = m.sender.EditWithPreview(ctx, peer, msgID, text, url, btn, 5)
+	}
+	num, numErr := strconv.Atoi(arg)
+	switch act {
+	case "r": // a page of results
+		posterMu.Lock()
+		if numErr == nil {
+			s.page = num
+		}
+		text, btn := posterResultsView(sid, s)
+		posterMu.Unlock()
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		_ = m.sender.EditWithPreview(ctx, peer, msgID, text, "", btn, 1)
+		return
+	case "o": // a title
+		if numErr != nil || num < 0 || num >= len(s.titles) {
 			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 			return
 		}
-		_ = m.sender.AnswerCallback(ctx, queryID, "Loading images...", false)
-		m.posterOpen(ctx, peer, sid, s, i, 0, msgID)
-	case "b": // back to the title list (a text message again)
-		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
-		text, btn := posterTitlesView(sid, s, s.query)
-		_ = m.sender.EditWithPreview(ctx, peer, msgID, text, "", btn, 1)
-	case "n", "p":
+		m.posterOpen(ctx, peer, sid, s, num, msgID, queryID)
+		return
+	case "b": // back to the results
 		posterMu.Lock()
-		if n := len(posterShown(s)); n > 0 {
-			if action == "n" {
-				s.idx = (s.idx + 1) % n
-			} else {
-				s.idx = (s.idx - 1 + n) % n
+		text, btn := posterResultsView(sid, s)
+		posterMu.Unlock()
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		_ = m.sender.EditWithPreview(ctx, peer, msgID, text, "", btn, 1)
+		return
+	}
+	if s.sel < 0 {
+		_ = m.sender.AnswerCallback(ctx, queryID, "This search expired. Run /p again.", true)
+		return
+	}
+	switch act {
+	case "i": // an image
+		posterMu.Lock()
+		if numErr == nil {
+			s.idx = num
+		}
+		posterMu.Unlock()
+		show()
+	case "k": // Posters / Backdrops
+		posterMu.Lock()
+		ok := len(s.images[arg]) > 0
+		if ok {
+			s.kind, s.idx = arg, 0
+			if s.lang != "all" && posterLangCount(s)[s.lang] == 0 {
+				s.lang = "all"
 			}
 		}
 		posterMu.Unlock()
-		refresh()
-	case "k": // Poster / Backdrop / Logo
+		if !ok {
+			_ = m.sender.AnswerCallback(ctx, queryID, "No images on TMDB for this title.", true)
+			return
+		}
+		show()
+	case "l": // a language
 		posterMu.Lock()
-		if len(s.images[arg]) > 0 {
-			s.kind, s.idx, s.lang = arg, 0, "*"
+		ok := arg == "all" || posterLangCount(s)[arg] > 0
+		if ok {
+			s.lang, s.idx = arg, 0
 		}
 		posterMu.Unlock()
-		refresh()
-	case "l": // the language menu (only the buttons change)
+		if !ok {
+			_ = m.sender.AnswerCallback(ctx, queryID, "No images on TMDB for this title.", true)
+			return
+		}
+		show()
+	case "L": // all the languages
 		posterMu.Lock()
-		btn := posterLangMenu(sid, s)
+		text, btn := posterLangView(sid, s)
 		posterMu.Unlock()
-		_ = m.sender.EditButtons(ctx, peer, msgID, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
-	case "L":
-		if arg == "-" {
-			arg = ""
-		}
+		_ = m.sender.EditWithPreview(ctx, peer, msgID, text, "", btn, 3)
+	case "v":
+		show()
+	case "g": // the original image as a file
 		posterMu.Lock()
-		s.lang, s.idx = arg, 0
-		if len(posterShown(s)) == 0 {
-			s.lang = "*"
+		list := posterFiltered(s)
+		if len(list) == 0 {
+			list = s.images[s.kind]
 		}
+		im := list[s.idx%len(list)]
+		t, kind := s.titles[s.sel], s.kind
 		posterMu.Unlock()
-		refresh()
-	case "v": // back from the language menu
-		refresh()
+		_ = m.sender.AnswerCallback(ctx, queryID, "Sending the original file...", false)
+		dctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		req, _ := http.NewRequestWithContext(dctx, "GET", ext.TMDBImageURL(im.Path, "original"), nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 30<<20))
+		if err != nil || len(body) == 0 {
+			return
+		}
+		orient := "Portrait"
+		if im.Width >= im.Height {
+			orient = "Landscape"
+		}
+		safe := strings.Trim(posterSafeName.ReplaceAllString(t.Name, "_"), "_")
+		if safe == "" {
+			safe = "poster"
+		}
+		safe = posterShort(safe, 60)
+		yr := t.Year
+		if yr == "" {
+			yr = "NA"
+		}
+		name := fmt.Sprintf("%s_%s_%s_%dx%d.jpg", safe, yr, posterKindName[kind], im.Width, im.Height)
+		caption := fmt.Sprintf("<b>%s (%s)</b>\n<blockquote><b>╰</b> <code>%s · %s · %dx%d · %s</code></blockquote>",
+			telegram.EscapeHTML(t.Name), posterYear(t.Year), posterKindName[kind], orient, im.Width, im.Height, ext.TMDBLangName(im.Lang))
+		_, _ = m.sender.SendDocumentBytes(context.Background(), peer, name, body, caption, msgID, nil)
 	default:
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	}

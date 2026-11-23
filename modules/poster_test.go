@@ -7,32 +7,32 @@ import (
 	"azml-go/helper/ext"
 )
 
-func TestPosterView(t *testing.T) {
+func TestPosterImageView(t *testing.T) {
 	s := &posterSession{
-		uid:    1,
-		titles: []ext.TMDBTitle{{ID: 1, MediaType: "movie", Name: "Oppenheimer", Year: "2023"}},
-		title:  ext.TMDBTitle{ID: 1, MediaType: "movie", Name: "Oppenheimer", Year: "2023"},
+		uid: 1, userL: "he", sel: 0, kind: "p", lang: "all",
+		titles: []ext.TMDBTitle{{ID: 7, MediaType: "movie", Name: "Oppenheimer", Year: "2023"}},
 		images: map[string][]ext.TMDBImage{
-			"poster":   {{Path: "/a.jpg", Width: 2000, Height: 3000, Lang: "en"}, {Path: "/b.jpg", Width: 1000, Height: 1500, Lang: "he"}},
-			"backdrop": {{Path: "/c.jpg", Width: 3840, Height: 2160}},
+			"p": {{Path: "/a.jpg", Width: 2000, Height: 3000, Lang: "fr"}, {Path: "/b.jpg", Width: 1000, Height: 1500, Lang: "he"},
+				{Path: "/c.jpg", Width: 1000, Height: 1500, Lang: "en"}, {Path: "/d.jpg", Width: 1000, Height: 1500}},
+			"b": {{Path: "/e.jpg", Width: 3840, Height: 2160}},
 		},
-		kind: "poster", lang: "*",
 	}
-	caption, url, _ := posterView("1", s)
-	for _, w := range []string{"Oppenheimer (2023)", "Type:</b> Poster", "2000 × 3000", "Language:</b> English", "1 / 2"} {
-		if !strings.Contains(caption, w) {
-			t.Fatalf("caption misses %q:\n%s", w, caption)
+	text, url, btn := posterImageView("1", s)
+	for _, w := range []string{"<b>Oppenheimer (2023)</b>", "Poster · Portrait", "Language :</b> <i>French", "2000 x 3000", "1/4", "tmdb.org/movie/7"} {
+		if !strings.Contains(text, w) {
+			t.Fatalf("missing %q in\n%s", w, text)
 		}
 	}
-	if url != "https://image.tmdb.org/t/p/w780/a.jpg" {
-		t.Fatalf("url %s", url)
+	if url != "https://image.tmdb.org/t/p/original/a.jpg" {
+		t.Fatal(url)
 	}
-	s.lang = "he"
-	if c, _, _ := posterView("1", s); !strings.Contains(c, "Hebrew") || !strings.Contains(c, "1 / 1") {
-		t.Fatalf("lang filter: %s", c)
+	kb := btn.BuildBotAPIKeyboard(5)
+	for _, w := range []string{"pstr 1 i 0", "pstr 1 i 3", "pstr 1 k b", "pstr 1 l en", "pstr 1 g", "pstr 1 b"} {
+		if !strings.Contains(kb, w) {
+			t.Fatalf("keyboard misses %q: %s", w, kb)
+		}
 	}
-	s.kind, s.lang = "backdrop", "*"
-	if c, u, _ := posterView("1", s); !strings.Contains(c, "No Text") || !strings.Contains(u, "w1280") {
-		t.Fatalf("backdrop: %s %s", c, u)
+	if l := posterLangs(s); strings.Join(l, ",") != "en,he,xx,fr" {
+		t.Fatalf("lang order %v", l)
 	}
 }

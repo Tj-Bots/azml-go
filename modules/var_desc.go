@@ -53,6 +53,7 @@ var varDescriptions = map[string]string{
 	"LEECH_FILENAME_CAPTION":       "Add custom word caption to leeched file/vedios. Str",
 	"BASE_URL":                     "Valid BASE URL where the bot is deployed to use torrent web files selection. Format of URL should be http://myip, where myip is the IP/Domain(public) of your bot or if you have chosen port other than 80 so write it in this format http://myip:port (http and not https). Str",
 	"BOT_MAX_TASKS":                "Maximum number of Task Bot will Run parallel. (Queue Tasks Included). Int",
+	"PREMIUM_MAX_TASKS":            "Tasks a premium user (/addpremium) may run at once, instead of USER_MAX_TASKS. 0 = no limit. Int",
 	"USER_MAX_TASKS":               "Limit the Maximum task for users of group at a time. use the Int",
 	"LEECH_LIMIT":                  "To limit the Torrent/Direct/ytdlp leech size. the default unit is GB. Int",
 	"TORRENT_LIMIT":                "To limit the size of torrent download. the default unit is GB. Int",

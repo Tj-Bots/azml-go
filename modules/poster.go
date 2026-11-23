@@ -215,7 +215,7 @@ func posterResultsView(sid string, s *posterSession) (string, *telegram.ButtonMa
 		btn.Row()
 	}
 	pagerRow(btn, "pstr "+sid+" r ", s.page, pages)
-	btn.IButton("❌", fmt.Sprintf("pstr %s x", sid))
+	btn.IButtonStyled("❌", fmt.Sprintf("pstr %s x", sid), "danger")
 	btn.Row()
 	return text, btn
 }
@@ -378,8 +378,8 @@ func posterImageView(sid string, s *posterSession) (string, string, *telegram.Bu
 	pagerRow(btn, "pstr "+sid+" i ", s.idx, n)
 	btn.IButtonStyled("Send Original", fmt.Sprintf("pstr %s g", sid), "primary")
 	btn.Row()
-	btn.IButton("◀️", fmt.Sprintf("pstr %s b", sid))
-	btn.IButton("❌", fmt.Sprintf("pstr %s x", sid))
+	btn.IButtonStyled("◀️", fmt.Sprintf("pstr %s b", sid), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("pstr %s x", sid), "danger")
 	btn.Row()
 	return text, ext.TMDBImageURL(im.Path, "original"), btn
 }
@@ -401,8 +401,8 @@ func posterLangView(sid string, s *posterSession) (string, *telegram.ButtonMaker
 		}
 	}
 	btn.Row()
-	btn.IButton("◀️", fmt.Sprintf("pstr %s v", sid))
-	btn.IButton("❌", fmt.Sprintf("pstr %s x", sid))
+	btn.IButtonStyled("◀️", fmt.Sprintf("pstr %s v", sid), "primary")
+	btn.IButtonStyled("❌", fmt.Sprintf("pstr %s x", sid), "danger")
 	btn.Row()
 	text := "㊂ <b><u>Poster Language : " + telegram.EscapeHTML(s.titles[s.sel].Name) + "</u></b>\n\n" +
 		"<blockquote>➲ Choose which images to show. The number is how many images exist in that language.</blockquote>"
@@ -433,12 +433,12 @@ func (m *LeechModule) HandlePosterCallback(ctx context.Context, peer tg.InputPee
 		return
 	}
 	if fromUID != s.uid {
-		_ = m.sender.AnswerCallback(ctx, queryID, "Only the user who searched can use these buttons!", true)
+		_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 		return
 	}
 	if act == "x" {
-		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
-		_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+		_ = m.sender.AnswerCallback(ctx, queryID, "Closed", false)
+		m.sender.DeleteWithCommand(ctx, peer, msgID) // like every ❌ of the bot: the command goes too
 		posterMu.Lock()
 		delete(posterSessions, sid)
 		posterMu.Unlock()

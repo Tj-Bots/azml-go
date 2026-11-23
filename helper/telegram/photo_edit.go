@@ -1,9 +1,13 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gotd/td/tg"
 )
@@ -106,5 +110,54 @@ func (m *MessageSender) EditWithPreview(ctx context.Context, peer tg.InputPeerCl
 	if err != nil && strings.Contains(err.Error(), "not modified") {
 		return nil
 	}
+	return err
+}
+
+// CreateInviteLink: a new invite link of a chat (Bot API), for memberLimit people, valid for ttl.
+func CreateInviteLink(ctx context.Context, chatID int64, name string, memberLimit int, ttl time.Duration) (string, error) {
+	p := map[string]interface{}{"chat_id": chatID, "name": name}
+	if memberLimit > 0 {
+		p["member_limit"] = memberLimit
+	}
+	if ttl > 0 {
+		p["expire_date"] = time.Now().Add(ttl).Unix()
+	}
+	token := getBotToken()
+	if token == "" {
+		return "", fmt.Errorf("no bot token")
+	}
+	body, _ := json.Marshal(p)
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://api.telegram.org/bot%s/createChatInviteLink", token), bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := botAPIHTTPClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var r struct {
+		Ok          bool   `json:"ok"`
+		Description string `json:"description"`
+		Result      struct {
+			InviteLink string `json:"invite_link"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return "", err
+	}
+	if !r.Ok {
+		return "", fmt.Errorf("%s", r.Description)
+	}
+	return r.Result.InviteLink, nil
+}
+
+// RemoveFromChat removes a user from a chat without banning him (ban + unban, Bot API).
+func RemoveFromChat(ctx context.Context, chatID, userID int64) error {
+	if _, err := botAPICall(ctx, "banChatMember", map[string]interface{}{"chat_id": chatID, "user_id": userID}); err != nil {
+		return err
+	}
+	_, err := botAPICall(ctx, "unbanChatMember", map[string]interface{}{"chat_id": chatID, "user_id": userID, "only_if_banned": true})
 	return err
 }

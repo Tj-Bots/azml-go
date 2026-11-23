@@ -66,6 +66,7 @@ type Config struct {
 	VtCustomCmds              string
 	BotMaxTasks               int
 	UserMaxTasks              int
+	PremiumMaxTasks           int // tasks a premium user may run at once (0 = no limit)
 	RealDebridAPI             string
 	DebridLinkAPI             string
 	SafeMode                  bool
@@ -241,6 +242,7 @@ func buildConfig() Config {
 		VtCustomCmds:              getEnv("VT_CUSTOM_CMDS", ""),
 		BotMaxTasks:               getEnvInt("BOT_MAX_TASKS", 15),
 		UserMaxTasks:              getEnvInt("USER_MAX_TASKS", 3),
+		PremiumMaxTasks:           getEnvInt("PREMIUM_MAX_TASKS", 6),
 		RealDebridAPI:             getEnv("REAL_DEBRID_API", ""),
 		DebridLinkAPI:             getEnv("DEBRID_LINK_API", ""),
 		SafeMode:                  getEnvBool("SAFE_MODE", false),
@@ -611,6 +613,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.QueueAll, _ = strconv.Atoi(val)
 	case "USER_MAX_TASKS":
 		GlobalConfig.UserMaxTasks, _ = strconv.Atoi(val)
+	case "PREMIUM_MAX_TASKS":
+		GlobalConfig.PremiumMaxTasks, _ = strconv.Atoi(val)
 	case "QUEUE_DOWNLOAD":
 		GlobalConfig.QueueDownload, _ = strconv.Atoi(val)
 	case "QUEUE_UPLOAD":
@@ -806,6 +810,7 @@ func configMapLocked() map[string]string {
 		"BASE_URL":                     GlobalConfig.BaseURL,
 		"BOT_MAX_TASKS":                strconv.Itoa(GlobalConfig.BotMaxTasks),
 		"USER_MAX_TASKS":               strconv.Itoa(GlobalConfig.UserMaxTasks),
+		"PREMIUM_MAX_TASKS":            strconv.Itoa(GlobalConfig.PremiumMaxTasks),
 		"LEECH_LIMIT":                  strconv.FormatInt(GlobalConfig.LeechLimit, 10),
 		"TORRENT_LIMIT":                strconv.FormatInt(GlobalConfig.TorrentLimit, 10),
 		"DIRECT_LIMIT":                 strconv.FormatInt(GlobalConfig.DirectLimit, 10),

@@ -554,7 +554,8 @@ func RenderBotLimits() string {
 		"<blockquote><b>╭</b> <b>Token Validity :</b> %s\n"+
 		"┠ <b>User Time Limit :</b> %s / task\n"+
 		"┠ <b>User Parallel Tasks :</b> %s\n"+
+		"┠ <b>Premium Parallel Tasks :</b> %s\n"+
 		"<b>╰</b> <b>Bot Parallel Tasks :</b> %s</blockquote>",
 		num(int64(cfg.DirectLimit)), tl, num(int64(cfg.YtdlpLimit)), num(int64(cfg.PlaylistLimit)), num(int64(cfg.MegaLimit)),
-		num(int64(cfg.LeechLimit)), tv, uti, num(int64(cfg.UserMaxTasks)), num(int64(cfg.BotMaxTasks)))
+		num(int64(cfg.LeechLimit)), tv, uti, num(int64(cfg.UserMaxTasks)), num(int64(cfg.PremiumMaxTasks)), num(int64(cfg.BotMaxTasks)))
 }

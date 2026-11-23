@@ -3025,7 +3025,13 @@ func (m *LeechModule) userTasksOK(ctx context.Context, peer tg.InputPeerClass, m
 	if limit <= 0 {
 		limit = config.Get().UserTasksLimit
 	}
-	if limit <= 0 || telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
+	if telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap) {
+		return true
+	}
+	if telegram.IsPremium(msg.UserID, m.userMap) { // premium: PREMIUM_MAX_TASKS instead (0 = no limit)
+		limit = config.Get().PremiumMaxTasks
+	}
+	if limit <= 0 {
 		return true
 	}
 	n := 0

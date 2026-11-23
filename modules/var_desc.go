@@ -19,6 +19,8 @@ var varDescriptions = map[string]string{
 	"VT_CUSTOM_CMDS":               "Extra tools for the Video Tools menu (-vt), one per line as <code>name: ffmpeg args</code> (the args come after <code>-i video</code>), e.g. <code>No Audio: -map 0 -map -0:a -c copy</code>. Str",
 	"DISABLE_FF_MODE":              "Disable FFmpeg Cmds (-ff) for all users. When True the option is hidden from User Settings. Default is False. Bool",
 	"REAL_DEBRID_API":              "real-debrid.com API token: the same for the hosters Real-Debrid supports (used when DEBRID_LINK_API is not set or fails). Str",
+	"ALLDEBRID_API":                "alldebrid.com API key: hoster links (1fichier, Rapidgator ...) become fast direct links, and magnets / .torrent files are downloaded by AllDebrid (the server does not join the torrent, also with DISABLE_TORRENTS). Str",
+	"ALLDEBRID_MODE":               "What AllDebrid is used for: all, torrents (only magnets / .torrent) or links (only hoster links). Default is all. Str",
 	"DEBRID_LINK_API":              "debrid-link.com API key: links of 360+ hosters (Mega, 1fichier, Rapidgator, Uptobox ...) are downloaded through debrid-link, fast and without the host's limits. Str",
 	"SAFE_MODE":                    "Hide the file names and the source link in the leech log and the finish message (only the file links stay). Default is False. Bool",
 	"AUTO_DELETE_MESSAGE_DURATION": "Seconds after which the bot deletes its short messages together with the command: /l /m /ytdl usage, task limits, /status without tasks, /cancelall menu, empty /history, yt-dlp errors. 0 = keep them. Int",

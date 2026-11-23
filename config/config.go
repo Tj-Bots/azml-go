@@ -69,6 +69,8 @@ type Config struct {
 	PremiumMaxTasks           int // tasks a premium user may run at once (0 = no limit)
 	RealDebridAPI             string
 	DebridLinkAPI             string
+	AllDebridAPI              string
+	AllDebridMode             string // all / torrents / links
 	SafeMode                  bool
 	PmAccess                  bool
 	DumpForAll                bool // /dump (join the Dump channel) for everyone, not only premium
@@ -246,6 +248,8 @@ func buildConfig() Config {
 		PremiumMaxTasks:           getEnvInt("PREMIUM_MAX_TASKS", 6),
 		RealDebridAPI:             getEnv("REAL_DEBRID_API", ""),
 		DebridLinkAPI:             getEnv("DEBRID_LINK_API", ""),
+		AllDebridAPI:              getEnv("ALLDEBRID_API", ""),
+		AllDebridMode:             getEnv("ALLDEBRID_MODE", "all"),
 		SafeMode:                  getEnvBool("SAFE_MODE", false),
 		PmAccess:                  getEnvBool("PM_ACCESS", false),
 		DumpForAll:                getEnvBool("DUMP_FOR_ALL", false),
@@ -571,6 +575,10 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.SafeMode = val == "true" || val == "1"
 	case "DEBRID_LINK_API":
 		GlobalConfig.DebridLinkAPI = val
+	case "ALLDEBRID_API":
+		GlobalConfig.AllDebridAPI = strings.TrimSpace(val)
+	case "ALLDEBRID_MODE":
+		GlobalConfig.AllDebridMode = strings.ToLower(strings.TrimSpace(val))
 	case "REAL_DEBRID_API":
 		GlobalConfig.RealDebridAPI = val
 	case "VT_CUSTOM_CMDS":
@@ -768,6 +776,8 @@ func configMapLocked() map[string]string {
 		"CAP_FONT":                     GlobalConfig.CapFont,
 		"REAL_DEBRID_API":              GlobalConfig.RealDebridAPI,
 		"DEBRID_LINK_API":              GlobalConfig.DebridLinkAPI,
+		"ALLDEBRID_API":                GlobalConfig.AllDebridAPI,
+		"ALLDEBRID_MODE":               GlobalConfig.AllDebridMode,
 		"SAFE_MODE":                    strconv.FormatBool(GlobalConfig.SafeMode),
 		"PM_ACCESS":                    strconv.FormatBool(GlobalConfig.PmAccess),
 		"DUMP_FOR_ALL":                 strconv.FormatBool(GlobalConfig.DumpForAll),

@@ -256,8 +256,8 @@ func renderHTMLTree(node *TreeNode, sb *strings.Builder, depth int, folderCounte
 		if child.IsDir {
 			folderCounter++
 			files, size := treeStats(child)
-			sb.WriteString(fmt.Sprintf(`<div class="folder open"><div class="row frow"><input class="cb fcb" type="checkbox" name="foldernode_%d" aria-label="select folder"><span class="tile t-folder"><svg><use href="#i-folder"/></svg></span><span class="txt"><span class="name">%s</span><span class="sub">%d files · %s</span></span><svg class="chev"><use href="#i-chev"/></svg></div><div class="kids">`,
-				folderCounter, name, files, ext.GetReadableFileSize(size)))
+			sb.WriteString(fmt.Sprintf(`<div class="fold open"><div class="fhead"><span class="ic k-folder"><svg><use href="#i-folder"/></svg></span><span class="tx"><span class="nm">%s</span><span class="mt">%d files · %s</span></span><svg class="chev"><use href="#i-chev"/></svg><input class="ck fcb" type="checkbox" name="foldernode_%d" aria-label="select folder"></div><div class="kids">`,
+				name, files, ext.GetReadableFileSize(size), folderCounter))
 			folderCounter = renderHTMLTree(child, sb, depth+1, folderCounter)
 			sb.WriteString(`</div></div>`)
 			continue
@@ -268,11 +268,11 @@ func renderHTMLTree(node *TreeNode, sb *strings.Builder, depth int, folderCounte
 		}
 		kind := fileKind(child.Name)
 		extName := strings.ToUpper(strings.TrimPrefix(filepath.Ext(child.Name), "."))
-		if extName == "" {
+		if extName == "" || len(extName) > 5 {
 			extName = "FILE"
 		}
-		sb.WriteString(fmt.Sprintf(`<label class="row file" data-kind="%s"><input class="cb fileb" type="checkbox" name="filenode_%s" data-size="%d"%s><span class="tile t-%s"><svg><use href="#i-%s"/></svg></span><span class="txt"><span class="name">%s</span><span class="sub"><b>%s</b> · %s</span></span></label><input type="hidden" value="off" name="filenode_%s">`,
-			kind, html.EscapeString(child.FileID), child.Size, checked, kind, kind, name, html.EscapeString(extName), ext.GetReadableFileSize(child.Size), html.EscapeString(child.FileID)))
+		sb.WriteString(fmt.Sprintf(`<label class="item" data-kind="%s"><span class="ic k-%s"><svg><use href="#i-%s"/></svg><b>%s</b></span><span class="tx"><span class="nm">%s</span><span class="mt">%s</span></span><input class="ck fb" type="checkbox" name="filenode_%s" data-size="%d"%s></label><input type="hidden" value="off" name="filenode_%s">`,
+			kind, kind, kind, html.EscapeString(extName), name, ext.GetReadableFileSize(child.Size), html.EscapeString(child.FileID), child.Size, checked, html.EscapeString(child.FileID)))
 	}
 	return folderCounter
 }

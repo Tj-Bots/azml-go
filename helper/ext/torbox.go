@@ -114,6 +114,14 @@ func tbForm(fields map[string]string, fileField, filePath string) (*bytes.Buffer
 	return &buf, mw.FormDataContentType(), nil
 }
 
+// ADFile is one finished file of a debrid download: its folder inside the torrent and a direct link.
+type ADFile struct {
+	Path string // folder inside the torrent ("" = top)
+	Name string
+	Size int64
+	Link string
+}
+
 // tbItem: an item of torrents/mylist or webdl/mylist.
 type tbItem struct {
 	ID               int64   `json:"id"`

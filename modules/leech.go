@@ -454,17 +454,6 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 
-	// AllDebrid (ALLDEBRID_API): a hoster link becomes its direct link (not a .torrent link)
-	if ext.IsURL(link) && !opt.Ytdl && ext.AllDebridFor("links") && !strings.HasSuffix(strings.ToLower(strings.Split(link, "?")[0]), ".torrent") &&
-		(!ext.IsMegaLink(link) || (cfg.MegaEmail == "" && (user == nil || user.MegaEmail == ""))) {
-		if d, err := ext.AllDebridUnlock(ctx, link); err == nil && d != "" {
-			log.Printf("[LEECH] AllDebrid link for %s", link)
-			link = d
-		} else if err != nil {
-			log.Printf("[LEECH] AllDebrid: %v", err)
-		}
-	}
-
 	// Debrid (DEBRID_LINK_API / REAL_DEBRID_API) like the Python bot; Mega only without a MEGA account
 	if ext.IsURL(link) && !opt.Ytdl && (cfg.DebridLinkAPI != "" || cfg.RealDebridAPI != "") &&
 		(!ext.IsMegaLink(link) || (cfg.MegaEmail == "" && (user == nil || user.MegaEmail == ""))) {
@@ -1129,7 +1118,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	} else if m.debridTorrents(msg.UserID) && isTorrentInput(link, nil) {
 		modeStr = "#Leech | #" + m.debridName(msg.UserID)
 		uTask.SetInputMode(pythonMode(modeStr, opt))
-		downloadedPath, dlErr = m.downloadAllDebrid(ctx, msg.UserID, link, taskDir, uTask)
+		downloadedPath, dlErr = m.downloadDebridTorrent(ctx, msg.UserID, link, taskDir, uTask)
 	} else if ext.IsMagnet(link) || strings.Contains(strings.ToLower(link), ".torrent") || ext.IsURL(link) || (func() bool { fi, err := os.Stat(link); return err == nil && !fi.IsDir() }()) {
 		cleanLink := strings.Split(strings.TrimSpace(link), "?")[0]
 		isLocalTorrent := false
@@ -1340,7 +1329,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		torrentFile := downloadedPath
 		modeStr = "#Leech | #" + m.debridName(msg.UserID)
 		uTask.SetInputMode(pythonMode(modeStr, opt))
-		p, err := m.downloadAllDebrid(ctx, msg.UserID, torrentFile, taskDir, uTask)
+		p, err := m.downloadDebridTorrent(ctx, msg.UserID, torrentFile, taskDir, uTask)
 		_ = os.Remove(torrentFile)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -3211,30 +3200,25 @@ func (m *LeechModule) downloadGofile(ctx context.Context, peer tg.InputPeerClass
 	return taskDir, nil
 }
 
-// downloadAllDebrid: a magnet / .torrent (link or file) downloaded by AllDebrid, then its files
-// from AllDebrid over HTTPS (aria2). The server never joins the torrent.
+// downloadDebridTorrent: a magnet / .torrent (link or file) downloaded by TorBox, then its files
+// from TorBox over HTTPS (aria2). The server never joins the torrent.
 // torboxFor: TorBox is set for kind and this user may use it (TORBOX_ACCESS).
 func (m *LeechModule) torboxFor(kind string, uid int64) bool {
 	sudo := telegram.IsOwner(uid) || telegram.IsSudo(uid, m.userMap)
 	return ext.TorBoxFor(kind, uid, sudo, telegram.IsPremium(uid, m.userMap))
 }
 
-// debridTorrents: a debrid service (TorBox, AllDebrid) takes the torrents of this user.
+// debridTorrents: TorBox takes the torrents of this user.
 func (m *LeechModule) debridTorrents(uid int64) bool {
-	return m.torboxFor("torrents", uid) || ext.AllDebridFor("torrents")
+	return m.torboxFor("torrents", uid)
 }
 
-func (m *LeechModule) debridName(uid int64) string {
-	if m.torboxFor("torrents", uid) {
-		return "TorBox"
-	}
-	return "AllDebrid"
-}
+func (m *LeechModule) debridName(uid int64) string { return "TorBox" }
 
 func (m *LeechModule) downloadAllDebrid(ctx context.Context, uid int64, link, taskDir string, uTask *ext.UnifiedTask) (string, error) {
 	src := link
 	low := strings.ToLower(strings.Split(link, "?")[0])
-	if ext.IsURL(link) && strings.HasSuffix(low, ".torrent") { // a .torrent link: the file is sent to AllDebrid
+	if ext.IsURL(link) && strings.HasSuffix(low, ".torrent") { // a .torrent link: the file is sent to TorBox
 		req, err := http.NewRequestWithContext(ctx, "GET", link, nil)
 		if err != nil {
 			return "", err
@@ -3248,7 +3232,7 @@ func (m *LeechModule) downloadAllDebrid(ctx context.Context, uid int64, link, ta
 		if err != nil || len(b) == 0 {
 			return "", fmt.Errorf("could not get the .torrent file")
 		}
-		src = filepath.Join(taskDir, "alldebrid.torrent")
+		src = filepath.Join(taskDir, "debrid.torrent")
 		if err := os.WriteFile(src, b, 0o644); err != nil {
 			return "", err
 		}
@@ -3266,21 +3250,9 @@ func (m *LeechModule) downloadAllDebrid(ctx context.Context, uid int64, link, ta
 		}
 		uTask.SetProgress(done, total, speed, eta)
 	}
-	var files []ext.ADFile
-	var name string
-	var err error
-	if provider == "TorBox" {
-		var cleanup func()
-		files, cleanup, name, err = ext.TorBoxTorrent(ctx, src, progress)
-		if err == nil {
-			defer cleanup() // it leaves the TorBox account when the files are here
-		}
-	} else {
-		var id int64
-		files, id, name, err = ext.AllDebridTorrent(ctx, src, progress)
-		if err == nil {
-			defer ext.AllDebridDelete(id) // the magnet leaves the AllDebrid account when the files are here
-		}
+	files, cleanup, name, err := ext.TorBoxTorrent(ctx, src, progress)
+	if err == nil {
+		defer cleanup() // it leaves the TorBox account when the files are here
 	}
 	if err != nil {
 		return "", err
@@ -3517,8 +3489,6 @@ func pythonMode(modeStr string, opt types.LeechOptions) string {
 		eng = "#Mega"
 	case strings.Contains(modeStr, "GDrive"):
 		eng = "#GDrive"
-	case strings.Contains(modeStr, "AllDebrid"):
-		eng = "#AllDebrid"
 	case strings.Contains(modeStr, "TorBox"):
 		eng = "#TorBox"
 	}

@@ -69,8 +69,6 @@ type Config struct {
 	PremiumMaxTasks           int // tasks a premium user may run at once (0 = no limit)
 	RealDebridAPI             string
 	DebridLinkAPI             string
-	AllDebridAPI              string
-	AllDebridMode             string // all / torrents / links
 	TorBoxAPI                 string
 	TorBoxMode                string // all / torrents / links
 	TorBoxAccess              string // sudo / premium / all
@@ -251,8 +249,6 @@ func buildConfig() Config {
 		PremiumMaxTasks:           getEnvInt("PREMIUM_MAX_TASKS", 6),
 		RealDebridAPI:             getEnv("REAL_DEBRID_API", ""),
 		DebridLinkAPI:             getEnv("DEBRID_LINK_API", ""),
-		AllDebridAPI:              getEnv("ALLDEBRID_API", ""),
-		AllDebridMode:             getEnv("ALLDEBRID_MODE", "all"),
 		TorBoxAPI:                 getEnv("TORBOX_API", ""),
 		TorBoxMode:                getEnv("TORBOX_MODE", "all"),
 		TorBoxAccess:              getEnv("TORBOX_ACCESS", "sudo"),
@@ -581,10 +577,6 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.SafeMode = val == "true" || val == "1"
 	case "DEBRID_LINK_API":
 		GlobalConfig.DebridLinkAPI = val
-	case "ALLDEBRID_API":
-		GlobalConfig.AllDebridAPI = strings.TrimSpace(val)
-	case "ALLDEBRID_MODE":
-		GlobalConfig.AllDebridMode = strings.ToLower(strings.TrimSpace(val))
 	case "TORBOX_API":
 		GlobalConfig.TorBoxAPI = strings.TrimSpace(val)
 	case "TORBOX_MODE":
@@ -788,8 +780,6 @@ func configMapLocked() map[string]string {
 		"CAP_FONT":                     GlobalConfig.CapFont,
 		"REAL_DEBRID_API":              GlobalConfig.RealDebridAPI,
 		"DEBRID_LINK_API":              GlobalConfig.DebridLinkAPI,
-		"ALLDEBRID_API":                GlobalConfig.AllDebridAPI,
-		"ALLDEBRID_MODE":               GlobalConfig.AllDebridMode,
 		"TORBOX_API":                   GlobalConfig.TorBoxAPI,
 		"TORBOX_MODE":                  GlobalConfig.TorBoxMode,
 		"TORBOX_ACCESS":                GlobalConfig.TorBoxAccess,

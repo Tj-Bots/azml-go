@@ -19,8 +19,6 @@ var varDescriptions = map[string]string{
 	"VT_CUSTOM_CMDS":               "Extra tools for the Video Tools menu (-vt), one per line as <code>name: ffmpeg args</code> (the args come after <code>-i video</code>), e.g. <code>No Audio: -map 0 -map -0:a -c copy</code>. Str",
 	"DISABLE_FF_MODE":              "Disable FFmpeg Cmds (-ff) for all users. When True the option is hidden from User Settings. Default is False. Bool",
 	"REAL_DEBRID_API":              "real-debrid.com API token: the same for the hosters Real-Debrid supports (used when DEBRID_LINK_API is not set or fails). Str",
-	"ALLDEBRID_API":                "alldebrid.com API key: hoster links (1fichier, Rapidgator ...) become fast direct links, and magnets / .torrent files are downloaded by AllDebrid (the server does not join the torrent, also with DISABLE_TORRENTS). Str",
-	"ALLDEBRID_MODE":               "What AllDebrid is used for: all, torrents (only magnets / .torrent) or links (only hoster links). Default is all. Str",
 	"TORBOX_API":                   "torbox.app API key: magnets / .torrent files (and hoster links on paid plans) are downloaded by TorBox, the bot takes the files over HTTPS (the server does not join the torrent, also with DISABLE_TORRENTS). Str",
 	"TORBOX_MODE":                  "What TorBox is used for: all, torrents (only magnets / .torrent) or links (only hoster links). Default is all. Str",
 	"TORBOX_ACCESS":                "Who may use TorBox: sudo (the owner and sudo users, default: TorBox forbids sharing an account), premium (also /addpremium users) or all. Str",

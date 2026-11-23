@@ -22,6 +22,7 @@ var varDescriptions = map[string]string{
 	"TORBOX_API":                   "torbox.app API key: magnets / .torrent files (and hoster links on paid plans) are downloaded by TorBox, the bot takes the files over HTTPS (the server does not join the torrent, also with DISABLE_TORRENTS). Str",
 	"TORBOX_MODE":                  "What TorBox is used for: all, torrents (only magnets / .torrent) or links (only hoster links). Default is all. Str",
 	"TORBOX_ACCESS":                "Who may use TorBox: sudo (the owner and sudo users, default: TorBox forbids sharing an account), premium (also /addpremium users) or all. Str",
+	"TORBOX_USER_TASKS":            "TorBox torrents one user may run at once (owner and sudo: no limit). 0 = no limit. Default is 1. Int",
 	"DEBRID_LINK_API":              "debrid-link.com API key: links of 360+ hosters (Mega, 1fichier, Rapidgator, Uptobox ...) are downloaded through debrid-link, fast and without the host's limits. Str",
 	"SAFE_MODE":                    "Hide the file names and the source link in the leech log and the finish message (only the file links stay). Default is False. Bool",
 	"AUTO_DELETE_MESSAGE_DURATION": "Seconds after which the bot deletes its short messages together with the command: /l /m /ytdl usage, task limits, /status without tasks, /cancelall menu, empty /history, yt-dlp errors. 0 = keep them. Int",

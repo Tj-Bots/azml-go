@@ -637,6 +637,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		go func() {
 			t := time.NewTicker(time.Second)
 			defer t.Stop()
+			var lastSize int64
 			for {
 				select {
 				case <-ctx.Done():
@@ -645,16 +646,19 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 					return
 				case <-t.C:
 				}
+				// checked again whenever the size changes (a .torrent file from Telegram is tiny, then
+				// TorBox gives the size of the torrent itself)
 				size := uTask.Size()
-				if size <= 0 {
+				if size <= 0 || size == lastSize {
 					continue
 				}
+				lastSize = size
 				if e := ext.CheckSizeLimits(msg.UserID, size, kind, opt.IsExtract, opt.IsZip, !opt.IsMirror); e != "" {
 					log.Printf("[LIMIT] %s stopped for user %d: %s", displayName, msg.UserID, strings.ReplaceAll(e, "\n", " "))
 					limitHit.Store(&e)
 					cancel()
+					return
 				}
-				return
 			}
 		}()
 	}
@@ -3202,6 +3206,11 @@ func (m *LeechModule) downloadGofile(ctx context.Context, peer tg.InputPeerClass
 
 // downloadDebridTorrent: a magnet / .torrent (link or file) downloaded by TorBox, then its files
 // from TorBox over HTTPS (aria2). The server never joins the torrent.
+var (
+	torboxMu      sync.Mutex
+	torboxRunning = map[int64]int{} // TorBox torrents running per user
+)
+
 // torboxFor: TorBox is set for kind and this user may use it (TORBOX_ACCESS).
 func (m *LeechModule) torboxFor(kind string, uid int64) bool {
 	sudo := telegram.IsOwner(uid) || telegram.IsSudo(uid, m.userMap)
@@ -3237,6 +3246,21 @@ func (m *LeechModule) downloadDebridTorrent(ctx context.Context, uid int64, link
 			return "", err
 		}
 		defer os.Remove(src)
+	}
+	// TORBOX_USER_TASKS: TorBox torrents one user may run at once (owner and sudo: no limit)
+	if lim := config.Get().TorBoxUserTasks; lim > 0 && !telegram.IsOwner(uid) && !telegram.IsSudo(uid, m.userMap) {
+		torboxMu.Lock()
+		if torboxRunning[uid] >= lim {
+			torboxMu.Unlock()
+			return "", fmt.Errorf("You can run %d torrent(s) at once. Wait for your torrent to finish.", lim)
+		}
+		torboxRunning[uid]++
+		torboxMu.Unlock()
+		defer func() {
+			torboxMu.Lock()
+			torboxRunning[uid]--
+			torboxMu.Unlock()
+		}()
 	}
 	provider := m.debridName(uid)
 	uTask.SetStatus(types.StatusDownloading, provider)

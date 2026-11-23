@@ -324,7 +324,7 @@ func (g *GDriveClient) apiFileInfo(id, token string) (*GDriveFile, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("gdrive API error (%d): %s", resp.StatusCode, string(b))
+		return nil, fmt.Errorf("%s", gdErrText(b)) // only the message of Google, not the whole JSON
 	}
 
 	var f GDriveFile

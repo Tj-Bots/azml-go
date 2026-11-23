@@ -1565,6 +1565,13 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		dumpID = user.DumpChatID
 	}
 
+	// /status shows the upload of all the files as one (like the Python bot), not file by file
+	batchName := ""
+	if len(filesToUpload) > 1 {
+		batchName = displayName
+	}
+	uTask.BeginBatch(batchName, totalUploadSize)
+	defer uTask.EndBatch()
 	for _, curFile := range filesToUpload {
 		userExcl := ""
 		if user != nil {

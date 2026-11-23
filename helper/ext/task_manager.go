@@ -411,6 +411,35 @@ type UnifiedTask struct {
 	leechers   int
 	isTorrent  bool
 	mu         sync.RWMutex
+
+	// a batch (several files / parts): /status shows the whole task like the Python bot, not
+	// one file after another. Each file reports its own progress; batchDone sums the ones done.
+	batch      bool
+	batchName  string // "" = keep the names the files set
+	batchTotal int64
+	batchDone  int64
+	itemCur    int64
+	itemTotal  int64
+}
+
+// BeginBatch: from now on the uploads of all the files count as one task of total bytes
+// (name "" keeps the file names). EndBatch stops it.
+func (u *UnifiedTask) BeginBatch(name string, total int64) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.batch, u.batchName, u.batchTotal, u.batchDone, u.itemCur, u.itemTotal = true, name, total, 0, 0, 0
+	if name != "" {
+		u.name = filepath.Base(name)
+	}
+	if total > 0 {
+		u.size = total
+	}
+}
+
+func (u *UnifiedTask) EndBatch() {
+	u.mu.Lock()
+	u.batch = false
+	u.mu.Unlock()
 }
 
 // SetPeers shows seeders / leechers of a torrent in the status.
@@ -536,6 +565,27 @@ func (u *UnifiedTask) Cancel() error {
 func (u *UnifiedTask) SetProgress(downloaded, size int64, speed float64, eta string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
+	if u.batch && u.status == types.StatusUploading && u.batchTotal > 0 {
+		// a new file / part starts again from 0: the one before is done
+		if downloaded < u.itemCur {
+			u.batchDone += u.itemTotal
+		}
+		u.itemCur = downloaded
+		if size > 0 {
+			u.itemTotal = size
+		}
+		done := u.batchDone + downloaded
+		if done > u.batchTotal {
+			done = u.batchTotal
+		}
+		u.downloaded, u.size, u.speed = done, u.batchTotal, speed
+		u.eta = eta
+		if speed > 0 {
+			u.eta = GetReadableTime(int64(float64(u.batchTotal-done) / speed))
+		}
+		u.progress = float64(done) / float64(u.batchTotal) * 100
+		return
+	}
 	u.downloaded = downloaded
 	if size > 0 {
 		u.size = size
@@ -571,6 +621,9 @@ func (u *UnifiedTask) SetEngine(engine string) {
 func (u *UnifiedTask) SetName(name string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
+	if u.batch && u.batchName != "" {
+		return // the batch keeps the task name
+	}
 	clean := filepath.Base(name)
 	if clean != "" && clean != "." && clean != "/" {
 		u.name = clean
@@ -580,6 +633,9 @@ func (u *UnifiedTask) SetName(name string) {
 func (u *UnifiedTask) SetSize(size int64) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
+	if u.batch && u.batchTotal > 0 && u.status == types.StatusUploading {
+		return
+	}
 	if size > 0 {
 		u.size = size
 	}

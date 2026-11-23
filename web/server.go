@@ -342,6 +342,13 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 .kpi small{color:var(--dim);font-size:13px;font-weight:500}
 .bar{height:6px;background:var(--s3);border-radius:9px;margin-top:12px;overflow:hidden}
 .bar i{display:block;height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,#6d28d9,var(--acc2));transition:width .25s}
+.srch-row{display:flex;gap:8px;margin-top:10px}
+.srch-row .search{margin-top:0;flex:1;min-width:0}
+.search input{min-width:0;width:100%}
+.selall{flex:0 0 auto;display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--s1);color:var(--tx);border-radius:14px;padding:0 14px;font:600 14px Inter,system-ui,sans-serif;cursor:pointer;transition:.15s}
+.selall:active{transform:scale(.96)}
+.selall.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.ibtn.tg{color:#38bdf8;text-decoration:none;margin-right:2px}
 .search{margin-top:10px;display:flex;align-items:center;gap:10px;background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:0 14px;color:var(--dim)}
 .search:focus-within{border-color:var(--acc)}
 .search input{flex:1;background:none;border:0;outline:none;color:var(--tx);font:inherit;padding:12px 0}
@@ -410,6 +417,7 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 <symbol id="i-invert" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
 <symbol id="i-fold" viewBox="0 0 24 24"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+<symbol id="i-tg" viewBox="0 0 24 24"><path d="M21.5 4.5L2.8 11.7c-.9.4-.9 1.6.1 1.9l4.6 1.4 1.8 5.5c.3.8 1.3 1 1.9.4l2.6-2.5 4.8 3.5c.7.5 1.7.1 1.9-.7l3.1-14.9c.2-1-.8-1.8-1.9-1.3z"/><path d="M8.5 14.8l9.5-7.3"/></symbol>
 </svg>
 <div class="toast" id="toast"><svg><use href="#i-check"/></svg><span>Saved — go back to Telegram and press <b>Done Selecting</b></span></div>
 <div class="wrap">
@@ -417,7 +425,8 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
     <div class="head">
       <img src="https://raw.githubusercontent.com/Tj-Bots/Leech-TJ/wzgram/docs/logo.png" alt="">
       <div class="t"><h1>Select Files</h1><p id="hint">Choose what to download</p></div>
-      <button type="button" class="ibtn" id="menuBtn" aria-label="Menu"><svg><use href="#i-menu"/></svg></button>
+      <a class="ibtn tg" href="https://t.me/TJ_Bots" target="_blank" rel="noopener" aria-label="Our channel"><svg><use href="#i-tg"/></svg></a>
+      <button type="button" class="ibtn" id="menuBtn" aria-label="Filter"><svg><use href="#i-menu"/></svg></button>
     </div>
     <div class="card">
       <div class="kpis">
@@ -426,7 +435,7 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
       </div>
       <div class="bar"><i id="bar"></i></div>
     </div>
-    <label class="search"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Search files" autocomplete="off"></label>
+    <div class="srch-row"><label class="search"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Search files" autocomplete="off"></label><button type="button" class="selall" id="selAll"><svg><use href="#i-all"/></svg><span>All</span></button></div>
     <div class="fchip" id="fchip"><span id="fname"></span><button type="button" id="fclear">Show all</button></div>
   </div>
   <form id="f" action="{form_url}" method="POST">
@@ -437,12 +446,8 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet">
   <div class="grabzone" id="grab"><div class="grab"></div></div>
-  <h3>Select</h3>
-  <button type="button" class="mi" data-act="all"><span class="tile t-video"><svg><use href="#i-all"/></svg></span>Select all</button>
-  <button type="button" class="mi" data-act="none"><span class="tile t-file"><svg><use href="#i-none"/></svg></span>Select none</button>
-  <button type="button" class="mi" data-act="invert"><span class="tile t-file"><svg><use href="#i-invert"/></svg></span>Invert selection</button>
-  <div class="sep"></div>
   <h3>Show only</h3>
+  <button type="button" class="mi" data-kind=""><span class="tile t-folder"><svg><use href="#i-file"/></svg></span>All files<small id="allCount"></small></button>
   <button type="button" class="mi" data-kind="video"><span class="tile t-video"><svg><use href="#i-video"/></svg></span>Videos<small data-count="video"></small></button>
   <button type="button" class="mi" data-kind="audio"><span class="tile t-audio"><svg><use href="#i-audio"/></svg></span>Audio<small data-count="audio"></small></button>
   <button type="button" class="mi" data-kind="sub"><span class="tile t-sub"><svg><use href="#i-sub"/></svg></span>Subtitles<small data-count="sub"></small></button>
@@ -470,6 +475,9 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
   function update(){
     var n=0,s=0;files.forEach(function(c){c.closest('.file').classList.toggle('on',c.checked);if(c.checked){n++;s+=+c.dataset.size||0}});
     $('nf').textContent=n;$('ns').textContent=fmt(s);$('bar').style.width=(total?s/total*100:0)+'%';sync();
+    var v=vis(),allOn=v.length>0&&v.every(function(c){return c.checked});
+    $('selAll').classList.toggle('on',allOn);$('selAll').querySelector('span').textContent=allOn?'None':'All';
+    $('selAll').querySelector('use').setAttribute('href',allOn?'#i-none':'#i-all');
     var same=state()===saved,go=$('go');go.disabled=n===0||same;
     $('goT').textContent=n===0?'Select at least one file':(same?'Selection saved':'Confirm '+n+' file'+(n>1?'s':'')+' · '+fmt(s));
   }
@@ -498,12 +506,15 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
   $('menuBtn').onclick=function(){menu(true)};$('scrim').onclick=function(){menu(false)};
   document.querySelectorAll('.mi').forEach(function(b){b.onclick=function(){
     var a=b.dataset.act,k=b.dataset.kind;
-    if(k){kindF=k;$('fname').textContent='Showing: '+b.textContent.replace(/\d+$/,'').trim();filter()}
+    if(k!==undefined&&a===undefined){kindF=k;$('fname').textContent='Showing: '+b.textContent.replace(/\d+$/,'').trim();filter();update()}
     else if(a==='fold'){var open=folders.some(function(f){return f.classList.contains('open')});folders.forEach(function(f){f.classList.toggle('open',!open)});$('foldT').textContent=open?'Expand folders':'Collapse folders'}
-    else{vis().forEach(function(c){c.checked=a==='all'?true:a==='none'?false:!c.checked});update()}
+
     menu(false);
   }});
-  $('fclear').onclick=function(){kindF='';filter()};
+  $('fclear').onclick=function(){kindF='';filter();update()};
+  $('allCount').textContent=files.length;
+  // one button: All when something is not selected, None when everything (shown) is
+  $('selAll').onclick=function(){var v=vis(),all=v.length>0&&v.every(function(c){return c.checked});v.forEach(function(c){c.checked=!all});update();if(navigator.vibrate)navigator.vibrate(6)};
   $('q').addEventListener('input',function(){query=this.value.trim().toLowerCase();filter()});
   $('f').addEventListener('submit',function(e){if(!files.some(function(c){return c.checked}))e.preventDefault()});
   if(location.search.indexOf('saved=1')>=0){var t=$('toast');t.classList.add('show');setTimeout(function(){t.classList.remove('show')},5000)}

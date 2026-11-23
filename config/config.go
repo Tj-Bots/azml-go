@@ -71,6 +71,9 @@ type Config struct {
 	DebridLinkAPI             string
 	AllDebridAPI              string
 	AllDebridMode             string // all / torrents / links
+	TorBoxAPI                 string
+	TorBoxMode                string // all / torrents / links
+	TorBoxAccess              string // sudo / premium / all
 	SafeMode                  bool
 	PmAccess                  bool
 	DumpForAll                bool // /dump (join the Dump channel) for everyone, not only premium
@@ -250,6 +253,9 @@ func buildConfig() Config {
 		DebridLinkAPI:             getEnv("DEBRID_LINK_API", ""),
 		AllDebridAPI:              getEnv("ALLDEBRID_API", ""),
 		AllDebridMode:             getEnv("ALLDEBRID_MODE", "all"),
+		TorBoxAPI:                 getEnv("TORBOX_API", ""),
+		TorBoxMode:                getEnv("TORBOX_MODE", "all"),
+		TorBoxAccess:              getEnv("TORBOX_ACCESS", "sudo"),
 		SafeMode:                  getEnvBool("SAFE_MODE", false),
 		PmAccess:                  getEnvBool("PM_ACCESS", false),
 		DumpForAll:                getEnvBool("DUMP_FOR_ALL", false),
@@ -579,6 +585,12 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.AllDebridAPI = strings.TrimSpace(val)
 	case "ALLDEBRID_MODE":
 		GlobalConfig.AllDebridMode = strings.ToLower(strings.TrimSpace(val))
+	case "TORBOX_API":
+		GlobalConfig.TorBoxAPI = strings.TrimSpace(val)
+	case "TORBOX_MODE":
+		GlobalConfig.TorBoxMode = strings.ToLower(strings.TrimSpace(val))
+	case "TORBOX_ACCESS":
+		GlobalConfig.TorBoxAccess = strings.ToLower(strings.TrimSpace(val))
 	case "REAL_DEBRID_API":
 		GlobalConfig.RealDebridAPI = val
 	case "VT_CUSTOM_CMDS":
@@ -778,6 +790,9 @@ func configMapLocked() map[string]string {
 		"DEBRID_LINK_API":              GlobalConfig.DebridLinkAPI,
 		"ALLDEBRID_API":                GlobalConfig.AllDebridAPI,
 		"ALLDEBRID_MODE":               GlobalConfig.AllDebridMode,
+		"TORBOX_API":                   GlobalConfig.TorBoxAPI,
+		"TORBOX_MODE":                  GlobalConfig.TorBoxMode,
+		"TORBOX_ACCESS":                GlobalConfig.TorBoxAccess,
 		"SAFE_MODE":                    strconv.FormatBool(GlobalConfig.SafeMode),
 		"PM_ACCESS":                    strconv.FormatBool(GlobalConfig.PmAccess),
 		"DUMP_FOR_ALL":                 strconv.FormatBool(GlobalConfig.DumpForAll),

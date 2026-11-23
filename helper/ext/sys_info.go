@@ -533,7 +533,7 @@ func RenderBotLimits() string {
 		return "∞"
 	}
 	tl := num(int64(cfg.TorrentLimit)) + " GB"
-	if cfg.DisableTorrents && !AllDebridFor("torrents") {
+	if cfg.DisableTorrents && !AllDebridFor("torrents") && strings.TrimSpace(cfg.TorBoxAPI) == "" {
 		tl = "Disabled"
 	}
 	tv := "Disabled"

@@ -66,7 +66,7 @@ func tmdbGet(ctx context.Context, path string, q url.Values, out interface{}) er
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// SearchTMDBTitles: movies and shows for a name in any language (like /cover), at most max.
+// SearchTMDBTitles: movies and shows for a name in any language, titles in English, at most max.
 func SearchTMDBTitles(ctx context.Context, name, year, userLang string, max int) ([]TMDBTitle, error) {
 	var langs []string
 	add := func(l string) {
@@ -77,13 +77,13 @@ func SearchTMDBTitles(ctx context.Context, name, year, userLang string, max int)
 		}
 		langs = append(langs, l)
 	}
+	// English first: the bot is in English, so the titles are too (the user's Telegram
+	// language gave Hebrew names). A name in other letters (ספיידרמן) is found in its language.
+	_ = userLang
+	add("en-US")
 	if l := scriptLang(name); l != "" {
 		add(l)
 	}
-	if l := shortLang(userLang); l != "" && l != "en" {
-		add(l)
-	}
-	add("en-US")
 	var res struct {
 		Results []struct {
 			ID           int    `json:"id"`

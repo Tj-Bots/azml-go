@@ -41,7 +41,7 @@ func (m *HelpModule) getStartText() string {
 		what = "direct links, Mega, and Telegram files"
 	}
 	return "<i>This bot downloads and leeches " + what + " straight back to Telegram.</i>\n\n" +
-		"<i>Type /help to see the available commands.</i>"
+		"<i>Type " + telegram.Cmd("help") + " to see the available commands.</i>"
 }
 
 func (m *HelpModule) getStartButtons() *telegram.ButtonMaker {
@@ -55,32 +55,99 @@ func (m *HelpModule) getStartButtons() *telegram.ButtonMaker {
 	return btn
 }
 
-func (m *HelpModule) getHelpGuideText() string {
-	cfg := config.Get()
-	sfx := cfg.CmdSuffix
-	return fmt.Sprintf("⌬ <b><u>%s :</u></b>\n\n"+
-		"<blockquote><b>╭</b> <b>Leech & Mirror:</b>\n"+
-		"┠ <code>/leech%s [link]</code> — "+leechSources()+"\n"+
-		"┠ <code>/zipleech%s [link]</code> — Zip contents before uploading\n"+
-		"┠ <code>/unzipleech%s [link]</code> — Extract zip/rar/7z archives\n"+
-		"┠ <code>/mirror%s [link]</code> — Upload to GoFile, VikingFile, PixelDrain, BuzzHeavier, DevUploads or StreamTape (<code>-up gofile</code>)\n"+
-		"<b>╰</b> <code>/ytdl%s [link]</code> — Download video/audio via yt-dlp</blockquote>\n\n"+
-		"<blockquote><b>╭</b> <b>User Configuration:</b>\n"+
-		"┠ <code>/us%s</code> — User settings (Prefix, Suffix, Caption, AutoRename)\n"+
-		"┠ <code>/ar%s [template]</code> — Quick AutoRename template set/clear\n"+
-		"┠ <code>/setthumb%s</code> (reply) — Set custom leech thumbnail\n"+
-		"┠ <code>/status%s</code> — Live download & upload speed and progress\n"+
-		"<b>╰</b> <code>"+telegram.Cmd("history")+"</code> — Your last 10 finished tasks</blockquote>\n\n"+
-		"<blockquote><b>╭</b> <b>Admin & Control:</b>\n"+
-		"┠ <code>/bs%s</code> — Bot Settings (Config vars, Aria2c, Private files)\n"+
-		"┠ <code>/cancel%s [GID]</code> — Cancel specific task\n"+
-		"┠ <code>"+telegram.Cmd("a")+"</code> <code>"+telegram.Cmd("ua")+"</code> — Authorize / unauthorize a user or this chat (reply or ID)\n"+
-		"┠ <code>"+telegram.Cmd("addsudo")+"</code> <code>"+telegram.Cmd("rmsudo")+"</code> — Add / remove a Sudo user (owner)\n"+
-		"┠ <code>"+telegram.Cmd("bl")+"</code> <code>"+telegram.Cmd("rbl")+"</code> — Blacklist / unblacklist a user\n"+
-		"┠ <code>"+telegram.Cmd("users")+"</code> <code>"+telegram.Cmd("authlist")+"</code> <code>"+telegram.Cmd("sudolist")+"</code> — Lists of users\n"+
-		"<b>╰</b> <code>/cancelall%s</code> — Cancel all your active tasks</blockquote>",
-		telegram.ToSmallCaps("Commands Guide"),
-		sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx, sfx)
+// The help guide like the Python bot: a menu (Basic / Users / Mics / Owner & Sudos), each page
+// lists the commands of this bot (with its CMD_SUFFIX).
+const helpHeader = "㊂ <b><i>Help Guide Menu!</i></b>\n\n<b>NOTE: <i>Send a command alone to see all its options.</i></b>"
+
+func helpMenu(uid int64, back bool) *telegram.ButtonMaker {
+	btn := telegram.NewButtonMaker()
+	btn.IButton("Basic", fmt.Sprintf("start_hg %d basic", uid))
+	btn.IButton("Users", fmt.Sprintf("start_hg %d users", uid))
+	btn.Row()
+	btn.IButton("Mics", fmt.Sprintf("start_hg %d miscs", uid))
+	btn.IButton("Owner & Sudos", fmt.Sprintf("start_hg %d admin", uid))
+	btn.Row()
+	if back {
+		btn.IButtonStyled("◀️", "start_back", "primary")
+	}
+	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", uid), "danger")
+	btn.Row()
+	return btn
+}
+
+// helpPage: the commands of one page; "" for an unknown page.
+func helpPage(page string) string {
+	c := func(names ...string) string {
+		out := make([]string, len(names))
+		for i, n := range names {
+			out[i] = telegram.Cmd(n)
+		}
+		return strings.Join(out, " or ")
+	}
+	switch page {
+	case "basic":
+		return "⌬ <b><i>Bᴀsɪᴄ Cᴏᴍᴍᴀɴᴅs!</i></b>\n\n<blockquote>" +
+			"<b>Use Leech commands for upload to Telegram:</b>\n" +
+			"<b>╭</b> " + c("leech", "l") + ": " + leechSources() + " to Telegram.\n" +
+			"┠ " + c("zipleech", "zl") + ": Zip the files before the upload.\n" +
+			"<b>╰</b> " + c("unzipleech", "uzl") + ": Extract zip / rar / 7z before the upload.\n\n" +
+			"<b>Use Mirror commands to upload to the cloud:</b>\n" +
+			"<b>╰</b> " + c("mirror", "m") + ": Google Drive (<code>-up gd</code>), RClone (<code>-up rc</code>) or the DDL servers (GoFile, PixelDrain ...).\n\n" +
+			"<b>Use yt-dlp commands for YouTube or any supported sites:</b>\n" +
+			"<b>╭</b> " + c("ytdl", "y") + ": Download with quality buttons.\n" +
+			"<b>╰</b> " + c("ytdlzip", "yz") + ": The same, zipped.\n\n" +
+			"<b>Cancel Tasks:</b>\n" +
+			"<b>╭</b> " + c("cancel", "c") + ": Cancel a task by its gid or reply.\n" +
+			"<b>╰</b> " + c("cancelall", "ca") + ": Cancel all your tasks.</blockquote>"
+	case "users":
+		return "⌬ <b><i>Usᴇʀs Cᴏᴍᴍᴀɴᴅs!</i></b>\n\n<blockquote>" +
+			"<b>Bot Settings:</b>\n" +
+			"<b>╭</b> " + c("us") + ": Open User Settings (PM also).\n" +
+			"┠ " + c("t") + ": Reply to a photo to set it as your thumbnail.\n" +
+			"┠ " + c("ar") + " [template]: Set / clear your AutoRename template.\n" +
+			"<b>╰</b> " + c("cover") + ": Reply to a video to set your thumbnail / TMDB poster as its cover.\n\n" +
+			"<b>Bot Stats:</b>\n" +
+			"<b>╭</b> " + c("status", "s") + ": All the active tasks. Add <code>me</code> for yours only.\n" +
+			"┠ " + c("history") + ": Your last 10 finished tasks with their links.\n" +
+			"┠ " + c("stats", "st") + ": Server stats.\n" +
+			"<b>╰</b> " + c("ping") + ": How long it takes to ping the bot.</blockquote>"
+	case "miscs":
+		return "⌬ <b><i>Mɪsᴄᴇʟʟᴀɴᴇᴏᴜs Cᴏᴍᴍᴀɴᴅs!</i></b>\n\n<blockquote>" +
+			"<b>Extras:</b>\n" +
+			"<b>╭</b> " + c("speedtest", "sp") + ": Check the speed of the server.\n" +
+			"<b>╰</b> " + c("mediainfo", "mi") + " [url/media]: MediaInfo of a file or a download link.\n\n" +
+			"<b>Movie/TV Shows Search:</b>\n" +
+			"<b>╭</b> " + c("p", "poster") + " [name]: Posters & backdrops of a movie / show (or reply to a file).\n" +
+			"┠ " + c("imdb") + ": Search in IMDB.\n" +
+			"<b>╰</b> " + c("anime", "al") + ": Search for anime in AniList.</blockquote>"
+	case "admin":
+		return "⌬ <b><i>Oᴡɴᴇʀ ᴏʀ Sᴜᴅᴏs Cᴏᴍᴍᴀɴᴅs!</i></b>\n\n<blockquote>" +
+			"<b>Bot Settings:</b>\n" +
+			"<b>╭</b> " + c("bs") + ": Open Bot Settings.\n" +
+			"<b>╰</b> " + c("users") + ": User stats info.\n\n" +
+			"<b>Authentication:</b>\n" +
+			"<b>╭</b> " + c("authorize", "a") + ": Authorize a chat or a user.\n" +
+			"┠ " + c("unauthorize", "ua") + ": Unauthorize a chat or a user.\n" +
+			"┠ " + c("authlist") + " / " + c("sudolist") + " / " + c("blacklisted") + ": The lists of users.\n" +
+			"┠ " + c("addsudo") + " / " + c("rmsudo") + ": Add / remove a sudo user (Only Owner).\n" +
+			"┠ " + c("addpremium", "ap") + " / " + c("rmpremium", "rp") + ": Add / remove a premium user.\n" +
+			"<b>╰</b> " + c("blacklist", "bl") + " / " + c("rmblacklist", "rbl") + ": Blacklist / unblacklist a user.\n\n" +
+			"<b>Bot Stats:</b>\n" +
+			"<b>╰</b> " + c("broadcast", "bc") + " [reply]: Broadcast to the users who started the bot.\n\n" +
+			"<b>Cancel Tasks:</b>\n" +
+			"<b>╰</b> /cancelallbot: Cancel all the tasks of all the bots.\n\n" +
+			"<b>Maintenance:</b>\n" +
+			"<b>╭</b> " + c("restart", "r") + ": Restart and update the bot.\n" +
+			"┠ /restartall: Restart and update all the bots.\n" +
+			"┠ /statusall: The status of all the bots.\n" +
+			"┠ " + c("log") + ": The log of the bot.\n" +
+			"<b>╰</b> " + c("shell") + ": Run shell commands (Only Owner).</blockquote>"
+	}
+	return ""
+}
+
+func (m *HelpModule) HandleHelp(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
+	_, _ = m.sender.SendMessageWithButtons(ctx, peer, helpHeader, msg.MessageID, helpMenu(msg.UserID, false), 2)
 }
 
 func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
@@ -109,14 +176,6 @@ func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, ms
 
 	startText := m.getStartText()
 	_, _ = m.sender.SendMessageWithButtons(ctx, peer, startText, msg.MessageID, m.getStartButtons(), 2)
-}
-
-func (m *HelpModule) HandleHelp(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
-	helpText := m.getHelpGuideText()
-	btn := telegram.NewButtonMaker()
-	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", msg.UserID), "danger")
-	btn.Row()
-	_, _ = m.sender.SendMessageWithButtons(ctx, peer, helpText, msg.MessageID, btn, 1)
 }
 
 func (m *HelpModule) HandlePing(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
@@ -168,13 +227,33 @@ func (m *HelpModule) HandleStats(ctx context.Context, peer tg.InputPeerClass, ms
 }
 
 func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64) {
-	if data == "start_help" {
-		helpText := m.getHelpGuideText()
-		helpBtn := telegram.NewButtonMaker()
-		helpBtn.IButtonStyled("◀️", "start_back", "primary")
-		helpBtn.IButtonStyled("❌", fmt.Sprintf("start_close %d", fromUID), "danger")
-		helpBtn.Row()
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, helpText, helpBtn, 2)
+	if data == "start_help" { // the Help button of /start: the menu, ◀️ back to /start
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, helpHeader, helpMenu(fromUID, true), 2)
+		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+		return
+	}
+	if strings.HasPrefix(data, "start_hg ") { // "start_hg <uid> <page>" (home = the menu)
+		parts := strings.Fields(data)
+		if len(parts) < 3 || parts[1] != fmt.Sprintf("%d", fromUID) {
+			_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+			return
+		}
+		page := parts[2]
+		if page == "admin" && !telegram.IsSudo(fromUID, m.userMap) {
+			_ = m.sender.AnswerCallback(ctx, queryID, "Not Sudo or Owner!", true)
+			return
+		}
+		text := helpPage(page)
+		if text == "" {
+			_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, helpHeader, helpMenu(fromUID, false), 2)
+			_ = m.sender.AnswerCallback(ctx, queryID, "", false)
+			return
+		}
+		btn := telegram.NewButtonMaker()
+		btn.IButtonStyled("◀️", fmt.Sprintf("start_hg %d home", fromUID), "primary")
+		btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", fromUID), "danger")
+		btn.Row()
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		return
 	}

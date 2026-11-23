@@ -1358,7 +1358,7 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 		addCmd(bc.Cover[0], "Reply to a video to set your thumbnail/TMDB poster as cover")
 	}
 	if len(bc.Poster) > 0 {
-		addCmd(bc.Poster[0], "Browse TMDB posters, backdrops & logos of a movie/show")
+		addCmd(bc.Poster[0], fmt.Sprintf("or /%s Posters & backdrops of a movie/show", bc.Poster[1]))
 	}
 
 	if len(bc.Cancel) > 0 {

@@ -3215,7 +3215,7 @@ func (m *LeechModule) debridTorrents(uid int64) bool {
 
 func (m *LeechModule) debridName(uid int64) string { return "TorBox" }
 
-func (m *LeechModule) downloadAllDebrid(ctx context.Context, uid int64, link, taskDir string, uTask *ext.UnifiedTask) (string, error) {
+func (m *LeechModule) downloadDebridTorrent(ctx context.Context, uid int64, link, taskDir string, uTask *ext.UnifiedTask) (string, error) {
 	src := link
 	low := strings.ToLower(strings.Split(link, "?")[0])
 	if ext.IsURL(link) && strings.HasSuffix(low, ".torrent") { // a .torrent link: the file is sent to TorBox

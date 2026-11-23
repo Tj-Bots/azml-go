@@ -32,6 +32,7 @@ type Commands struct {
 	Help        []string
 	Log         []string
 	Cover       []string
+	Poster      []string
 	Shell       []string
 	UserSetting []string
 	BotSetting  []string
@@ -161,6 +162,9 @@ func InitCommands() {
 		},
 		Cover: []string{
 			"cover" + suffix,
+		},
+		Poster: []string{
+			"poster" + suffix,
 		},
 		Shell: []string{
 			"shell" + suffix,

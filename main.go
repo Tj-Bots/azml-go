@@ -259,6 +259,7 @@ func main() {
 	app.SetSelectHandler(leechMod.HandleSelectCallback)
 	app.SetCmdHelpHandler(leechMod.HandleHelpCallback)
 	app.SetToolHandlers(leechMod.HandleCover, modules.HandleShell(sender))
+	app.SetPosterHandlers(leechMod.HandlePoster, leechMod.HandlePosterCallback)
 	app.SetSaveHandler(leechMod.HandleSaveCallback)
 	app.SetVTHandlers(leechMod.HandleVTCallback, leechMod.HandleVTInput)
 	app.SetYtdlHandler(ytdlMod.HandleYtdl, ytdlMod.HandleYtdlCallback)

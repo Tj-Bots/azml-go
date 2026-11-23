@@ -71,6 +71,8 @@ type BotApp struct {
 	settingsCbHandler     func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	coverHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	shellHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	posterHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	posterCbHandler       func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	cmdHelpCbHandler      func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)
 	userSettingsImporter  func(ctx context.Context, peer tg.InputPeerClass, replyTo int, userID int64, data []byte)
 	settingsImporter      func(ctx context.Context, peer tg.InputPeerClass, replyTo int, data []byte)
@@ -288,6 +290,11 @@ func (b *BotApp) SetBotSettingsInputHandlers(val func(ctx context.Context, peer 
 func (b *BotApp) SetToolHandlers(cover, shell func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)) {
 	b.coverHandler = cover
 	b.shellHandler = shell
+}
+
+// SetPosterHandlers: /poster and its buttons.
+func (b *BotApp) SetPosterHandlers(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext), cb func(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64)) {
+	b.posterHandler, b.posterCbHandler = h, cb
 }
 
 // SetCmdHelpHandler: the buttons of the /leech /mirror /ytdl usage menu.
@@ -991,6 +998,10 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 		if b.coverHandler != nil {
 			b.coverHandler(ctx, peer, msgCtx)
 		}
+	case telegram.MatchCommand(text, telegram.BotCommands.Poster, b.botUsername):
+		if b.posterHandler != nil {
+			b.posterHandler(ctx, peer, msgCtx)
+		}
 	case telegram.MatchCommand(text, telegram.BotCommands.Shell, b.botUsername):
 		if b.shellHandler != nil {
 			b.shellHandler(ctx, peer, msgCtx)
@@ -1057,6 +1068,10 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 	case data == "save":
 		if b.saveCbHandler != nil {
 			b.saveCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
+		}
+	case strings.HasPrefix(data, "pstr "):
+		if b.posterCbHandler != nil {
+			b.posterCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
 	case strings.HasPrefix(data, "chelp "):
 		if b.cmdHelpCbHandler != nil {
@@ -1341,6 +1356,9 @@ func (b *BotApp) registerBotCommands(ctx context.Context) {
 
 	if len(bc.Cover) > 0 {
 		addCmd(bc.Cover[0], "Reply to a video to set your thumbnail/TMDB poster as cover")
+	}
+	if len(bc.Poster) > 0 {
+		addCmd(bc.Poster[0], "Browse TMDB posters, backdrops & logos of a movie/show")
 	}
 
 	if len(bc.Cancel) > 0 {

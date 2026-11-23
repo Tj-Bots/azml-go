@@ -22,6 +22,7 @@ var varDescriptions = map[string]string{
 	"DEBRID_LINK_API":              "debrid-link.com API key: links of 360+ hosters (Mega, 1fichier, Rapidgator, Uptobox ...) are downloaded through debrid-link, fast and without the host's limits. Str",
 	"SAFE_MODE":                    "Hide the file names and the source link in the leech log and the finish message (only the file links stay). Default is False. Bool",
 	"AUTO_DELETE_MESSAGE_DURATION": "Seconds after which the bot deletes its short messages together with the command: /l /m /ytdl usage, task limits, /status without tasks, /cancelall menu, empty /history, yt-dlp errors. 0 = keep them. Int",
+	"DUMP_FOR_ALL":                 "/dump gives a join link of the Dump channel (LEECH_LOG_ID) to everyone, not only to premium users. Default is False. Bool",
 	"PM_ACCESS":                    "Let everyone use the bot in private chat, like in authorized groups. Blacklisted users stay blocked. Default is False. Bool",
 	"SET_COMMANDS":                 "Register the bot commands in Telegram's command menu at start. Default is True. Bool",
 	"WEB_PINCODE":                  "Ask for the pincode on the file selection web page. False = the Select Files link opens the list directly. Default is True. Bool",

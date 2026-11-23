@@ -110,7 +110,10 @@ func helpPage(page string) string {
 			"<b>╭</b> " + c("status", "s") + ": All the active tasks. Add <code>me</code> for yours only.\n" +
 			"┠ " + c("history") + ": Your last 10 finished tasks with their links.\n" +
 			"┠ " + c("stats", "st") + ": Server stats.\n" +
-			"<b>╰</b> " + c("ping") + ": How long it takes to ping the bot.</blockquote>"
+			"<b>╰</b> " + c("ping") + ": How long it takes to ping the bot.\n\n" +
+			"<b>Premium:</b>\n" +
+			"<b>╭</b> " + c("premium") + ": Your premium status (PM also).\n" +
+			"<b>╰</b> " + c("dump") + ": A join link of the Dump channel (in PM).</blockquote>"
 	case "miscs":
 		return "⌬ <b><i>Mɪsᴄᴇʟʟᴀɴᴇᴏᴜs Cᴏᴍᴍᴀɴᴅs!</i></b>\n\n<blockquote>" +
 			"<b>Extras:</b>\n" +

@@ -260,6 +260,7 @@ func main() {
 	app.SetCmdHelpHandler(leechMod.HandleHelpCallback)
 	app.SetToolHandlers(leechMod.HandleCover, modules.HandleShell(sender))
 	app.SetPosterHandlers(leechMod.HandlePoster, leechMod.HandlePosterCallback)
+	app.SetDumpHandler(authMod.HandleDump)
 	app.SetSaveHandler(leechMod.HandleSaveCallback)
 	app.SetVTHandlers(leechMod.HandleVTCallback, leechMod.HandleVTInput)
 	app.SetYtdlHandler(ytdlMod.HandleYtdl, ytdlMod.HandleYtdlCallback)

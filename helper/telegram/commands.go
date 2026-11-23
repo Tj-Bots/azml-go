@@ -22,6 +22,7 @@ type Commands struct {
 	AddPremium  []string
 	RmPremium   []string
 	Premium     []string
+	Dump        []string
 	Blacklist   []string
 	RmBlacklist []string
 	Users       []string
@@ -118,6 +119,9 @@ func InitCommands() {
 			"removepremium" + suffix,
 			"removepremuim" + suffix,
 			"rp" + suffix,
+		},
+		Dump: []string{
+			"dump" + suffix,
 		},
 		Premium: []string{
 			"premium" + suffix,

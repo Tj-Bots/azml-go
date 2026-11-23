@@ -161,3 +161,62 @@ func RemoveFromChat(ctx context.Context, chatID, userID int64) error {
 	_, err := botAPICall(ctx, "unbanChatMember", map[string]interface{}{"chat_id": chatID, "user_id": userID, "only_if_banned": true})
 	return err
 }
+
+// botAPIRaw calls a Bot API method and returns its "result" as raw JSON.
+func botAPIRaw(ctx context.Context, method string, p map[string]interface{}) (json.RawMessage, error) {
+	token := getBotToken()
+	if token == "" {
+		return nil, fmt.Errorf("no bot token")
+	}
+	body, _ := json.Marshal(p)
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://api.telegram.org/bot%s/%s", token, method), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := botAPIHTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var r struct {
+		Ok          bool            `json:"ok"`
+		Description string          `json:"description"`
+		Result      json.RawMessage `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, err
+	}
+	if !r.Ok {
+		return nil, fmt.Errorf("%s", r.Description)
+	}
+	return r.Result, nil
+}
+
+// IsChatMember: the user is in the chat now (member, admin, owner, or restricted but still in).
+func IsChatMember(ctx context.Context, chatID, userID int64) (bool, error) {
+	raw, err := botAPIRaw(ctx, "getChatMember", map[string]interface{}{"chat_id": chatID, "user_id": userID})
+	if err != nil {
+		return false, err
+	}
+	var m struct {
+		Status   string `json:"status"`
+		IsMember bool   `json:"is_member"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return false, err
+	}
+	switch m.Status {
+	case "creator", "administrator", "member":
+		return true, nil
+	case "restricted":
+		return m.IsMember, nil
+	}
+	return false, nil
+}
+
+// RevokeInviteLink cancels an invite link made by the bot.
+func RevokeInviteLink(ctx context.Context, chatID int64, link string) error {
+	_, err := botAPIRaw(ctx, "revokeChatInviteLink", map[string]interface{}{"chat_id": chatID, "invite_link": link})
+	return err
+}

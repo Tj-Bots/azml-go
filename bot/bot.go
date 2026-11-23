@@ -93,6 +93,7 @@ type BotApp struct {
 	addPremHandler        func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	rmPremHandler         func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	checkPremHandler      func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
+	dumpHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	startHandler          func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	helpHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
 	pingHandler           func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)
@@ -290,6 +291,11 @@ func (b *BotApp) SetBotSettingsInputHandlers(val func(ctx context.Context, peer 
 func (b *BotApp) SetToolHandlers(cover, shell func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)) {
 	b.coverHandler = cover
 	b.shellHandler = shell
+}
+
+// SetDumpHandler: /dump (a join link of the Dump channel).
+func (b *BotApp) SetDumpHandler(h func(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext)) {
+	b.dumpHandler = h
 }
 
 // SetPosterHandlers: /poster and its buttons.
@@ -875,6 +881,11 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	// open his settings in private even when he is not authorized by himself
 	usInPM := chatID == senderID && telegram.MatchCommand(text, telegram.BotCommands.UserSetting, b.botUsername) &&
 		b.memberOfAuthorizedGroup(ctx, senderID)
+	// /premium and /dump always answer in PM (his status; /dump checks its own access)
+	if chatID == senderID && (telegram.MatchCommand(text, telegram.BotCommands.Premium, b.botUsername) ||
+		telegram.MatchCommand(text, telegram.BotCommands.Dump, b.botUsername)) {
+		usInPM = true
+	}
 	if !usInPM && !telegram.IsAuthorized(chatID, senderID, b.userMap) {
 		log.Printf("[AZML-Go] Unauthorized command %q by user %d in chat %d", text, senderID, chatID)
 		sentID, _ := b.sender.SendMessage(ctx, peer, "⌬ <b>Access Denied!</b>\nYou are not authorized to use this bot.\nContact the bot owner to get authorization.", m.ID, nil)
@@ -977,6 +988,10 @@ func (b *BotApp) routeMessage(ctx context.Context, m *tg.Message, entities tg.En
 	case telegram.MatchCommand(text, telegram.BotCommands.Premium, b.botUsername):
 		if b.checkPremHandler != nil {
 			b.checkPremHandler(ctx, peer, msgCtx)
+		}
+	case telegram.MatchCommand(text, telegram.BotCommands.Dump, b.botUsername):
+		if b.dumpHandler != nil {
+			b.dumpHandler(ctx, peer, msgCtx)
 		}
 	case telegram.MatchCommand(text, telegram.BotCommands.Help, b.botUsername):
 		if b.helpHandler != nil {

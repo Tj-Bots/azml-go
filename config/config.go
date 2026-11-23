@@ -71,6 +71,7 @@ type Config struct {
 	DebridLinkAPI             string
 	SafeMode                  bool
 	PmAccess                  bool
+	DumpForAll                bool // /dump (join the Dump channel) for everyone, not only premium
 	SetCommands               bool
 	WebPincode                bool
 	YtDlpOptions              string
@@ -247,6 +248,7 @@ func buildConfig() Config {
 		DebridLinkAPI:             getEnv("DEBRID_LINK_API", ""),
 		SafeMode:                  getEnvBool("SAFE_MODE", false),
 		PmAccess:                  getEnvBool("PM_ACCESS", false),
+		DumpForAll:                getEnvBool("DUMP_FOR_ALL", false),
 		SetCommands:               getEnvBool("SET_COMMANDS", true),
 		WebPincode:                getEnvBool("WEB_PINCODE", true),
 		YtDlpOptions:              getEnv("YT_DLP_OPTIONS", ""),
@@ -563,6 +565,8 @@ func UpdateConfigVar(key, val string) error {
 		GlobalConfig.SetCommands = val == "true" || val == "1"
 	case "PM_ACCESS":
 		GlobalConfig.PmAccess = val == "true" || val == "1"
+	case "DUMP_FOR_ALL":
+		GlobalConfig.DumpForAll = val == "true" || val == "1"
 	case "SAFE_MODE":
 		GlobalConfig.SafeMode = val == "true" || val == "1"
 	case "DEBRID_LINK_API":
@@ -766,6 +770,7 @@ func configMapLocked() map[string]string {
 		"DEBRID_LINK_API":              GlobalConfig.DebridLinkAPI,
 		"SAFE_MODE":                    strconv.FormatBool(GlobalConfig.SafeMode),
 		"PM_ACCESS":                    strconv.FormatBool(GlobalConfig.PmAccess),
+		"DUMP_FOR_ALL":                 strconv.FormatBool(GlobalConfig.DumpForAll),
 		"SET_COMMANDS":                 strconv.FormatBool(GlobalConfig.SetCommands),
 		"WEB_PINCODE":                  strconv.FormatBool(GlobalConfig.WebPincode),
 		"YT_DLP_OPTIONS":               GlobalConfig.YtDlpOptions,

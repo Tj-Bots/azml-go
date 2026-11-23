@@ -66,6 +66,7 @@ var configVarKeys = []string{
 	"SAFE_MODE",
 	"AUTO_DELETE_MESSAGE_DURATION",
 	"PM_ACCESS",
+	"DUMP_FOR_ALL",
 	"SET_COMMANDS",
 	"WEB_PINCODE",
 	"YT_DLP_OPTIONS",

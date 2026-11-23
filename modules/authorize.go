@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"azml-go/config"
@@ -162,7 +163,7 @@ func (m *AuthorizeModule) HandleAddPremium(ctx context.Context, peer tg.InputPee
 	if u.ExpiryTime > 0 {
 		expiryStr = ext.GetReadableTime(durationSec)
 	}
-	_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("◈ <b>User Promoted to Premium!</b>\n• <b>User ID:</b> <code>%d</code>\n• <b>Duration:</b> <code>%s</code>\n• <b>Benefits:</b> more parallel tasks, the Dump channel (<code>%s</code> in PM), no token verification", targetID, expiryStr, telegram.Cmd("premium")), msg.MessageID, nil)
+	_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("◈ <b>User Promoted to Premium!</b>\n• <b>User ID:</b> <code>%d</code>\n• <b>Duration:</b> <code>%s</code>\n• <b>Benefits:</b> more parallel tasks, the bot in PM, the Dump channel (<code>%s</code>)", targetID, expiryStr, telegram.Cmd("dump")), msg.MessageID, nil)
 }
 
 func (m *AuthorizeModule) HandleRmPremium(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
@@ -182,41 +183,105 @@ func (m *AuthorizeModule) HandleRmPremium(ctx context.Context, peer tg.InputPeer
 	u.ExpiryTime = 0
 	_ = ext.DB.SaveUser(u)
 	// he leaves the Dump channel he joined as premium (owner and sudo stay)
-	if ch := config.Get().LeechLogID; ch != 0 && !telegram.IsOwner(targetID) && !telegram.IsSudo(targetID, m.userMap) {
+	if ch := config.Get().LeechLogID; ch != 0 && !config.Get().DumpForAll && !telegram.IsOwner(targetID) && !telegram.IsSudo(targetID, m.userMap) {
 		_ = telegram.RemoveFromChat(ctx, ch, targetID)
 	}
 	_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("× <b>Premium Removed for:</b> <code>%d</code>", targetID), msg.MessageID, nil)
 }
 
+// HandleCheckPremium: /premium, his premium status (always works in PM, like /us). Owner / sudo
+// can reply to someone to see his.
 func (m *AuthorizeModule) HandleCheckPremium(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
 	targetID := msg.UserID
-	if (telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap)) && msg.IsReply {
+	if (telegram.IsOwner(msg.UserID) || telegram.IsSudo(msg.UserID, m.userMap)) && msg.IsReply && msg.ReplyUserID != 0 {
 		targetID = msg.ReplyUserID
 	}
-
+	cfg := config.Get()
+	status, remaining := "<i>Not Premium</i>", "-"
 	if telegram.IsPremium(targetID, m.userMap) {
-		u := m.userMap.Get(targetID)
-		remStr := "Lifetime"
-		if u != nil && u.ExpiryTime > 0 {
-			remSec := u.ExpiryTime - time.Now().Unix()
-			remStr = ext.GetReadableTime(remSec)
+		status, remaining = "<i>Active</i> ✓", "Lifetime"
+		if u := m.userMap.Get(targetID); u != nil && u.ExpiryTime > 0 {
+			remaining = ext.GetReadableTime(u.ExpiryTime - time.Now().Unix())
 		}
-		text := fmt.Sprintf("◈ <b>Premium User Status:</b>\n• <b>User ID:</b> <code>%d</code>\n✓ <b>Status:</b> Active\n• <b>Remaining:</b> <code>%s</code>", targetID, remStr)
-		// the Dump channel: a one-person invite link, only in his PM (in a group anyone could take it)
-		if ch := config.Get().LeechLogID; ch != 0 && targetID == msg.UserID {
-			if msg.ChatID != msg.UserID {
-				text += "\n\n<i>Send " + telegram.Cmd("premium") + " in my PM to join the Dump channel.</i>"
-			} else if link, err := telegram.CreateInviteLink(ctx, ch, fmt.Sprintf("premium %d", targetID), 1, 24*time.Hour); err == nil {
-				btn := telegram.NewButtonMaker()
-				btn.UButtonStyled("📥 Join Dump Channel", link, "primary")
-				btn.Row()
-				_, _ = m.sender.SendMessageWithButtons(ctx, peer, text+"\n\n<i>The link works once, for 24 hours.</i>", msg.MessageID, btn, 1)
-				return
-			}
+		if telegram.IsOwner(targetID) || telegram.IsSudo(targetID, m.userMap) {
+			status = "<i>Owner / Sudo</i> ✓"
 		}
-		_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
-	} else {
-		_, _ = m.sender.SendMessage(ctx, peer, fmt.Sprintf("◈ <b>Premium User Status:</b>\n• <b>User ID:</b> <code>%d</code>\n× <b>Status:</b> Not Premium", targetID), msg.MessageID, nil)
+	}
+	tasks := "∞"
+	if cfg.PremiumMaxTasks > 0 {
+		tasks = strconv.Itoa(cfg.PremiumMaxTasks)
+	}
+	text := fmt.Sprintf("㊂ <b><u>Premium Status :</u></b>\n\n"+
+		"<blockquote><b>╭</b> <b>User :</b> <code>%d</code>\n"+
+		"┠ <b>Status :</b> %s\n"+
+		"<b>╰</b> <b>Remaining :</b> <code>%s</code></blockquote>\n\n"+
+		"<blockquote><b>╭</b> <b>Premium gives :</b>\n"+
+		"┠ %s tasks at once (instead of %d)\n"+
+		"┠ The bot in private chat\n"+
+		"<b>╰</b> The Dump channel: <code>%s</code></blockquote>",
+		targetID, status, remaining, tasks, cfg.UserMaxTasks, telegram.Cmd("dump"))
+	if !telegram.IsPremium(targetID, m.userMap) {
+		text += "\n\n<i>Ask the bot owner for premium.</i>"
+	}
+	_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
+}
+
+// dumpLinks: the last /dump link of each user (a new /dump cancels the old one).
+var (
+	dumpLinksMu sync.Mutex
+	dumpLinks   = map[int64]string{}
+)
+
+// HandleDump: /dump in PM, a join link of the Dump channel (LEECH_LOG_ID) for premium users
+// (everyone with DUMP_FOR_ALL): for him only, once, 5 minutes; none while he is in the channel.
+func (m *AuthorizeModule) HandleDump(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
+	cfg := config.Get()
+	reply := func(text string) {
+		_, _ = m.sender.SendMessage(ctx, peer, text, msg.MessageID, telegram.CloseMarkup(msg.UserID))
+	}
+	if msg.ChatID != msg.UserID {
+		reply("<i>Send</i> <code>" + telegram.Cmd("dump") + "</code> <i>in my PM to get the Dump channel link.</i>")
+		return
+	}
+	ch := cfg.LeechLogID
+	if ch == 0 {
+		reply("<i>This bot has no Dump channel.</i>")
+		return
+	}
+	if !cfg.DumpForAll && !telegram.IsPremium(msg.UserID, m.userMap) {
+		reply("<i>The Dump channel is for premium users only.</i> " + telegram.Cmd("premium"))
+		return
+	}
+	in, err := telegram.IsChatMember(ctx, ch, msg.UserID)
+	if err != nil {
+		reply("<i>Can't check the Dump channel: " + telegram.EscapeHTML(err.Error()) + "</i>\n<i>(the bot must be an admin there, with Invite Users)</i>")
+		return
+	}
+	if in {
+		reply("㊂ <b><u>Dump Channel :</u></b>\n\n<blockquote>✓ You are already in the Dump channel.</blockquote>")
+		return
+	}
+	dumpLinksMu.Lock()
+	old := dumpLinks[msg.UserID]
+	dumpLinksMu.Unlock()
+	if old != "" { // only one link per user: the old one stops working
+		_ = telegram.RevokeInviteLink(ctx, ch, old)
+	}
+	link, err := telegram.CreateInviteLink(ctx, ch, fmt.Sprintf("dump %d", msg.UserID), 1, 5*time.Minute)
+	if err != nil {
+		reply("<i>Can't make a link: " + telegram.EscapeHTML(err.Error()) + "</i>\n<i>(the bot must be an admin there, with Invite Users)</i>")
+		return
+	}
+	dumpLinksMu.Lock()
+	dumpLinks[msg.UserID] = link
+	dumpLinksMu.Unlock()
+	btn := telegram.NewButtonMaker()
+	btn.UButtonStyled("📥 Join Dump Channel", link, "primary")
+	btn.Row()
+	text := "㊂ <b><u>Dump Channel :</u></b>\n\n<blockquote><b>╭</b> For you only, works once\n" +
+		"┠ Valid for 5 minutes\n<b>╰</b> A new " + telegram.Cmd("dump") + " cancels this link</blockquote>"
+	if id, err := m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 1); err == nil && id > 0 {
+		m.sender.AutoDeleteMessage(peer, id, 300) // the link is dead after 5 minutes anyway
 	}
 }
 

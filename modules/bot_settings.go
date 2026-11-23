@@ -410,7 +410,7 @@ func (m *BotSettingsModule) buildVarsMenu(page int) (string, *telegram.ButtonMak
 	var keys []string
 	for _, k := range configVarKeys {
 		// with DISABLE_TORRENTS the torrent vars are hidden
-		if config.Get().DisableTorrents && (k == "TORRENT_TIMEOUT" || k == "TORRENT_LIMIT") {
+		if config.Get().DisableTorrents && (k == "TORRENT_TIMEOUT" || (k == "TORRENT_LIMIT" && strings.TrimSpace(config.Get().TorBoxAPI) == "")) { // with TorBox the torrents (and their limit) are back
 			continue
 		}
 		keys = append(keys, k)

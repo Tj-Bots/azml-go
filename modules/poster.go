@@ -27,7 +27,7 @@ type posterSession struct {
 	kind    string
 	lang    string // "*" = all languages
 	idx     int
-	photoID int // the preview message (0 while the title list is shown)
+	query   string
 	at      time.Time
 }
 
@@ -105,14 +105,15 @@ func (m *LeechModule) HandlePoster(ctx context.Context, peer tg.InputPeerClass, 
 		fail("<i>Nothing found on TMDB for</i> <code>" + telegram.EscapeHTML(query) + "</code>")
 		return
 	}
-	s := &posterSession{uid: msg.UserID, titles: titles, kind: "poster", lang: "*"}
+	s := &posterSession{uid: msg.UserID, titles: titles, kind: "poster", lang: "*", query: query}
 	sid := newPosterSession(s)
 	if len(titles) == 1 {
+		s.query = query
 		m.posterOpen(ctx, peer, sid, s, 0, msg.MessageID, 0)
 		return
 	}
 	text, btn := posterTitlesView(sid, s, query)
-	_, _ = m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 1)
+	_, _ = m.sender.SendWithPreview(ctx, peer, text, "", msg.MessageID, btn, 1)
 }
 
 // repliedName: the file name (or the caption / text) of the replied message.
@@ -154,12 +155,14 @@ func posterTitlesView(sid string, s *posterSession, query string) (string, *tele
 	return text, btn
 }
 
-// posterOpen loads the images of title i and shows the first one (as a new photo message).
+// posterOpen loads the images of title i and shows the first one: the list message (a reply to
+// the command) becomes the preview, or a new reply when there was no list.
 func (m *LeechModule) posterOpen(ctx context.Context, peer tg.InputPeerClass, sid string, s *posterSession, i, replyTo, listMsg int) {
 	t := s.titles[i]
 	p, b, l, err := ext.TMDBTitleImages(ctx, t.MediaType, t.ID)
 	if err != nil || len(p)+len(b)+len(l) == 0 {
-		_, _ = m.sender.SendMessage(ctx, peer, "<i>No images on TMDB for</i> <b>"+telegram.EscapeHTML(t.Name)+"</b>", replyTo, telegram.CloseMarkup(s.uid))
+		text := "<i>No images on TMDB for</i> <b>" + telegram.EscapeHTML(t.Name) + "</b>"
+		_, _ = m.sender.SendMessage(ctx, peer, text, replyTo, telegram.CloseMarkup(s.uid))
 		return
 	}
 	posterMu.Lock()
@@ -171,19 +174,13 @@ func (m *LeechModule) posterOpen(ctx context.Context, peer tg.InputPeerClass, si
 			break
 		}
 	}
-	posterMu.Unlock()
-	caption, url, btn := posterView(sid, s)
-	id, sErr := m.sender.SendPhotoURL(ctx, peer, url, caption, replyTo, btn, 5)
-	if sErr != nil {
-		_, _ = m.sender.SendMessage(ctx, peer, "<i>Can't show the image: "+telegram.EscapeHTML(sErr.Error())+"</i>", replyTo, telegram.CloseMarkup(s.uid))
-		return
-	}
-	posterMu.Lock()
-	s.photoID = id
+	text, url, btn := posterView(sid, s)
 	posterMu.Unlock()
 	if listMsg > 0 {
-		_ = m.sender.DeleteMessage(ctx, peer, []int{listMsg})
+		_ = m.sender.EditWithPreview(ctx, peer, listMsg, text, url, btn, 5)
+		return
 	}
+	_, _ = m.sender.SendWithPreview(ctx, peer, text, url, replyTo, btn, 5)
 }
 
 // posterShown: the images of the current kind and language.
@@ -325,7 +322,7 @@ func (m *LeechModule) HandlePosterCallback(ctx context.Context, peer tg.InputPee
 		posterMu.Lock()
 		caption, url, btn := posterView(sid, s)
 		posterMu.Unlock()
-		if err := m.sender.EditPhotoURL(ctx, peer, msgID, url, caption, btn, 5); err != nil {
+		if err := m.sender.EditWithPreview(ctx, peer, msgID, caption, url, btn, 5); err != nil {
 			_ = m.sender.AnswerCallback(ctx, queryID, "Can't load this image, try the next one.", true)
 			return
 		}
@@ -350,10 +347,8 @@ func (m *LeechModule) HandlePosterCallback(ctx context.Context, peer tg.InputPee
 		m.posterOpen(ctx, peer, sid, s, i, 0, msgID)
 	case "b": // back to the title list (a text message again)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
-		text, btn := posterTitlesView(sid, s, s.title.Name)
-		if _, err := m.sender.SendMessageWithButtons(ctx, peer, text, 0, btn, 1); err == nil {
-			_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
-		}
+		text, btn := posterTitlesView(sid, s, s.query)
+		_ = m.sender.EditWithPreview(ctx, peer, msgID, text, "", btn, 1)
 	case "n", "p":
 		posterMu.Lock()
 		if n := len(posterShown(s)); n > 0 {

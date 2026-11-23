@@ -20,15 +20,15 @@ import (
 // Poster / Backdrop / Logo, a language filter and the original image.
 
 type posterSession struct {
-	uid     int64
-	titles  []ext.TMDBTitle
-	title   ext.TMDBTitle
-	images  map[string][]ext.TMDBImage // poster / backdrop / logo
-	kind    string
-	lang    string // "*" = all languages
-	idx     int
-	query   string
-	at      time.Time
+	uid    int64
+	titles []ext.TMDBTitle
+	title  ext.TMDBTitle
+	images map[string][]ext.TMDBImage // poster / backdrop / logo
+	kind   string
+	lang   string // "*" = all languages
+	idx    int
+	query  string
+	at     time.Time
 }
 
 var (

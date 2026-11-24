@@ -328,7 +328,7 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 		}
 	}
 	elapsed := ext.TimeSinceFormatted(startTime)
-	errMsg := fmt.Sprintf("<i><b>"+header+"</b></i>\n"+
+	errMsg := fmt.Sprintf("<i><b>"+header+"</b></i>\n\n"+ // an empty line before the quote, like the Python bot
 		"<blockquote><b>╭</b> <b>Task for:</b> %s\n"+
 		"┠ <b>Due To:</b> %s\n"+
 		"┠ <b>Mode:</b> %s\n"+

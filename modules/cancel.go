@@ -90,7 +90,8 @@ func (m *CancelModule) HandleCancel(ctx context.Context, peer tg.InputPeerClass,
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		m.replyAndVanish(peer, msg, fmt.Sprintf("✓ Task <code>%s</code> cancelled successfully!", gid))
+		// the task itself answers "Download Stopped!" (like the Python bot); the command goes
+		_ = m.sender.DeleteMessage(bgCtx, peer, []int{msg.MessageID})
 		if m.statusMod != nil {
 			if m.taskMgr.Count() == 0 {
 				m.statusMod.DeleteAllMessages(bgCtx)

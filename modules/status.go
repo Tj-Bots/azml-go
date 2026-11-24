@@ -346,19 +346,9 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 					return
 				}
 				_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
-				name, tag := task.Name(), taskUserTag(task)
 				_ = task.Cancel()
 				m.taskMgr.RemoveTask(gid)
 				_ = m.sender.AnswerCallback(ctx, queryID, "× Task Cancelled!", false)
-				// like /cancel: a message in the chat (it goes away by itself)
-				go func() {
-					bg, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-					defer cancel()
-					text := fmt.Sprintf("%s\n✓ Task <code>%s</code> cancelled successfully!", tag, telegram.EscapeHTML(name))
-					if id, err := m.sender.SendMessage(bg, peer, text, 0, nil); err == nil && id > 0 {
-						m.sender.AutoDeleteMessage(peer, id, 10)
-					}
-				}()
 				if m.taskMgr.Count() == 0 {
 					m.DeleteAllMessages(context.Background())
 				} else {

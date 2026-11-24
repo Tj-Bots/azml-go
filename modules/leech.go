@@ -311,15 +311,24 @@ func (m *LeechModule) sendDownloadError(ctx context.Context, peer tg.InputPeerCl
 		ctx = context.Background() // the task's context is done: the message must still go out
 	}
 	m.deleteCommandLinks(peer, msg) // like the Python bot: also when the task fails or is refused
-	if low := strings.ToLower(errStr); strings.Contains(low, "context canceled") || stopped {
-		if strings.HasPrefix(low, "upload") || strings.Contains(low, " upload failed") {
+	// like the Python bot: "Upload Stopped!" when the upload failed, and a 😘 when the user
+	// stopped the task himself
+	low := strings.ToLower(errStr)
+	isUpload := strings.HasPrefix(low, "upload") || strings.Contains(low, " upload failed")
+	header := "Download Stopped!"
+	if isUpload {
+		header = "Upload Stopped!"
+	}
+	if strings.Contains(low, "context canceled") || stopped {
+		header += " 😘"
+		if isUpload {
 			errStr = "Your upload has been stopped!"
 		} else {
 			errStr = "Download stopped by user!"
 		}
 	}
 	elapsed := ext.TimeSinceFormatted(startTime)
-	errMsg := fmt.Sprintf("<i><b>Download Stopped!</b></i>\n"+
+	errMsg := fmt.Sprintf("<i><b>"+header+"</b></i>\n"+
 		"<blockquote><b>╭</b> <b>Task for:</b> %s\n"+
 		"┠ <b>Due To:</b> %s\n"+
 		"┠ <b>Mode:</b> %s\n"+
@@ -1310,14 +1319,8 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if dlErr != nil {
 		ext.ReleaseDownload(taskUID)
 		if errors.Is(dlErr, context.Canceled) || strings.Contains(strings.ToLower(dlErr.Error()), "cancel") {
-			m.taskMgr.RemoveTask(taskUID)
-			if m.statusMod != nil {
-				if m.taskMgr.Count() == 0 {
-					m.statusMod.DeleteAllMessages(ctx)
-				} else {
-					go m.statusMod.UpdateAllMessages(ctx, true)
-				}
-			}
+			// stopped by the user (Cancel button, /cancel): "Download Stopped!" like the Python bot
+			m.sendDownloadError(ctx, peer, msg, notifyID, "context canceled", modeStr, taskStartTime)
 			return
 		}
 		m.sendDownloadError(ctx, peer, msg, notifyID, dlErr.Error(), modeStr, taskStartTime)

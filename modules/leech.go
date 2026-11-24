@@ -615,6 +615,14 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if cfg.BotPM || (user != nil && user.BotPM) {
 		pmStartID = m.sendPMStart(ctx, msg, sourceURL)
 	}
+	// a task that fails or is cancelled leaves no "Task Started" in PM (nothing follows it there)
+	pmFinished := false
+	defer func() {
+		if pmStartID > 0 && !pmFinished {
+			pm := &tg.InputPeerUser{UserID: msg.UserID, AccessHash: telegram.GetUserAccessHash(msg.UserID)}
+			_ = m.sender.DeleteMessage(context.Background(), pm, []int{pmStartID})
+		}
+	}()
 	if queuedDL {
 		_ = m.sender.EditMessage(ctx, peer, notifyID, "<i>Starting download from queue...</i>", nil)
 	}
@@ -2325,6 +2333,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 
 	// the "Task Started" in PM goes after the upload, like the Python bot: when DELETE_LINKS is
 	// off (the source is still in the group) or CLEAN_LOG_MSG is on
+	pmFinished = true // the files reached the PM: the rule of the Python bot below
 	if pmStartID > 0 && (!cfg.DeleteLinks || cfg.CleanLogMsg) {
 		pm := &tg.InputPeerUser{UserID: msg.UserID, AccessHash: telegram.GetUserAccessHash(msg.UserID)}
 		_ = m.sender.DeleteMessage(context.Background(), pm, []int{pmStartID})

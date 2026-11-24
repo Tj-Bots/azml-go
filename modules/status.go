@@ -312,7 +312,7 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 				q.IButtonStyled("✓ Yes, Cancel", "status ycancel "+gid, "danger")
 				q.IButtonStyled("✘ No", "status ncancel "+gid, "primary")
 				q.Row()
-				text := fmt.Sprintf("<b>Cancel this task?</b>\n<code>%s</code>", telegram.EscapeHTML(task.Name()))
+				text := fmt.Sprintf("%s\n<b>Cancel this task?</b>\n<code>%s</code>", taskUserTag(task), telegram.EscapeHTML(task.Name()))
 				// a normal message (an ephemeral one could not be deleted): only the task's user can
 				// press it, it goes away after the answer or after 30 seconds
 				if id, err := m.sender.SendMessageWithButtons(ctx, peer, text, msgID, q, 2); err == nil && id > 0 {
@@ -346,9 +346,19 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 					return
 				}
 				_ = m.sender.DeleteMessage(ctx, peer, []int{msgID})
+				name, tag := task.Name(), taskUserTag(task)
 				_ = task.Cancel()
 				m.taskMgr.RemoveTask(gid)
 				_ = m.sender.AnswerCallback(ctx, queryID, "× Task Cancelled!", false)
+				// like /cancel: a message in the chat (it goes away by itself)
+				go func() {
+					bg, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					text := fmt.Sprintf("%s\n✓ Task <code>%s</code> cancelled successfully!", tag, telegram.EscapeHTML(name))
+					if id, err := m.sender.SendMessage(bg, peer, text, 0, nil); err == nil && id > 0 {
+						m.sender.AutoDeleteMessage(peer, id, 10)
+					}
+				}()
 				if m.taskMgr.Count() == 0 {
 					m.DeleteAllMessages(context.Background())
 				} else {
@@ -719,4 +729,22 @@ func (m *StatusModule) editStatusID(ctx context.Context, peer tg.InputPeerClass,
 		}
 	}
 	return m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 3)
+}
+
+// taskUserTag: @username of the task's user, else his name as a mention.
+func taskUserTag(t interface {
+	UserID() int64
+}) string {
+	if d, ok := t.(interface {
+		StatusUsername() string
+		StatusSenderName() string
+	}); ok {
+		if u := strings.TrimPrefix(strings.TrimSpace(d.StatusUsername()), "@"); u != "" {
+			return "@" + u
+		}
+		if n := strings.TrimSpace(d.StatusSenderName()); n != "" {
+			return fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", t.UserID(), telegram.EscapeHTML(n))
+		}
+	}
+	return fmt.Sprintf("<a href=\"tg://user?id=%d\">User</a>", t.UserID())
 }

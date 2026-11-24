@@ -52,6 +52,10 @@ var mirrorHelpArgs = []helpArg{
 	{"Same Folder", "<b>Same Folder</b>\n\n<blockquote><code>-m name</code> — every file of <code>-i</code> / <code>-b</code> goes to one folder.</blockquote>", "/cmd -i 3 -m Season 1"},
 	{"Login", "<b>Login</b>\n\n<blockquote><code>-u user -p pass</code> — the user and password of a direct link that needs a login.</blockquote>", "/cmd link -u me -p 1234"},
 	{"Headers", "<b>Headers</b>\n\n<blockquote><code>-h Key: value</code> — extra headers for a direct link.</blockquote>", "/cmd link -h Referer: https://site.com"},
+	{"Video Tools", "<b>Video Tools</b>\n\n<blockquote><code>-vt</code> — a menu before the task starts: rename, merge, extract, remove streams, trim, convert, sync and more.</blockquote>", "/cmd link -vt"},
+	{"Split Tracks", "<b>Split Tracks</b>\n\n<blockquote><code>-st</code> — every video, audio and subtitle track as its own file.</blockquote>", "/cmd link -st"},
+	{"Extract Audio", "<b>Extract Audio</b>\n\n<blockquote><code>-ea</code> — only the audio of the video.\n<code>-ea m4a</code> — in a format: m4a flac opus ogg wav mp3.</blockquote>", "/cmd link -ea mp3"},
+	{"Convert", "<b>Convert</b>\n\n<blockquote><code>-cv mp4</code> — videos to mp4 (no re-encode)\n<code>-ca mp3</code> — audios to mp3</blockquote>", "/cmd link -cv mp4"},
 	{"Rename", "<b>Mirror Rename</b>\n\n<blockquote>Prefix, suffix and remname of mirrored files: /us → Mirror Settings → Rename.</blockquote>", ""},
 }
 

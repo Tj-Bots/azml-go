@@ -27,7 +27,7 @@ var leechHelpArgs = []helpArg{
 	{"Multi", "<b>Multi Links</b>\n\n<blockquote><code>-i 5</code> — reply to the first message: it and the next 4 messages are leeched.</blockquote>", "/cmd -i 5"},
 	{"Bulk", "<b>Bulk</b>\n\n<blockquote><code>-b</code> — reply to a message or .txt with a list of links (one per line).\n<code>-b 3:8</code> — only links 3 to 8.</blockquote>", "/cmd -b"},
 	{"Same Folder", "<b>Same Folder</b>\n\n<blockquote><code>-m name</code> — every file of <code>-i</code> / <code>-b</code> goes to one folder; with <code>-z</code> into one zip.</blockquote>", "/cmd -i 3 -m Season 1 -z"},
-	{"Select Files", "<b>Select Files</b>\n\n<blockquote><code>-s</code> — choose the files to download (GoFile, Drive folder, Mega).</blockquote>", "/cmd link -s"},
+	{"Select Files", "<b>Select Files</b>\n\n<blockquote><code>-s</code> — choose the files to download (GoFile, Drive folder, Mega, torrents).</blockquote>", "/cmd link -s"},
 	{"Thumbnail", "<b>Thumbnail</b>\n\n<blockquote><code>-t link</code> — a thumbnail for this task only: an image link or a t.me link of a photo.</blockquote>", "/cmd link -t https://t.me/c/123/45"},
 	{"Split Size", "<b>Split Size</b>\n\n<blockquote><code>-sp 1.5GB</code> — the split size for this task (e.g. 500MB, 1.5GB).</blockquote>", "/cmd link -sp 1GB"},
 	{"Doc / Media", "<b>Document / Media</b>\n\n<blockquote><code>-d</code> — upload as document\n<code>-med</code> — upload as media</blockquote>", "/cmd link -d"},
@@ -42,9 +42,17 @@ var leechHelpArgs = []helpArg{
 }
 
 var mirrorHelpArgs = []helpArg{
-	{"Host", "<b>Upload Host</b>\n\n<blockquote><code>-up gofile</code> — choose the host directly. The default host is set in /us → Mirror Settings.</blockquote>", "/cmd link -up gofile"},
-	{"Name", "<b>New Name</b>\n\n<blockquote><code>-n name</code> — the new name of the file.</blockquote>", "/cmd link -n My File.zip"},
+	{"Upload To", "<b>Upload To</b>\n\n<blockquote><code>-up gd</code> — Google Drive\n<code>-up rc</code> — RClone (your RClone Path)\n<code>-up gofile</code> — a DDL server (gofile, pixeldrain, buzzheavier ...)\n<code>-up mtp:folder_id</code> — your token.pickle, to that Drive folder\n<code>-up remote:path</code> — an RClone remote\nWithout <code>-up</code>: the default of /us → Mirror Settings.</blockquote>", "/cmd link -up gd"},
+	{"Name", "<b>New Name</b>\n\n<blockquote><code>-n name</code> — the new name of the file or folder.</blockquote>", "/cmd link -n My File.zip"},
 	{"Zip / Extract", "<b>Zip / Extract</b>\n\n<blockquote><code>-z</code> — zip before upload\n<code>-e</code> — extract an archive\n<code>-p pass</code> — the archive password</blockquote>", "/cmd link -z"},
+	{"Join Parts", "<b>Join Split Parts</b>\n\n<blockquote><code>-j</code> — joins .001 .002 ... parts back into one file.</blockquote>", "/cmd link -j"},
+	{"Select Files", "<b>Select Files</b>\n\n<blockquote><code>-s</code> — choose the files to download (GoFile, Drive folder, Mega, torrents).</blockquote>", "/cmd link -s"},
+	{"Multi", "<b>Multi Links</b>\n\n<blockquote><code>-i 5</code> — reply to the first message: it and the next 4 messages are mirrored.</blockquote>", "/cmd -i 5"},
+	{"Bulk", "<b>Bulk</b>\n\n<blockquote><code>-b</code> — reply to a message or .txt with a list of links (one per line).\n<code>-b 3:8</code> — only links 3 to 8.</blockquote>", "/cmd -b"},
+	{"Same Folder", "<b>Same Folder</b>\n\n<blockquote><code>-m name</code> — every file of <code>-i</code> / <code>-b</code> goes to one folder.</blockquote>", "/cmd -i 3 -m Season 1"},
+	{"Login", "<b>Login</b>\n\n<blockquote><code>-u user -p pass</code> — the user and password of a direct link that needs a login.</blockquote>", "/cmd link -u me -p 1234"},
+	{"Headers", "<b>Headers</b>\n\n<blockquote><code>-h Key: value</code> — extra headers for a direct link.</blockquote>", "/cmd link -h Referer: https://site.com"},
+	{"Rename", "<b>Mirror Rename</b>\n\n<blockquote>Prefix, suffix and remname of mirrored files: /us → Mirror Settings → Rename.</blockquote>", ""},
 }
 
 var ytdlHelpArgs = []helpArg{
@@ -62,7 +70,7 @@ var ytdlHelpArgs = []helpArg{
 func helpKind(kind string) (title, intro string, args []helpArg) {
 	switch kind {
 	case "mirror":
-		return "Mirror", "Download and upload to a DDL host.\n➲ <code>/cmd link</code>\n➲ Reply to a link / file with <code>/cmd</code>", mirrorHelpArgs
+		return "Mirror", "Download and upload to Google Drive, RClone or a DDL host.\n➲ <code>/cmd link</code>\n➲ Reply to a link / file with <code>/cmd</code>", mirrorHelpArgs
 	case "ytdl":
 		return "YT-DLP", "Download from YouTube and 1000+ sites (Instagram, TikTok, X, Facebook ...).\n➲ <code>/cmd link</code>\n➲ <code>/cmd link 720p</code>", ytdlHelpArgs
 	}
@@ -77,7 +85,7 @@ func helpCmd(kind string) string {
 	return "/" + c + config.Get().CmdSuffix
 }
 
-const helpPerPage = 8
+const helpPerPage = 30 // every argument on one page, 3 per row
 
 // cmdHelpMenu: the intro and the buttons of one page.
 func cmdHelpMenu(kind string, uid int64, page int) (string, *telegram.ButtonMaker) {
@@ -97,7 +105,7 @@ func cmdHelpMenu(kind string, uid int64, page int) (string, *telegram.ButtonMake
 	for i := page * helpPerPage; i < len(args) && i < (page+1)*helpPerPage; i++ {
 		btn.IButton(args[i].Btn, fmt.Sprintf("chelp %d %s i %d %d", uid, kind, i, page))
 		n++
-		if n%2 == 0 {
+		if n%3 == 0 {
 			btn.Row()
 		}
 	}

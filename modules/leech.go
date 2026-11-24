@@ -1122,7 +1122,11 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	} else if m.debridTorrents(msg.UserID) && isTorrentInput(link, nil) {
 		modeStr = "#Leech | #" + m.debridName(msg.UserID)
 		uTask.SetInputMode(pythonMode(modeStr, opt))
-		downloadedPath, dlErr = m.downloadDebridTorrent(ctx, msg.UserID, link, taskDir, uTask)
+		downloadedPath, dlErr = m.downloadDebridTorrent(ctx, peer, msg, opt.Select, link, taskDir, uTask)
+		if dlErr == errSelectionCancelled {
+			m.sendDownloadError(ctx, peer, msg, notifyID, "File selection cancelled by user", modeStr, taskStartTime)
+			return
+		}
 	} else if ext.IsMagnet(link) || strings.Contains(strings.ToLower(link), ".torrent") || ext.IsURL(link) || (func() bool { fi, err := os.Stat(link); return err == nil && !fi.IsDir() }()) {
 		cleanLink := strings.Split(strings.TrimSpace(link), "?")[0]
 		isLocalTorrent := false
@@ -1333,7 +1337,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		torrentFile := downloadedPath
 		modeStr = "#Leech | #" + m.debridName(msg.UserID)
 		uTask.SetInputMode(pythonMode(modeStr, opt))
-		p, err := m.downloadDebridTorrent(ctx, msg.UserID, torrentFile, taskDir, uTask)
+		p, err := m.downloadDebridTorrent(ctx, peer, msg, opt.Select, torrentFile, taskDir, uTask)
 		_ = os.Remove(torrentFile)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -3224,7 +3228,8 @@ func (m *LeechModule) debridTorrents(uid int64) bool {
 
 func (m *LeechModule) debridName(uid int64) string { return "TorBox" }
 
-func (m *LeechModule) downloadDebridTorrent(ctx context.Context, uid int64, link, taskDir string, uTask *ext.UnifiedTask) (string, error) {
+func (m *LeechModule) downloadDebridTorrent(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, sel bool, link, taskDir string, uTask *ext.UnifiedTask) (string, error) {
+	uid := msg.UserID
 	src := link
 	low := strings.ToLower(strings.Split(link, "?")[0])
 	if ext.IsURL(link) && strings.HasSuffix(low, ".torrent") { // a .torrent link: the file is sent to TorBox
@@ -3280,6 +3285,52 @@ func (m *LeechModule) downloadDebridTorrent(ctx context.Context, uid int64, link
 	}
 	if err != nil {
 		return "", err
+	}
+	// -s: TorBox has the whole torrent; the user picks which files the bot takes from it
+	if sel && len(files) > 1 {
+		selID := fmt.Sprintf("tb%d", time.Now().UnixNano()%1e9)
+		var infos []downloader.MegaFileInfo
+		for i, f := range files {
+			infos = append(infos, downloader.MegaFileInfo{ID: strconv.Itoa(i), Name: f.Name, Size: f.Size, Path: f.Path})
+		}
+		done := RegisterMegaSelectCache(selID, infos, uid)
+		selMsg, _ := m.sender.SendMessage(ctx, peer, fmt.Sprintf("㊂ <b><u>Select Files :</u></b>\n\n<blockquote>The torrent is ready: %d files. Choose them on the web page, then press <b>Done Selecting</b>.</blockquote>", len(files)), msg.MessageID, BuildMegaSelectionButtons(selID))
+		cleanSel := func() {
+			if selMsg > 0 {
+				_ = m.sender.DeleteMessage(context.Background(), peer, []int{selMsg})
+			}
+		}
+		select {
+		case ok := <-done:
+			cleanSel()
+			if !ok {
+				ClearMegaSelectCache(selID)
+				return "", errSelectionCancelled
+			}
+		case <-ctx.Done():
+			cleanSel()
+			ClearMegaSelectCache(selID)
+			return "", ctx.Err()
+		}
+		chosen := map[string]bool{}
+		if c := GetMegaSelectCache(selID); c != nil {
+			for _, f := range c.Files {
+				if f.Selected {
+					chosen[f.ID] = true
+				}
+			}
+		}
+		ClearMegaSelectCache(selID)
+		var keep []ext.ADFile
+		for i, f := range files {
+			if chosen[strconv.Itoa(i)] {
+				keep = append(keep, f)
+			}
+		}
+		if len(keep) == 0 {
+			return "", fmt.Errorf("no files selected")
+		}
+		files = keep
 	}
 	root := taskDir
 	if len(files) > 1 && name != "" {

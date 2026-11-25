@@ -18,7 +18,8 @@ import (
 var GeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta" // a var for the tests
 
 // geminiModels: tried in order (a model the key can't use falls to the next one).
-var geminiModels = []string{"gemini-2.5-flash", "gemini-2.0-flash"}
+// Flash first (the best translation); when its free quota is over, Flash-Lite (much more requests a day).
+var geminiModels = []string{"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"}
 
 var geminiHTTP = &http.Client{Timeout: 3 * time.Minute}
 
@@ -68,10 +69,12 @@ func langNameFor(code string) string {
 	return code
 }
 
-// GeminiTranslate: the lines translated to lang, in the same order (batches of 150).
+// GeminiTranslate: the lines translated to lang, in the same order. Big batches (400 lines, a
+// movie is 3-5 requests): the free quota counts requests, and more lines at once also give the
+// model more context.
 func GeminiTranslate(ctx context.Context, key string, lines []string, lang string) ([]string, error) {
 	out := make([]string, 0, len(lines))
-	const batch = 150
+	const batch = 400
 	for start := 0; start < len(lines); start += batch {
 		end := start + batch
 		if end > len(lines) {
@@ -116,11 +119,17 @@ func geminiBatch(ctx context.Context, key string, lines []string, lang string) (
 				if strings.Contains(low, "not found") || strings.Contains(low, "not supported") {
 					break // this model: next one
 				}
+				if strings.Contains(low, "per day") || strings.Contains(low, "daily") {
+					break // the daily quota of this model is over: the next model
+				}
 				if strings.Contains(low, "quota") || strings.Contains(low, "rate") || strings.Contains(low, "exhausted") {
-					select {
+					if attempt == 1 {
+						break // still over the limit: the next model
+					}
+					select { // the per-minute limit: wait a little, once
 					case <-ctx.Done():
 						return nil, ctx.Err()
-					case <-time.After(20 * time.Second):
+					case <-time.After(30 * time.Second):
 					}
 				}
 				continue

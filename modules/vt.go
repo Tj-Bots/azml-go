@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -90,8 +91,9 @@ type vtState struct {
 	result chan *VTSelection // nil = cancelled
 	once   sync.Once
 	// the tracks of the file, read before the download when possible (vt_streams.go)
-	streams []probeStream
-	probing bool
+	streams  []probeStream
+	probing  bool
+	langPage int // the page of the language list
 }
 
 var vtStates sync.Map // "uid" -> *vtState
@@ -348,6 +350,7 @@ func (m *LeechModule) videoToolsMenu(ctx context.Context, peer tg.InputPeerClass
 	vtStates.Store(key, st)
 	go func() { // the tracks, like /mediainfo (the menu works meanwhile)
 		streams := m.vtProbe(ctx, peer, msg, link)
+		log.Printf("[VT] tracks read before the download: %d", len(streams))
 		st.mu.Lock()
 		st.streams, st.probing = streams, false
 		page := st.page
@@ -442,9 +445,8 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 	case "rename", "trim":
 		st.wait = action
 		ext.SetPendingSettingSession(st.user, "vt_"+action, st.chat, st.msgID, vtTimeout)
-	case "daudio", "dsubs": // the tracks of the file when they were read, else picked after the download
-		kind := map[string]string{"daudio": "audio", "dsubs": "subtitle"}[action]
-		if len(st.tracks(kind)) > 1 {
+	case "daudio", "dsubs": // the page of the tracks (read before the download, or "after the download")
+		if st.probing || len(st.streams) > 0 {
 			st.page = "pick_" + action
 			break
 		}

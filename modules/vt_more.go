@@ -403,7 +403,7 @@ func translateSRT(src, dst, lang, geminiKey string) error {
 			texts[i] = strings.TrimSpace(c.text)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
-		res, err := ext.GeminiTranslate(ctx, geminiKey, texts, lang)
+		res, err := ext.GeminiTranslate(ctx, geminiKey, texts, vtLangName(lang))
 		cancel()
 		if err == nil && len(res) == len(cues) {
 			var sb strings.Builder

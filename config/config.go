@@ -897,7 +897,6 @@ func startupValuesLocked() map[string]string {
 		"AUTHOR_URL":                   c.AuthorURL,
 		"SHOW_EXTRA_CMDS":              b(c.ShowExtraCmds),
 		"TIMEZONE":                     c.Timezone,
-		"ENABLE_FFMPEG_CMDS":           b(c.EnableFFmpegCmds),
 		"FFMPEG_ENCODING":              b(c.FFmpegEncoding),
 		"TMDB_ACCESS_TOKEN":            c.TMDBAccessToken,
 		"DDL_API":                      c.DDLAPI,

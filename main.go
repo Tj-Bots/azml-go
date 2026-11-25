@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -154,6 +155,17 @@ func main() {
 				_ = db.SaveBotSetting("_DEPLOY_CONFIG", snapshot)
 			}
 			n := 0
+			// ENABLE_FFMPEG_CMDS is the old name of DISABLE_FF_MODE (the other way round): it
+			// becomes DISABLE_FF_MODE once, else the two fought over the same setting
+			if v, ok := dbSettings["ENABLE_FFMPEG_CMDS"]; ok {
+				if _, has := dbSettings["DISABLE_FF_MODE"]; !has {
+					on := strings.EqualFold(v, "true") || v == "1"
+					dbSettings["DISABLE_FF_MODE"] = strconv.FormatBool(!on)
+					_ = db.SaveBotSetting("DISABLE_FF_MODE", dbSettings["DISABLE_FF_MODE"])
+				}
+				delete(dbSettings, "ENABLE_FFMPEG_CMDS")
+				_ = db.DeleteBotSetting("ENABLE_FFMPEG_CMDS")
+			}
 			for k, v := range dbSettings {
 				// the core variables come only from the deploy; any other value (also an empty
 				// one from Reset) wins over it, like the Python bot

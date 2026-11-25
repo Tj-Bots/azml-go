@@ -29,6 +29,7 @@ var noExportKeys = map[string]bool{
 	"BASE_URL":            true,
 	"BASE_URL_PORT":       true,
 	"PORT":                true,
+	"CMD_SUFFIX":          true, // each bot has its own (/l1, /l2 ...): a backup of bot 2 must not make bot 1 answer /l2
 }
 
 func exportableKey(key string) bool {
@@ -77,8 +78,8 @@ func (m *BotSettingsModule) sendExport(ctx context.Context, peer tg.InputPeerCla
 	caption := fmt.Sprintf("⌬ <b>Bot Settings Export</b>\n\n"+
 		"┠ <b>Variables:</b> %d (only the changed ones)\n"+
 		"╰ <i>Not included: BOT_TOKEN, OWNER_ID, TELEGRAM_API, TELEGRAM_HASH, DATABASE_URL, DATABASE_NAME, "+
-		"BOT_TOKENS, USER_SESSION_STRING, BASE_URL</i>\n\n"+
-		"<i>To import: /bs → Import/Export Settings → Import, then send this file.</i>", n)
+		"BOT_TOKENS, USER_SESSION_STRING, BASE_URL, CMD_SUFFIX</i>\n\n"+
+		"<i>To import: send this file to the other bot (or /bs → Import/Export Settings → Import).</i>", n)
 	_, err := m.sender.SendDocumentBytes(ctx, peer, SettingsFileName, data, caption, replyTo, nil)
 	return err
 }

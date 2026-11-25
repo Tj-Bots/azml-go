@@ -1088,6 +1088,8 @@ func (b *BotApp) routeCallback(ctx context.Context, cb *tg.UpdateBotCallbackQuer
 		if b.posterCbHandler != nil {
 			b.posterCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 		}
+	case strings.HasPrefix(data, "impset "):
+		b.handleImportOffer(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
 	case strings.HasPrefix(data, "chelp "):
 		if b.cmdHelpCbHandler != nil {
 			b.cmdHelpCbHandler(ctx, peer, cb.QueryID, cb.MsgID, data, cb.UserID)
@@ -1751,6 +1753,12 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				if sess.PromptMsgID > 0 && b.settingsUpdateHandler != nil {
 					b.settingsUpdateHandler(ctx, peer, sess.PromptMsgID, u, "ycookies")
 				}
+				return true
+			}
+
+			// 0c. a backup file (/bs or /us Export) sent without /bs → Import: the bot asks at once
+			if (lowerName == "azml_settings.json" || lowerName == "azml_user_settings.json") && doc.Size <= 4<<20 {
+				b.offerImport(ctx, peer, m.ID, senderID, lowerName == "azml_settings.json", doc)
 				return true
 			}
 

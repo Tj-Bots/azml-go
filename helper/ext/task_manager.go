@@ -442,6 +442,13 @@ func (u *UnifiedTask) EndBatch() {
 	u.mu.Unlock()
 }
 
+// ClearPeers: no more seeders / leechers line (the torrent part is over).
+func (t *UnifiedTask) ClearPeers() {
+	t.mu.Lock()
+	t.seeders, t.leechers, t.isTorrent = 0, 0, false
+	t.mu.Unlock()
+}
+
 // SetPeers shows seeders / leechers of a torrent in the status.
 func (t *UnifiedTask) SetPeers(seeders, leechers int) {
 	t.mu.Lock()

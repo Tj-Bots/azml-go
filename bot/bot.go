@@ -7,7 +7,6 @@ import (
 	"log"
 	"maps"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -1913,28 +1912,8 @@ func (b *BotApp) handleIncomingMedia(ctx context.Context, peer tg.InputPeerClass
 				return false
 			}
 
-			// 1C. Torrent file document
-			if strings.HasSuffix(lowerName, ".torrent") {
-				cfg := config.Get()
-				_ = os.MkdirAll(cfg.DownloadDir, 0755)
-				torrentPath := filepath.Join(cfg.DownloadDir, fmt.Sprintf("%d_%s.torrent", senderID, ext.RandomHex(4)))
-				dl := tdDownloader.NewDownloader()
-				loc := doc.AsInputDocumentFileLocation("")
-				if loc != nil {
-					_, err := dl.Download(b.rawAPI, loc).ToPath(ctx, torrentPath)
-					if err == nil && b.leechHandler != nil {
-						msgCtx := &types.MessageContext{
-							ChatID:     chatID,
-							MessageID:  m.ID,
-							UserID:     senderID,
-							SenderName: torrentSenderName(b.userMap, senderID),
-							Text:       fmt.Sprintf("/leech %s", torrentPath),
-						}
-						b.leechHandler(ctx, peer, msgCtx, false, false)
-						return true
-					}
-				}
-			}
+			// a .torrent file starts only with a command (/leech as its caption or a reply), like
+			// the Python bot: sent alone it is not taken, else every bot in a group started it
 		}
 	}
 

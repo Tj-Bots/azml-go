@@ -62,7 +62,7 @@ func TestTorBoxFlow(t *testing.T) {
 		t.Fatal("mode / access")
 	}
 	var seen int64
-	files, cleanup, name, err := TorBoxTorrent(context.Background(), "magnet:?xt=urn:btih:abc", func(d, _ int64, _ float64, _ string) { seen = d })
+	files, cleanup, name, err := TorBoxTorrent(context.Background(), "magnet:?xt=urn:btih:abc", func(p TBProgress) { seen = p.Done })
 	if err != nil || name != "Show S01" || len(files) != 2 {
 		t.Fatalf("%v %q %+v", err, name, files)
 	}

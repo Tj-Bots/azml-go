@@ -3281,17 +3281,22 @@ func (m *LeechModule) downloadDebridTorrent(ctx context.Context, peer tg.InputPe
 	}
 	provider := m.debridName(uid)
 	uTask.SetStatus(types.StatusDownloading, provider)
-	progress := func(done, total int64, speed float64, n string) {
-		if n != "" {
-			uTask.SetName(n)
+	// while TorBox downloads: its progress, speed, ETA, seeders and peers, like a torrent here
+	progress := func(p ext.TBProgress) {
+		if p.Name != "" {
+			uTask.SetName(p.Name)
 		}
 		eta := "-"
-		if speed > 0 && total > done {
-			eta = ext.GetReadableTime(int64(float64(total-done) / speed))
+		if p.ETA > 0 {
+			eta = ext.GetReadableTime(p.ETA)
+		} else if p.Speed > 0 && p.Total > p.Done {
+			eta = ext.GetReadableTime(int64(float64(p.Total-p.Done) / p.Speed))
 		}
-		uTask.SetProgress(done, total, speed, eta)
+		uTask.SetProgress(p.Done, p.Total, p.Speed, eta)
+		uTask.SetPeers(p.Seeds, p.Peers)
 	}
 	files, cleanup, name, err := ext.TorBoxTorrent(ctx, src, progress)
+	uTask.ClearPeers() // the files now come from TorBox's servers, not from a torrent
 	if err == nil {
 		defer cleanup() // it leaves the TorBox account when the files are here
 	}

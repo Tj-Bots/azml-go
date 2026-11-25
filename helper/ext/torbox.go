@@ -129,6 +129,9 @@ type tbItem struct {
 	Size             int64   `json:"size"`
 	Progress         float64 `json:"progress"`
 	DownloadSpeed    float64 `json:"download_speed"`
+	Seeds            int     `json:"seeds"`
+	Peers            int     `json:"peers"`
+	ETA              int64   `json:"eta"`
 	DownloadState    string  `json:"download_state"`
 	DownloadFinished bool    `json:"download_finished"`
 	DownloadPresent  bool    `json:"download_present"`
@@ -140,8 +143,18 @@ type tbItem struct {
 	} `json:"files"`
 }
 
+// TBProgress: the download on TorBox's servers, for /status.
+type TBProgress struct {
+	Done, Total  int64
+	Speed        float64
+	Name         string
+	Seeds, Peers int
+	ETA          int64 // seconds, 0 = unknown
+	State        string
+}
+
 // tbWait polls an item (torrents or webdl) every 5 seconds until it is on TorBox's servers.
-func tbWait(ctx context.Context, kind string, id int64, onProgress func(done, total int64, speed float64, name string)) (*tbItem, error) {
+func tbWait(ctx context.Context, kind string, id int64, onProgress func(TBProgress)) (*tbItem, error) {
 	deadline := time.Now().Add(12 * time.Hour)
 	for {
 		data, err := tbCall(ctx, "GET", "/"+kind+"/mylist", url.Values{"id": {strconv.FormatInt(id, 10)}, "bypass_cache": {"true"}}, nil, "")
@@ -158,7 +171,7 @@ func tbWait(ctx context.Context, kind string, id int64, onProgress func(done, to
 		state := strings.ToLower(it.DownloadState)
 		if it.DownloadFinished && it.DownloadPresent {
 			if onProgress != nil {
-				onProgress(it.Size, it.Size, 0, it.Name)
+				onProgress(TBProgress{Done: it.Size, Total: it.Size, Name: it.Name, State: it.DownloadState})
 			}
 			return &it, nil
 		}
@@ -170,7 +183,8 @@ func tbWait(ctx context.Context, kind string, id int64, onProgress func(done, to
 			if p > 1 { // some answers give percent
 				p /= 100
 			}
-			onProgress(int64(p*float64(it.Size)), it.Size, it.DownloadSpeed, it.Name)
+			onProgress(TBProgress{Done: int64(p * float64(it.Size)), Total: it.Size, Speed: it.DownloadSpeed, Name: it.Name,
+				Seeds: it.Seeds, Peers: it.Peers, ETA: it.ETA, State: it.DownloadState})
 		}
 		if time.Now().After(deadline) {
 			return nil, fmt.Errorf("TorBox: not ready in time (%s)", it.DownloadState)
@@ -221,7 +235,7 @@ func tbFiles(ctx context.Context, kind string, it *tbItem) ([]ADFile, error) {
 
 // TorBoxTorrent: a magnet (or a local .torrent file) downloaded by TorBox; the files with direct
 // links, a cleanup (removes it from the account) and its name.
-func TorBoxTorrent(ctx context.Context, magnetOrFile string, onProgress func(done, total int64, speed float64, name string)) ([]ADFile, func(), string, error) {
+func TorBoxTorrent(ctx context.Context, magnetOrFile string, onProgress func(TBProgress)) ([]ADFile, func(), string, error) {
 	fields := map[string]string{"seed": "3", "allow_zip": "false"} // 3 = no seeding
 	file := ""
 	if fi, err := os.Stat(magnetOrFile); err == nil && !fi.IsDir() {

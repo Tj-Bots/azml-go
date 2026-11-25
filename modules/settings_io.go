@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -96,6 +97,14 @@ func (m *BotSettingsModule) ImportSettings(ctx context.Context, peer tg.InputPee
 	known := map[string]bool{}
 	for _, k := range config.AllKeys() {
 		known[k] = true
+	}
+	// a backup from before: ENABLE_FFMPEG_CMDS is the old name of DISABLE_FF_MODE (the other way round)
+	if v, ok := f.Settings["ENABLE_FFMPEG_CMDS"]; ok {
+		if _, has := f.Settings["DISABLE_FF_MODE"]; !has {
+			on := strings.EqualFold(strings.TrimSpace(v), "true") || strings.TrimSpace(v) == "1"
+			f.Settings["DISABLE_FF_MODE"] = strconv.FormatBool(!on)
+		}
+		delete(f.Settings, "ENABLE_FFMPEG_CMDS")
 	}
 	keys := make([]string, 0, len(f.Settings))
 	for k := range f.Settings {

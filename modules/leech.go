@@ -378,7 +378,7 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			m.sendDownloadError(ctx, peer, msg, notifyID, "Video Tools (-vt) are disabled on this bot.", "#Leech", time.Now())
 			return
 		}
-		if vtSel = m.videoToolsMenu(ctx, peer, msg); vtSel == nil {
+		if vtSel = m.videoToolsMenu(ctx, peer, msg, link); vtSel == nil {
 			m.sendDownloadError(ctx, peer, msg, notifyID, "Video Tools closed, task cancelled.", "#Leech", time.Now())
 			return
 		}
@@ -1499,6 +1499,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 	if vtSel != nil && vtSel.DefSubs == "ask" {
 		setStep(uTask, "Waiting: choose the subtitle")
 		vtSel.DefSubs = m.askTrack(ctx, peer, msg, downloadedPath, "subs")
+	}
+	if vtSel != nil && vtSel.Translate != "" {
+		if vtSel.TrStream == "ask" {
+			setStep(uTask, "Waiting: choose the subtitle")
+			vtSel.TrStream = m.askTrack(ctx, peer, msg, downloadedPath, "translate")
+		}
+		if vtSel.TrAI && user != nil {
+			vtSel.TrKey = user.GeminiKey // his own key; without one Google Translate is used
+		}
 	}
 	if vtSel != nil && !vtSel.empty() {
 		setStep(uTask, "Video Tools (FFmpeg)")

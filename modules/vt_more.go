@@ -1,9 +1,11 @@
 package modules
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -252,9 +254,18 @@ func vtAudioSplit(path, minutes string) {
 	}
 }
 
-// ---- subtitle translation ----
+// vtTrOpts: how the subtitles are translated (Video Tools → Translate Subtitles).
+type vtTrOpts struct {
+	Key    string // the user's Gemini key: AI translation; "" = Google Translate
+	Stream string // "" = the first text subtitle, "all", or a subtitle number (1 = the first subtitle track)
+	Drop   bool   // the translation replaces the original track (else it is added next to it)
+}
 
-func vtTranslateSubs(path, lang string) {
+var textSubCodecs = map[string]bool{"subrip": true, "ass": true, "ssa": true, "mov_text": true, "webvtt": true, "text": true}
+
+// vtTranslateSubs: .srt files get a translated copy next to them; in a video the chosen subtitle
+// track(s) are translated and added as new tracks (or replace the originals with Drop).
+func vtTranslateSubs(path, lang string, o vtTrOpts) {
 	var srts []string
 	for _, f := range mediaFiles(path) {
 		if strings.EqualFold(filepath.Ext(f), ".srt") {
@@ -264,54 +275,105 @@ func vtTranslateSubs(path, lang string) {
 	if len(srts) > 0 { // subtitle files: a translated copy next to each one
 		for _, f := range srts {
 			base := strings.TrimSuffix(f, filepath.Ext(f))
-			_ = translateSRT(f, base+"."+lang+".srt", lang)
+			_ = translateSRT(f, base+"."+lang+".srt", lang, o.Key)
 		}
 		return
 	}
-	for _, video := range vtVideos(path) { // inside a video: translate the first text subtitle, add it
-		textSub := -1
+	for _, video := range vtVideos(path) {
+		var subs []probeStream // every subtitle track, in order
 		for _, s := range probeStreams(video) {
-			if s.CodecType == "subtitle" && map[string]bool{"subrip": true, "ass": true, "ssa": true, "mov_text": true, "webvtt": true, "text": true}[s.CodecName] {
-				textSub = s.Index
-				break
+			if s.CodecType == "subtitle" {
+				subs = append(subs, s)
 			}
 		}
-		if textSub < 0 {
+		var pick []int // ordinal among the subtitle tracks
+		switch o.Stream {
+		case "all":
+			for i, s := range subs {
+				if textSubCodecs[s.CodecName] {
+					pick = append(pick, i)
+				}
+			}
+		case "":
+			for i, s := range subs {
+				if textSubCodecs[s.CodecName] {
+					pick = append(pick, i)
+					break
+				}
+			}
+		default:
+			if n, err := strconv.Atoi(o.Stream); err == nil && n >= 1 && n <= len(subs) && textSubCodecs[subs[n-1].CodecName] {
+				pick = append(pick, n-1)
+			}
+		}
+		if len(pick) == 0 {
 			continue
 		}
 		base, ext := strings.TrimSuffix(video, filepath.Ext(video)), filepath.Ext(video)
-		src, dst := base+".vt_src.srt", base+".vt_tr.srt"
-		if runFFmpeg("-i", video, "-map", fmt.Sprintf("0:%d", textSub), "-c:s", "srt", src) != nil {
+		var translated []string // srt files, one per picked track
+		var picked []int
+		for k, i := range pick {
+			src, dst := fmt.Sprintf("%s.vt_src%d.srt", base, k), fmt.Sprintf("%s.vt_tr%d.srt", base, k)
+			if runFFmpeg("-i", video, "-map", fmt.Sprintf("0:s:%d", i), "-c:s", "srt", src) != nil {
+				continue
+			}
+			if translateSRT(src, dst, lang, o.Key) == nil {
+				translated = append(translated, dst)
+				picked = append(picked, i)
+			}
+			_ = os.Remove(src)
+		}
+		if len(translated) == 0 {
 			continue
 		}
-		if translateSRT(src, dst, lang) == nil {
-			subCodec := "srt"
-			if strings.EqualFold(ext, ".mp4") {
-				subCodec = "mov_text"
+		subCodec := "srt"
+		if strings.EqualFold(ext, ".mp4") {
+			subCodec = "mov_text"
+		}
+		args := []string{"-i", video}
+		for _, t := range translated {
+			args = append(args, "-i", t)
+		}
+		args = append(args, "-map", "0")
+		kept := len(subs)
+		if o.Drop { // the originals that were translated go
+			for _, i := range picked {
+				args = append(args, "-map", fmt.Sprintf("-0:s:%d", i))
 			}
-			nSubs := 0
-			for _, s := range probeStreams(video) {
-				if s.CodecType == "subtitle" {
-					nSubs++
+			kept -= len(picked)
+		}
+		for k := range translated {
+			args = append(args, "-map", fmt.Sprintf("%d:0", k+1))
+		}
+		args = append(args, "-c", "copy")
+		for k, i := range picked {
+			n := kept + k
+			srcLang := subs[i].Tags["language"]
+			title := "Translated (" + lang + ")"
+			if srcLang != "" {
+				title = fmt.Sprintf("Translated %s → %s", srcLang, lang)
+			}
+			args = append(args, fmt.Sprintf("-c:s:%d", n), subCodec,
+				fmt.Sprintf("-metadata:s:s:%d", n), "language="+lang,
+				fmt.Sprintf("-metadata:s:s:%d", n), "title="+title)
+		}
+		if !vtReplace(video, base+".vt"+ext, args) && !strings.EqualFold(ext, ".mkv") {
+			for i, a := range args {
+				if a == "mov_text" {
+					args[i] = "srt"
 				}
 			}
-			args := []string{"-i", video, "-i", dst, "-map", "0", "-map", "1:0", "-c", "copy",
-				fmt.Sprintf("-c:s:%d", nSubs), subCodec,
-				fmt.Sprintf("-metadata:s:s:%d", nSubs), "language=" + lang,
-				fmt.Sprintf("-metadata:s:s:%d", nSubs), "title=Translated (" + lang + ")"}
-			if !vtReplace(video, base+".vt"+ext, args) && !strings.EqualFold(ext, ".mkv") {
-				args[len(args)-5] = "srt"
-				vtReplace(video, base+".vt.mkv", args)
-			}
+			vtReplace(video, base+".vt.mkv", args)
 		}
-		_ = os.Remove(src)
-		_ = os.Remove(dst)
+		for _, t := range translated {
+			_ = os.Remove(t)
+		}
 	}
 }
 
 type srtCue struct{ head, text string }
 
-func translateSRT(src, dst, lang string) error {
+func translateSRT(src, dst, lang, geminiKey string) error {
 	raw, err := os.ReadFile(src)
 	if err != nil {
 		return err
@@ -332,9 +394,28 @@ func translateSRT(src, dst, lang string) error {
 	if len(cues) == 0 {
 		return fmt.Errorf("empty subtitle")
 	}
+	// AI (the user's Gemini key): the whole subtitle in batches, with context; on any error the
+	// lines go to Google Translate below
+	out := make([]string, len(cues))
+	if geminiKey != "" {
+		texts := make([]string, len(cues))
+		for i, c := range cues {
+			texts[i] = strings.TrimSpace(c.text)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+		res, err := ext.GeminiTranslate(ctx, geminiKey, texts, lang)
+		cancel()
+		if err == nil && len(res) == len(cues) {
+			var sb strings.Builder
+			for i, c := range cues {
+				fmt.Fprintf(&sb, "%s\n%s\n\n", c.head, strings.TrimSpace(res[i]))
+			}
+			return os.WriteFile(dst, []byte(sb.String()), 0644)
+		}
+		log.Printf("[VT] Gemini translation failed (%v), using Google Translate", err)
+	}
 	// batches of cues, one cue per line (its own line breaks kept as " ⏎ ")
 	const sep = " ⏎ "
-	out := make([]string, len(cues))
 	for start := 0; start < len(cues); {
 		end, size := start, 0
 		for end < len(cues) && size < 3500 {

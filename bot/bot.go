@@ -1993,6 +1993,18 @@ func (b *BotApp) applyUserSettingValue(ctx context.Context, peer tg.InputPeerCla
 	case "ycookies":
 		// cookies come as a file (handled with the incoming documents)
 		return
+	case "gemkey":
+		key := strings.TrimSpace(val)
+		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err := ext.GeminiCheckKey(cctx, key)
+		cancel()
+		if err != nil {
+			ext.SetSettingNote(u.UserID, "× <i>"+telegram.EscapeHTML(err.Error())+"</i>")
+			break
+		}
+		u.GeminiKey = key
+		ext.SetSettingNote(u.UserID, "✓ <i>Gemini key saved and working.</i>")
+		fieldName, val = "Gemini Key", "…"+key[max(0, len(key)-4):]
 	case "megalogin":
 		parts := strings.Fields(val)
 		if len(parts) != 2 {

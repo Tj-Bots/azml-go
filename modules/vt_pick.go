@@ -76,6 +76,7 @@ func trackLabel(s probeStream) string {
 
 // askTrack: the tracks of the first video of path as buttons; the chosen number ("1", "2" ...)
 // or "" (skipped, timed out, or only one track).
+// kind: "audio", "subs" or "translate" (text subtitles only, with an "All" button).
 func (m *LeechModule) askTrack(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, path, kind string) string {
 	videos := vtVideos(path)
 	if len(videos) == 0 {
@@ -83,16 +84,30 @@ func (m *LeechModule) askTrack(ctx context.Context, peer tg.InputPeerClass, msg 
 	}
 	want := "audio"
 	title := "Default Audio"
-	if kind == "subs" {
+	switch kind {
+	case "subs":
 		want, title = "subtitle", "Default Subtitle"
+	case "translate":
+		want, title = "subtitle", "Translate Subtitles"
 	}
 	var tracks []probeStream
+	var nums []int // the number of each track among the tracks of its kind
+	n := 0
 	for _, s := range probeStreams(videos[0]) {
-		if s.CodecType == want {
-			tracks = append(tracks, s)
+		if s.CodecType != want {
+			continue
 		}
+		n++
+		if kind == "translate" && !textSubCodecs[s.CodecName] {
+			continue
+		}
+		tracks = append(tracks, s)
+		nums = append(nums, n)
 	}
 	if len(tracks) < 2 { // nothing to choose
+		if kind == "translate" {
+			return "" // the first (only) text subtitle
+		}
 		return ""
 	}
 	token := ext.RandomHex(3)
@@ -108,17 +123,22 @@ func (m *LeechModule) askTrack(ctx context.Context, peer tg.InputPeerClass, msg 
 
 	btn := telegram.NewButtonMaker()
 	for i, t := range tracks {
-		label := fmt.Sprintf("%d · %s", i+1, trackLabel(t))
-		if t.Tags["DISPOSITION_DEFAULT"] == "1" {
-			label += " ✓"
-		}
-		btn.IButton(label, fmt.Sprintf("vtool %d pick %s %d", msg.UserID, token, i+1))
+		label := fmt.Sprintf("%d · %s", nums[i], trackLabel(t))
+		btn.IButton(label, fmt.Sprintf("vtool %d pick %s %d", msg.UserID, token, nums[i]))
+		btn.Row()
+	}
+	if kind == "translate" {
+		btn.IButton("All Subtitles", fmt.Sprintf("vtool %d pick %s all", msg.UserID, token))
 		btn.Row()
 	}
 	btn.IButtonStyled("Skip", fmt.Sprintf("vtool %d pick %s skip", msg.UserID, token), "danger")
 	btn.Row()
-	text := fmt.Sprintf("㊂ <b><u>%s :</u></b>\n\n<blockquote>%d tracks in <code>%s</code>.\nPress the one to play first (2 minutes).</blockquote>",
-		title, len(tracks), telegram.EscapeHTML(shortName(videos[0])))
+	what := "Press the one to play first"
+	if kind == "translate" {
+		what = "Press the one to translate"
+	}
+	text := fmt.Sprintf("%s\n㊂ <b><u>%s :</u></b>\n\n<blockquote>%d tracks in <code>%s</code>.\n%s (2 minutes).</blockquote>",
+		userTag(msg), title, len(tracks), telegram.EscapeHTML(shortName(videos[0])), what)
 	id, _ := m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, btn, 1)
 	defer func() {
 		if id > 0 {
@@ -132,6 +152,18 @@ func (m *LeechModule) askTrack(ctx context.Context, peer tg.InputPeerClass, msg 
 	case <-ctx.Done():
 	}
 	return ""
+}
+
+// userTag: @username, else his name as a mention (the bot asks him something).
+func userTag(msg *types.MessageContext) string {
+	if msg.Username != "" {
+		return "@" + strings.TrimPrefix(msg.Username, "@")
+	}
+	name := msg.SenderName
+	if name == "" {
+		name = "User"
+	}
+	return fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", msg.UserID, telegram.EscapeHTML(name))
 }
 
 func shortName(p string) string {

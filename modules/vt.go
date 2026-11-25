@@ -61,6 +61,10 @@ type VTSelection struct {
 	DefSubs    string // the same for the default subtitle
 	AudioSplit string // minutes
 	Translate  string // language code
+	TrAI       bool   // translate with the user's Gemini key (else Google Translate)
+	TrStream   string // "" first text subtitle, "all", a subtitle number, or "ask" (after the download)
+	TrDrop     bool   // the translation replaces the original track
+	TrKey      string // the user's Gemini key (set when the task runs, never shown)
 }
 
 func (s *VTSelection) empty() bool {
@@ -85,6 +89,9 @@ type vtState struct {
 	start  time.Time
 	result chan *VTSelection // nil = cancelled
 	once   sync.Once
+	// the tracks of the file, read before the download when possible (vt_streams.go)
+	streams []probeStream
+	probing bool
 }
 
 var vtStates sync.Map // "uid" -> *vtState
@@ -173,7 +180,19 @@ func vtSelectedText(s VTSelection) []string {
 		out = append(out, "Audio Split → "+name(vtASplit, s.AudioSplit))
 	}
 	if s.Translate != "" {
-		out = append(out, "Translate Subtitles → "+telegram.EscapeHTML(s.Translate))
+		t := "Translate → " + vtLangName(s.Translate)
+		if s.TrAI {
+			t += " · AI"
+		}
+		if s.TrStream == "all" {
+			t += " · all subtitles"
+		} else if s.TrStream != "" && s.TrStream != "ask" {
+			t += " · subtitle " + telegram.EscapeHTML(s.TrStream)
+		}
+		if s.TrDrop {
+			t += " · replace"
+		}
+		out = append(out, t)
 	}
 	return out
 }
@@ -207,6 +226,11 @@ func (st *vtState) menu() (string, *telegram.ButtonMaker) {
 		}
 		back()
 		return "㊂ <b><u>Video Tools : Trim</u></b>\n\n<blockquote>Send start and end:\n<code>00:01:30-00:05:00</code> or <code>90-300</code> (seconds)\nOnly start: <code>00:10:00</code></blockquote>\n<i>Cut without re-encoding, starts at the nearest keyframe.</i>", b
+	}
+	if st.wait == "" {
+		if text, ok := st.streamPage(b); ok {
+			return text, b
+		}
 	}
 	if p, ok := vtPrompts[st.wait]; ok {
 		if p.isSet(&st.sel) {
@@ -312,8 +336,8 @@ func (m *LeechModule) vtRefresh(st *vtState) {
 }
 
 // videoToolsMenu shows the menu and waits; nil = cancelled.
-func (m *LeechModule) videoToolsMenu(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) *VTSelection {
-	st := &vtState{user: msg.UserID, chat: msg.ChatID, peer: peer, page: "main", start: time.Now(), result: make(chan *VTSelection, 1)}
+func (m *LeechModule) videoToolsMenu(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext, link string) *VTSelection {
+	st := &vtState{user: msg.UserID, chat: msg.ChatID, peer: peer, page: "main", start: time.Now(), result: make(chan *VTSelection, 1), probing: true}
 	text, b := st.menu()
 	id, err := m.sender.SendMessageWithButtons(ctx, peer, text, msg.MessageID, b, 2)
 	if err != nil || id <= 0 {
@@ -322,6 +346,16 @@ func (m *LeechModule) videoToolsMenu(ctx context.Context, peer tg.InputPeerClass
 	st.msgID = id
 	key := strconv.FormatInt(msg.UserID, 10)
 	vtStates.Store(key, st)
+	go func() { // the tracks, like /mediainfo (the menu works meanwhile)
+		streams := m.vtProbe(ctx, peer, msg, link)
+		st.mu.Lock()
+		st.streams, st.probing = streams, false
+		page := st.page
+		st.mu.Unlock()
+		if page != "main" {
+			m.vtRefresh(st)
+		}
+	}()
 	defer func() {
 		vtStates.Delete(key)
 		if s, ok := ext.GetPendingSettingSession(msg.UserID, msg.ChatID); ok && s != nil && strings.HasPrefix(s.Key, "vt_") {
@@ -363,12 +397,23 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 		_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 		return
 	}
-	_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	action, arg := parts[2], ""
 	if len(parts) > 3 {
 		arg = parts[3]
 	}
+	if action == "tre" && arg == "ai" { // AI needs the user's own Gemini key
+		if u := m.userMap.Get(fromUID); u == nil || u.GeminiKey == "" {
+			_ = m.sender.AnswerCallback(ctx, queryID, "Add your free Gemini key first: /us → Universal → Gemini Key", true)
+			return
+		}
+	}
+	_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	st.mu.Lock()
+	if st.vtStreamAction(action, arg) {
+		st.mu.Unlock()
+		m.vtRefresh(st)
+		return
+	}
 	finish := func(r *VTSelection) {
 		st.once.Do(func() { st.result <- r })
 	}
@@ -379,6 +424,9 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 		return
 	case "done":
 		s := st.sel
+		if s.Translate != "" && s.TrStream == "" && len(st.tracks("subtitle")) == 0 {
+			s.TrStream = "ask" // the tracks were not read: the user picks one after the download
+		}
 		st.mu.Unlock()
 		finish(&s)
 		return
@@ -394,7 +442,12 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 	case "rename", "trim":
 		st.wait = action
 		ext.SetPendingSettingSession(st.user, "vt_"+action, st.chat, st.msgID, vtTimeout)
-	case "daudio", "dsubs": // the tracks are known only after the download: the user picks one then
+	case "daudio", "dsubs": // the tracks of the file when they were read, else picked after the download
+		kind := map[string]string{"daudio": "audio", "dsubs": "subtitle"}[action]
+		if len(st.tracks(kind)) > 1 {
+			st.page = "pick_" + action
+			break
+		}
 		was := (action == "daudio" && st.sel.DefAudio != "") || (action == "dsubs" && st.sel.DefSubs != "")
 		st.sel.clearTool()
 		if !was {
@@ -404,7 +457,7 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 				st.sel.DefSubs = "ask"
 			}
 		}
-	case "async", "ssync", "translate":
+	case "async", "ssync":
 		st.wait = action
 		ext.SetPendingSettingSession(st.user, "vt_"+action, st.chat, st.msgID, vtTimeout)
 	case "merge_all", "strip":
@@ -506,8 +559,13 @@ func (m *LeechModule) HandleVTInput(uid int64, key, val string) bool {
 				ext.SetPendingSettingSession(uid, key, st.chat, st.msgID, vtTimeout) // wrong value: wait again
 				return true
 			}
-			st.sel.clearTool()
+			if key != "vt_translate" || st.sel.Translate == "" {
+				st.sel.clearTool()
+			}
 			p.set(&st.sel, v)
+			if key == "vt_translate" {
+				st.page = "translate"
+			}
 		}
 	}
 	st.wait = ""
@@ -799,7 +857,11 @@ func runVideoTools(path string, s *VTSelection) (string, int) {
 		vtAudioSplit(path, s.AudioSplit)
 	}
 	if s.Translate != "" {
-		vtTranslateSubs(path, s.Translate)
+		key := ""
+		if s.TrAI {
+			key = s.TrKey
+		}
+		vtTranslateSubs(path, s.Translate, vtTrOpts{Key: key, Stream: s.TrStream, Drop: s.TrDrop})
 	}
 	if s.Custom != "" {
 		if _, cmds := vtCustomTools(); cmds[s.Custom] != "" {

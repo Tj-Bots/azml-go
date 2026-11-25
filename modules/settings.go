@@ -1287,15 +1287,18 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
-	case "megalogin", "ffcmds":
+	case "megalogin", "ffcmds", "gemkey":
 		text, btn := m.buildExtraMenu(u, action, "")
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
-	case "edit_megalogin", "edit_ffcmds":
+	case "edit_megalogin", "edit_ffcmds", "edit_gemkey":
 		key := strings.TrimPrefix(action, "edit_")
 		ext.SetPendingSettingSession(targetUID, key, 0, msgID, 60*time.Second)
 		prompt := "➲ <i>Send your MEGA email and password separated by a space within 60 seconds:</i>\n<code>email@example.com password</code>\n<i>The message is deleted right away.</i>"
+		if key == "gemkey" {
+			prompt = "➲ <i>Send your Gemini API key within 60 seconds (aistudio.google.com → Get API key). The message is deleted right away.</i>"
+		}
 		if key == "ffcmds" {
 			prompt = "➲ <i>Send a command as</i> <code>name: ffmpeg args</code> <i>within 60 seconds, e.g.</i>\n<code>tomkv: -map 0 -c copy</code>\n<i>Use it with</i> <code>-ff name</code>. <i>Send</i> <code>name:</code> <i>alone to delete one.</i>"
 		}
@@ -1309,10 +1312,12 @@ func (m *SettingsModule) HandleCallback(ctx context.Context, peer tg.InputPeerCl
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, text+"\n\n"+prompt, btn, 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 
-	case "del_megalogin", "del_ffcmds":
+	case "del_megalogin", "del_ffcmds", "del_gemkey":
 		key := strings.TrimPrefix(action, "del_")
 		if key == "megalogin" {
 			u.MegaEmail, u.MegaPass = "", ""
+		} else if key == "gemkey" {
+			u.GeminiKey = ""
 		} else {
 			u.FFmpegCommands = nil
 		}
@@ -1489,7 +1494,7 @@ func (m *SettingsModule) HandleSettingUpdated(ctx context.Context, peer tg.Input
 		return
 	}
 	switch key {
-	case "megalogin", "ffcmds":
+	case "megalogin", "ffcmds", "gemkey":
 		text, btn = m.buildExtraMenu(u, key, ext.TakeSettingNote(u.UserID))
 	case "ytopt", "ycookies":
 		text, btn = m.buildYtdlSettingMenu(u, key, "")
@@ -1902,8 +1907,9 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 		"┠ <b>Daily Leech :</b> <code>%s</code> today\n"+
 		"┠ <b>YT-DLP Options :</b> <i>%s</i>\n"+
 		"┠ <b>YT-DLP Cookies :</b> <i>%s</i>\n"+
-		"<b>╰</b> <b>MediaInfo Mode :</b> <i>%s</i></blockquote>",
-		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), existsText(u.YtOpt != ""), existsText(u.YtCookies != ""), onOff(u.MediaInfoOn(config.Get().ShowMediaInfo)))
+		"┠ <b>MediaInfo Mode :</b> <i>%s</i>\n"+
+		"<b>╰</b> <b>Gemini Key :</b> <i>%s</i></blockquote>",
+		u.UserID, telegram.EscapeHTML(name), tasks, ext.GetReadableFileSize(dailyBytes), existsText(u.YtOpt != ""), existsText(u.YtCookies != ""), onOff(u.MediaInfoOn(config.Get().ShowMediaInfo)), existsText(u.GeminiKey != ""))
 	btn := telegram.NewButtonMaker()
 	if u.YtOpt != "" {
 		btn.IButtonStyled("✓ YT-DLP Options", fmt.Sprintf("userset %d ytopt", u.UserID), "success")
@@ -1935,6 +1941,12 @@ func (m *SettingsModule) buildUniversalMenu(u *types.UserSettings) (string, *tel
 		btn.IButton("MediaInfo", fmt.Sprintf("userset %d mediainfo", u.UserID))
 	}
 	btn.IButton("Import/Export", fmt.Sprintf("userset %d iesettings", u.UserID))
+	btn.Row()
+	if u.GeminiKey != "" {
+		btn.IButtonStyled("✓ Gemini Key", fmt.Sprintf("userset %d gemkey", u.UserID), "success")
+	} else {
+		btn.IButton("Gemini Key", fmt.Sprintf("userset %d gemkey", u.UserID))
+	}
 	btn.Row()
 	btn.IButtonStyled("◀️", fmt.Sprintf("userset %d main", u.UserID), "primary")
 	btn.IButtonStyled("❌", fmt.Sprintf("userset %d close", u.UserID), "danger")
@@ -1992,7 +2004,19 @@ func (m *SettingsModule) buildYtdlSettingMenu(u *types.UserSettings, key, note s
 func (m *SettingsModule) buildExtraMenu(u *types.UserSettings, key, note string) (string, *telegram.ButtonMaker) {
 	btn := telegram.NewButtonMaker()
 	var text string
-	if key == "megalogin" {
+	if key == "gemkey" {
+		val := "Not Exists"
+		if k := u.GeminiKey; k != "" {
+			val = "<code>…" + telegram.EscapeHTML(k[max(0, len(k)-4):]) + "</code>"
+		}
+		text = "㊂ <b><u>Gemini Key :</u></b>\n\n" +
+			"<blockquote><b>╭</b> <b>Key :</b> " + val + "\n" +
+			"<b>╰</b> <b>Description :</b> <i>Your own free Gemini API key (aistudio.google.com) for AI subtitle translation in Video Tools (-vt). Without it subtitles are translated with Google Translate.</i></blockquote>"
+		btn.IButton(map[bool]string{true: "Change Key", false: "Set Key"}[u.GeminiKey != ""], fmt.Sprintf("userset %d edit_gemkey", u.UserID))
+		if u.GeminiKey != "" {
+			btn.IButton("↻ Delete", fmt.Sprintf("userset %d del_gemkey", u.UserID))
+		}
+	} else if key == "megalogin" {
 		val := "Not Exists"
 		if u.MegaEmail != "" {
 			val = "<code>" + telegram.EscapeHTML(u.MegaEmail) + "</code>"

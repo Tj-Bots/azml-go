@@ -44,13 +44,13 @@ func (m *HelpModule) getStartText() string {
 		"<i>Type " + telegram.Cmd("help") + " to see the available commands.</i>"
 }
 
-func (m *HelpModule) getStartButtons() *telegram.ButtonMaker {
+func (m *HelpModule) getStartButtons(uid int64) *telegram.ButtonMaker {
 	// like the Python bot: channel and group, then Help under them
 	btn := telegram.NewButtonMaker()
 	btn.UButtonStyled("Updates 🗞️", "https://t.me/TJ_Bots", "primary")
 	btn.UButtonStyled("Group 🧲", "https://t.me/Tj_Leech_Group", "primary")
 	btn.Row()
-	btn.IButtonStyled("Help 📖", "start_help", "primary")
+	btn.IButtonStyled("Help 📖", fmt.Sprintf("start_help %d", uid), "primary")
 	btn.Row()
 	return btn
 }
@@ -68,7 +68,7 @@ func helpMenu(uid int64, back bool) *telegram.ButtonMaker {
 	btn.IButton("Owner & Sudos", fmt.Sprintf("start_hg %d admin", uid))
 	btn.Row()
 	if back {
-		btn.IButtonStyled("◀️", "start_back", "primary")
+		btn.IButtonStyled("◀️", fmt.Sprintf("start_back %d", uid), "primary")
 	}
 	btn.IButtonStyled("❌", fmt.Sprintf("start_close %d", uid), "danger")
 	btn.Row()
@@ -178,7 +178,7 @@ func (m *HelpModule) HandleStart(ctx context.Context, peer tg.InputPeerClass, ms
 	}
 
 	startText := m.getStartText()
-	_, _ = m.sender.SendMessageWithButtons(ctx, peer, startText, msg.MessageID, m.getStartButtons(), 2)
+	_, _ = m.sender.SendMessageWithButtons(ctx, peer, startText, msg.MessageID, m.getStartButtons(msg.UserID), 2)
 }
 
 func (m *HelpModule) HandlePing(ctx context.Context, peer tg.InputPeerClass, msg *types.MessageContext) {
@@ -230,6 +230,14 @@ func (m *HelpModule) HandleStats(ctx context.Context, peer tg.InputPeerClass, ms
 }
 
 func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerClass, queryID int64, msgID int, data string, fromUID int64) {
+	// the Help button of /start and ◀️ back to it: "start_help <uid>" / "start_back <uid>"
+	if strings.HasPrefix(data, "start_help") || strings.HasPrefix(data, "start_back") {
+		if f := strings.Fields(data); len(f) > 1 && f[1] != fmt.Sprintf("%d", fromUID) {
+			_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
+			return
+		}
+		data = strings.Fields(data)[0]
+	}
 	if data == "start_help" { // the Help button of /start: the menu, ◀️ back to /start
 		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, helpHeader, helpMenu(fromUID, true), 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
@@ -261,7 +269,7 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 		return
 	}
 	if data == "start_back" {
-		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, m.getStartText(), m.getStartButtons(), 2)
+		_ = m.sender.EditMessageWithButtons(ctx, peer, msgID, m.getStartText(), m.getStartButtons(fromUID), 2)
 		_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 		return
 	}
@@ -313,7 +321,7 @@ func (m *HelpModule) HandleStatsCallback(ctx context.Context, peer tg.InputPeerC
 		key = parts[2]
 	}
 
-	if targetUID != 0 && targetUID != fromUID && !telegram.IsOwner(fromUID) {
+	if targetUID != 0 && targetUID != fromUID { // like the Python bot (wzmlxcb): also not for the owner
 		_ = m.sender.AnswerCallback(ctx, queryID, "𝙏𝙝𝙖𝙩'𝙨 𝙉𝙤𝙩 𝙔𝙤𝙪𝙧𝙨...😤", true)
 		return
 	}

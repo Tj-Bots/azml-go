@@ -96,7 +96,7 @@ func TestRenderAllMenus(t *testing.T) {
 	tx, b = bm.buildSessionMenu()
 	out.WriteString(render("bs session", tx, b, 2))
 	hm := &HelpModule{}
-	out.WriteString(render("start", hm.getStartText(), hm.getStartButtons(), 2))
+	out.WriteString(render("start", hm.getStartText(), hm.getStartButtons(1), 2))
 	out.WriteString(render("help", helpHeader, helpMenu(1, false), 2))
 	for _, pg := range []string{"basic", "users", "miscs", "admin"} {
 		out.WriteString(render("help "+pg, helpPage(pg), nil, 1))

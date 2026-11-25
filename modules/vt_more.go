@@ -1,8 +1,12 @@
 package modules
 
 import (
+	"unicode/utf8"
+
 	"encoding/json"
 	"fmt"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/unicode"
 	"io"
 	"net/http"
 	"net/url"
@@ -256,13 +260,17 @@ func vtAudioSplit(path, minutes string) {
 type vtTrOpts struct {
 	Stream string // "" = the first text subtitle, "all", or a subtitle number (1 = the first subtitle track)
 	Drop   bool   // the translation replaces the original track (else it is added next to it)
+	// Progress: lines translated of all the lines (for /status)
+	Progress func(done, total int)
 }
 
 var textSubCodecs = map[string]bool{"subrip": true, "ass": true, "ssa": true, "mov_text": true, "webvtt": true, "text": true}
 
 // vtTranslateSubs: .srt files get a translated copy next to them; in a video the chosen subtitle
 // track(s) are translated and added as new tracks (or replace the originals with Drop).
-func vtTranslateSubs(path, lang string, o vtTrOpts) {
+// The path to upload comes back: a single .srt becomes a folder with the original and the
+// translation (or only the translation with Drop), since the upload takes only that path.
+func vtTranslateSubs(path, lang string, o vtTrOpts) string {
 	var srts []string
 	for _, f := range mediaFiles(path) {
 		if strings.EqualFold(filepath.Ext(f), ".srt") {
@@ -270,11 +278,30 @@ func vtTranslateSubs(path, lang string, o vtTrOpts) {
 		}
 	}
 	if len(srts) > 0 { // subtitle files: a translated copy next to each one
+		var made []string
 		for _, f := range srts {
 			base := strings.TrimSuffix(f, filepath.Ext(f))
-			_ = translateSRT(f, base+"."+lang+".srt", lang)
+			dst := base + "." + lang + ".srt"
+			if translateSRT(f, dst, lang, o.Progress) == nil {
+				made = append(made, dst)
+				if o.Drop {
+					_ = os.Remove(f)
+				}
+			}
 		}
-		return
+		if fi, err := os.Stat(path); err == nil && !fi.IsDir() && len(made) == 1 {
+			if o.Drop {
+				return made[0]
+			}
+			// the original and the translation together
+			dir := strings.TrimSuffix(path, filepath.Ext(path))
+			if err := os.MkdirAll(dir, 0o755); err == nil {
+				_ = os.Rename(path, filepath.Join(dir, filepath.Base(path)))
+				_ = os.Rename(made[0], filepath.Join(dir, filepath.Base(made[0])))
+				return dir
+			}
+		}
+		return path
 	}
 	for _, video := range vtVideos(path) {
 		var subs []probeStream // every subtitle track, in order
@@ -314,7 +341,7 @@ func vtTranslateSubs(path, lang string, o vtTrOpts) {
 			if runFFmpeg("-i", video, "-map", fmt.Sprintf("0:s:%d", i), "-c:s", "srt", src) != nil {
 				continue
 			}
-			if translateSRT(src, dst, lang) == nil {
+			if translateSRT(src, dst, lang, o.Progress) == nil {
 				translated = append(translated, dst)
 				picked = append(picked, i)
 			}
@@ -366,16 +393,17 @@ func vtTranslateSubs(path, lang string, o vtTrOpts) {
 			_ = os.Remove(t)
 		}
 	}
+	return path
 }
 
 type srtCue struct{ head, text string }
 
-func translateSRT(src, dst, lang string) error {
+func translateSRT(src, dst, lang string, progress func(done, total int)) error {
 	raw, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	body := strings.ReplaceAll(strings.TrimPrefix(string(raw), "\ufeff"), "\r\n", "\n")
+	body := strings.ReplaceAll(strings.TrimPrefix(decodeSubtitle(raw), "\ufeff"), "\r\n", "\n")
 	var cues []srtCue
 	for _, block := range regexp.MustCompile(`\n{2,}`).Split(strings.TrimSpace(body), -1) {
 		lines := strings.Split(block, "\n")
@@ -417,6 +445,9 @@ func translateSRT(src, dst, lang string) error {
 			}
 		} else {
 			copy(out[start:end], got)
+		}
+		if progress != nil {
+			progress(end, len(cues))
 		}
 		start = end
 	}
@@ -511,4 +542,55 @@ func chromeExTranslate(text, lang string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("translate clients5: bad answer")
+}
+
+// decodeSubtitle: the text of a subtitle in UTF-8. Old subtitles are often Windows-1255 (Hebrew),
+// 1256 (Arabic), 1251 (Cyrillic) or 1252; UTF-16 has a BOM. The code page is guessed from the
+// high bytes: Hebrew letters are 0xE0-0xFA only, Cyrillic also has capitals 0xC0-0xDF and 0xFB-0xFF (ы ь э ю я), Arabic
+// mostly 0xC1-0xDA; few high bytes = Western.
+func decodeSubtitle(raw []byte) string {
+	switch {
+	case len(raw) >= 2 && raw[0] == 0xFF && raw[1] == 0xFE:
+		if s, err := unicode.UTF16(unicode.LittleEndian, unicode.ExpectBOM).NewDecoder().Bytes(raw); err == nil {
+			return string(s)
+		}
+	case len(raw) >= 2 && raw[0] == 0xFE && raw[1] == 0xFF:
+		if s, err := unicode.UTF16(unicode.BigEndian, unicode.ExpectBOM).NewDecoder().Bytes(raw); err == nil {
+			return string(s)
+		}
+	}
+	if utf8.Valid(raw) {
+		return string(raw)
+	}
+	var hi, c0df, e0fa, fbff int
+	for _, b := range raw {
+		if b < 0x80 {
+			continue
+		}
+		hi++
+		switch {
+		case b >= 0xC0 && b <= 0xDF:
+			c0df++
+		case b >= 0xE0 && b <= 0xFA:
+			e0fa++
+		case b >= 0xFB:
+			fbff++
+		}
+	}
+	cm := charmap.Windows1252
+	switch {
+	case hi == 0 || hi*20 < len(raw): // a few accents: Western
+	case e0fa*10 > hi*8 && c0df*33 < hi && fbff*50 < hi: // only 0xE0-0xFA (no capitals 0xC0-0xDF): Hebrew
+		cm = charmap.Windows1255
+	case fbff*30 > hi: // ы ь э ю я: Cyrillic
+		cm = charmap.Windows1251
+	case c0df > e0fa: // Arabic letters are mostly 0xC1-0xDA
+		cm = charmap.Windows1256
+	default:
+		cm = charmap.Windows1251
+	}
+	if s, err := cm.NewDecoder().Bytes(raw); err == nil {
+		return string(s)
+	}
+	return string(raw)
 }

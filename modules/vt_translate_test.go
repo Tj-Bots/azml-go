@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"golang.org/x/text/encoding/charmap"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,5 +53,47 @@ func TestTranslateSubs(t *testing.T) {
 	out, _ := exec.Command("ffmpeg", "-v", "error", "-i", v, "-map", "0:s:1", "-f", "srt", "-").Output()
 	if !strings.Contains(string(out), "HE:first rus") || !strings.Contains(string(out), "HE:second") {
 		t.Fatalf("translated: %s", out)
+	}
+}
+
+func TestTranslateSingleSRTAndEncoding(t *testing.T) {
+	defer fakeTranslate()()
+	d := t.TempDir()
+	// a Hebrew subtitle in Windows-1255 ("שלום עולם")
+	heb, _ := charmapEncode1255("שלום עולם")
+	f := filepath.Join(d, "Movie.he.srt")
+	_ = os.WriteFile(f, append([]byte("1\r\n00:00:01,000 --> 00:00:02,000\r\n"), heb...), 0o644)
+	var last int
+	out := vtTranslateSubs(f, "en", vtTrOpts{Progress: func(done, all int) { last = done }})
+	fi, err := os.Stat(out)
+	if err != nil || !fi.IsDir() {
+		t.Fatalf("want a folder with both files, got %s %v", out, err)
+	}
+	b, _ := os.ReadFile(filepath.Join(out, "Movie.he.en.srt"))
+	if !strings.Contains(string(b), "HE:שלום עולם") || last != 1 {
+		t.Fatalf("translated %q progress %d", b, last)
+	}
+	if _, err := os.Stat(filepath.Join(out, "Movie.he.srt")); err != nil {
+		t.Fatal("the original is not in the folder")
+	}
+	// Russian in Windows-1251
+	ru, _ := charmap.Windows1251.NewEncoder().String("Привет, как дела? Хорошо")
+	if got := decodeSubtitle([]byte(ru)); got != "Привет, как дела? Хорошо" {
+		t.Fatalf("cp1251: %q", got)
+	}
+}
+
+func charmapEncode1255(s string) ([]byte, error) {
+	return charmap.Windows1255.NewEncoder().Bytes([]byte(s))
+}
+
+func TestDecodeArabicWestern(t *testing.T) {
+	ar, _ := charmap.Windows1256.NewEncoder().String("مرحبا بكم في الفيلم الجديد")
+	if got := decodeSubtitle([]byte(ar)); got != "مرحبا بكم في الفيلم الجديد" {
+		t.Fatalf("cp1256: %q", got)
+	}
+	fr, _ := charmap.Windows1252.NewEncoder().String("Bonjour, ça va? Très bien, merci beaucoup mon ami.")
+	if got := decodeSubtitle([]byte(fr)); got != "Bonjour, ça va? Très bien, merci beaucoup mon ami." {
+		t.Fatalf("cp1252: %q", got)
 	}
 }

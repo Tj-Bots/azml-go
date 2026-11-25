@@ -1507,11 +1507,21 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		}
 	}
 	if vtSel != nil && !vtSel.empty() {
-		setStep(uTask, "Video Tools (FFmpeg)")
 		var shots int
-		done := trackStep(uTask, taskDir, pathSize(downloadedPath))
-		downloadedPath, shots = runVideoTools(downloadedPath, vtSel)
-		done()
+		if vtSel.Translate != "" { // the real progress: the lines translated
+			setStep(uTask, "Translating Subtitles")
+			total := pathSize(downloadedPath)
+			downloadedPath, shots = runVideoTools(downloadedPath, vtSel, func(done, all int) {
+				if all > 0 {
+					uTask.SetProgress(total*int64(done)/int64(all), total, 0, "-")
+				}
+			})
+		} else {
+			setStep(uTask, "Video Tools (FFmpeg)")
+			done := trackStep(uTask, taskDir, pathSize(downloadedPath))
+			downloadedPath, shots = runVideoTools(downloadedPath, vtSel)
+			done()
+		}
 		if shots > 0 {
 			opt.Screenshots = shots
 		}

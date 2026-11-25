@@ -794,7 +794,8 @@ func vtRename(path, name string) string {
 
 // runVideoTools: merge, remove, trim, extract, convert, owner tool, rename (like the Python bot).
 // Screenshots are sent by the normal upload (it returns how many).
-func runVideoTools(path string, s *VTSelection) (string, int) {
+// progress: the lines translated (Translate Subtitles), nil when not needed.
+func runVideoTools(path string, s *VTSelection, progress ...func(done, total int)) (string, int) {
 	if s == nil || s.empty() {
 		return path, 0
 	}
@@ -848,7 +849,11 @@ func runVideoTools(path string, s *VTSelection) (string, int) {
 		vtAudioSplit(path, s.AudioSplit)
 	}
 	if s.Translate != "" {
-		vtTranslateSubs(path, s.Translate, vtTrOpts{Stream: s.TrStream, Drop: s.TrDrop})
+		o := vtTrOpts{Stream: s.TrStream, Drop: s.TrDrop}
+		if len(progress) > 0 {
+			o.Progress = progress[0]
+		}
+		path = vtTranslateSubs(path, s.Translate, o)
 	}
 	if s.Custom != "" {
 		if _, cmds := vtCustomTools(); cmds[s.Custom] != "" {

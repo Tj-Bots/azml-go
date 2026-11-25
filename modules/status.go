@@ -98,14 +98,14 @@ func (m *StatusModule) HandleStatus(ctx context.Context, peer tg.InputPeerClass,
 	}
 	m.mu.Unlock()
 
-	// no active tasks: a short stats message, deleted with the command after
-	// AUTO_DELETE_MESSAGE_DURATION (like the Python bot)
+	// no active tasks: a short stats message, deleted with the command after 3 seconds
 	if m.taskMgr.Count() == 0 {
 		text, _ := m.taskMgr.BuildStatusMessage(1)
 		sentID, err := m.sender.SendMessage(ctx, peer, text, msg.MessageID, nil)
 		if err == nil && sentID > 0 {
-			autoDeletePair(m.sender, peer, sentID, msg.MessageID)
+			m.sender.AutoDeleteMessage(peer, sentID, 3)
 		}
+		m.sender.AutoDeleteMessage(peer, msg.MessageID, 3)
 		return
 	}
 

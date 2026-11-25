@@ -270,7 +270,7 @@ func (m *TaskManager) BuildStatusMessage(page int) (string, *telegram.ButtonMake
 		sb.WriteString(fmt.Sprintf("┠ <b>Engine:</b> %s\n", telegram.EscapeHTML(engine)))
 		sb.WriteString(fmt.Sprintf("┠ <b>Mode:</b> %s\n", telegram.EscapeHTML(inMode))) // like the Python bot: #Leech | #Aria2
 		sb.WriteString(fmt.Sprintf("┠ <b>User:</b> <code>%s</code>\n", telegram.EscapeHTML(user)))
-		sb.WriteString(fmt.Sprintf("<b>╰</b> /cancel%s_%s</blockquote>\n\n", telegram.EscapeHTML(config.Get().CmdSuffix), telegram.EscapeHTML(t.GID())))
+		sb.WriteString(fmt.Sprintf("<b>╰</b> /cancel%s_%s</blockquote>\n\n", telegram.EscapeHTML(telegram.Suffix()), telegram.EscapeHTML(t.GID())))
 	}
 
 	mem := GetMemoryStats()

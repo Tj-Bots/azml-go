@@ -47,8 +47,25 @@ type Commands struct {
 
 var BotCommands Commands
 
+// activeSuffix: the CMD_SUFFIX the commands were made with at start. A new CMD_SUFFIX in /bs
+// works only after a restart, so the commands shown in messages use this one too (else a bot
+// answering /dump would say "send /dump2").
+var (
+	activeSuffix    string
+	activeSuffixSet bool
+)
+
+// Suffix is the CMD_SUFFIX the bot answers to now.
+func Suffix() string {
+	if activeSuffixSet {
+		return activeSuffix
+	}
+	return config.Get().CmdSuffix
+}
+
 func InitCommands() {
 	suffix := config.Get().CmdSuffix
+	activeSuffix, activeSuffixSet = suffix, true
 
 	BotCommands = Commands{
 		Start: []string{
@@ -377,7 +394,7 @@ func MatchCancelCommand(text string, botUsername ...string) (bool, string) {
 // IsThumbCommand: /t /thumb /setthumb (with this bot's suffix) or /us thumb, e.g. as a photo
 // caption. With CMD_SUFFIX only this bot's command matches (/t2 is not /t).
 func IsThumbCommand(text, botUsername string) bool {
-	suffix := config.Get().CmdSuffix
+	suffix := Suffix()
 	if MatchCommand(text, []string{"t" + suffix, "thumb" + suffix, "setthumb" + suffix}, botUsername) {
 		return true
 	}
@@ -388,10 +405,10 @@ func IsThumbCommand(text, botUsername string) bool {
 
 // IsCancelCommand: /cancel of this bot (with CMD_SUFFIX /cancel2 for the second bot).
 func IsCancelCommand(text, botUsername string) bool {
-	return MatchCommand(strings.TrimSpace(text), []string{"cancel" + config.Get().CmdSuffix}, botUsername)
+	return MatchCommand(strings.TrimSpace(text), []string{"cancel" + Suffix()}, botUsername)
 }
 
 // Cmd: "/name" with this bot's CMD_SUFFIX, for texts that show a command (/log2 clear ...).
 func Cmd(name string) string {
-	return "/" + name + config.Get().CmdSuffix
+	return "/" + name + Suffix()
 }

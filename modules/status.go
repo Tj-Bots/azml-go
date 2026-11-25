@@ -35,6 +35,7 @@ type StatusModule struct {
 	chatPeers      map[int64]tg.InputPeerClass
 	reservingSlots map[int64]time.Time
 	mu             sync.RWMutex
+	updMu          sync.Mutex // UpdateAllMessages one at a time
 	stopTicker     chan struct{}
 }
 
@@ -291,6 +292,13 @@ func (m *StatusModule) HandleCallback(ctx context.Context, peer tg.InputPeerClas
 	// Telegram slow the bot down (flood wait) and then the edits came all at once
 	switch parts[1] {
 	case "ref", "page", "nex", "pre":
+		// an old status (from before a restart, a second one, or after the tasks ended): the
+		// press removes it and the bot forgets it
+		if chatID == 0 || m.taskMgr.Count() == 0 {
+			_ = m.sender.AnswerCallback(ctx, queryID, "This status is old, removed.", false)
+			m.sender.DeleteWithCommand(ctx, peer, msgID)
+			return
+		}
 		if left := statusPressWait(peer, msgID); left > 0 {
 			_ = m.sender.AnswerCallback(ctx, queryID, fmt.Sprintf("Don't spam! Wait %.1fs", left.Seconds()), false)
 			return
@@ -475,6 +483,14 @@ func statusPressWait(peer tg.InputPeerClass, msgID int) time.Duration {
 
 // UpdateAllMessages periodically refreshes active status messages on their current active page
 func (m *StatusModule) UpdateAllMessages(ctx context.Context, force bool) {
+	// one update at a time: two at once each saw "no status in this chat" and both sent one
+	if !m.updMu.TryLock() {
+		if !force {
+			return
+		}
+		m.updMu.Lock()
+	}
+	defer m.updMu.Unlock()
 	// If no tasks are running, check if any status reply was created very recently (within 15s)
 	// Brand new tasks being initiated should never have their status messages wiped!
 	if m.taskMgr.Count() == 0 {

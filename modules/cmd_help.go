@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"azml-go/config"
 	"azml-go/helper/telegram"
 	"azml-go/types"
 
@@ -86,7 +85,7 @@ func helpCmd(kind string) string {
 	if kind == "mirror" || kind == "ytdl" {
 		c = kind
 	}
-	return "/" + c + config.Get().CmdSuffix
+	return "/" + c + telegram.Suffix()
 }
 
 const helpPerPage = 30 // every argument on one page, 3 per row

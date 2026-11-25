@@ -148,7 +148,7 @@ func (m *SettingsModule) HandleSettings(ctx context.Context, peer tg.InputPeerCl
 		}
 
 		// wait 60s for a photo; the prompt is edited with the result (see bot.thumbSaved)
-		suffix := config.Get().CmdSuffix
+		suffix := telegram.Suffix()
 		promptText := "㊂ <b><u>Custom Thumbnail :</u></b>\n\n" +
 			"<blockquote>Send a <b>photo</b> or an image file within <b>60 seconds</b>.\n" +
 			"Also: reply to a photo with <code>/t" + suffix + "</code>, or <code>/t" + suffix + " image-link</code></blockquote>\n" +

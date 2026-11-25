@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"azml-go/config"
 	"context"
 	"fmt"
 	"strings"
@@ -66,7 +65,7 @@ func (m *CancelModule) HandleCancel(ctx context.Context, peer tg.InputPeerClass,
 	}
 
 	if gid == "" {
-		reply := fmt.Sprintf("Reply to an active Command message which was used to start the download or send <code>/cancel%s_GID</code> to cancel it!", config.Get().CmdSuffix)
+		reply := fmt.Sprintf("Reply to an active Command message which was used to start the download or send <code>/cancel%s_GID</code> to cancel it!", telegram.Suffix())
 		m.replyAndVanish(peer, msg, reply)
 		return
 	}

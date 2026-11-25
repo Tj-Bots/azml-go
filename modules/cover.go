@@ -34,7 +34,7 @@ func (m *LeechModule) HandleCover(ctx context.Context, peer tg.InputPeerClass, m
 	fail := func(text string) { m.replyTemp(ctx, peer, msg, text) }
 
 	if !msg.IsReply || msg.ReplyToID <= 0 {
-		c := "/cover" + config.Get().CmdSuffix
+		c := "/cover" + telegram.Suffix()
 		fail("<i>Reply to a video with</i> <code>" + c + "</code> <i>(your thumbnail) or</i> <code>" + c + " Spiderman</code> <i>(a TMDB image of that movie, the name in any language).</i>")
 		return
 	}

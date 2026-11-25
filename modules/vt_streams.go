@@ -255,9 +255,11 @@ func (st *vtState) streamPage(b *telegram.ButtonMaker) (string, bool) {
 
 // vtStreamAction: the actions of those pages (true = handled).
 func (st *vtState) vtStreamAction(action, arg string) bool {
-	keepTr := func() { // one tool at a time, but the translate options stay while it is chosen
+	keepTr := func() { // one tool at a time: the other tools go, the translate options stay
 		if st.sel.Translate == "" {
+			ai, stream, drop := st.sel.TrAI, st.sel.TrStream, st.sel.TrDrop
 			st.sel.clearTool()
+			st.sel.TrAI, st.sel.TrStream, st.sel.TrDrop = ai, stream, drop
 		}
 	}
 	switch action {

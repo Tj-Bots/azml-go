@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,9 +21,94 @@ import (
 
 var GeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta" // a var for the tests
 
-// geminiModels: tried in order (a model the key can't use falls to the next one).
-// Flash first (the best translation); when its free quota is over, Flash-Lite (much more requests a day).
-var geminiModels = []string{"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"}
+// geminiFallback: used only when the list of the key's models can't be read. Google retires
+// models (gemini-2.0-flash is gone), so the models are taken from the API itself.
+var geminiFallback = []string{"gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"}
+
+var (
+	gemModelsMu sync.Mutex
+	gemModels   = map[string]gemModelList{} // per key
+)
+
+type gemModelList struct {
+	names []string
+	at    time.Time
+}
+
+var gemVerRe = regexp.MustCompile(`^gemini-(\d+(?:\.\d+)?)-flash(-lite)?(?:-(preview|exp)[\w.-]*|-\d{3})?$`)
+
+// geminiModelsFor: the Flash models this key can use, newest first, Flash before Flash-Lite of
+// the same version, stable before preview (kept 6 hours).
+func geminiModelsFor(ctx context.Context, key string) []string {
+	gemModelsMu.Lock()
+	if l, ok := gemModels[key]; ok && time.Since(l.at) < 6*time.Hour {
+		gemModelsMu.Unlock()
+		return l.names
+	}
+	gemModelsMu.Unlock()
+	b, err := geminiDo(ctx, key, "GET", "/models?pageSize=1000", nil)
+	if err != nil {
+		return geminiFallback
+	}
+	var r struct {
+		Models []struct {
+			Name    string   `json:"name"`
+			Methods []string `json:"supportedGenerationMethods"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(b, &r) != nil {
+		return geminiFallback
+	}
+	type cand struct {
+		name    string
+		ver     float64
+		lite    bool
+		preview bool
+	}
+	var cs []cand
+	for _, m := range r.Models {
+		name := strings.TrimPrefix(m.Name, "models/")
+		ok := false
+		for _, x := range m.Methods {
+			if x == "generateContent" {
+				ok = true
+			}
+		}
+		g := gemVerRe.FindStringSubmatch(name)
+		if !ok || g == nil {
+			continue
+		}
+		v, _ := strconv.ParseFloat(g[1], 64)
+		cs = append(cs, cand{name, v, g[2] != "", g[3] != ""})
+	}
+	sort.SliceStable(cs, func(i, j int) bool {
+		a, b := cs[i], cs[j]
+		if a.preview != b.preview {
+			return !a.preview
+		}
+		if a.ver != b.ver {
+			return a.ver > b.ver
+		}
+		return !a.lite && b.lite
+	})
+	var names []string
+	for _, c := range cs {
+		names = append(names, c.name)
+		if len(names) == 4 {
+			break
+		}
+	}
+	if len(names) == 0 {
+		names = geminiFallback
+	}
+	gemModelsMu.Lock()
+	gemModels[key] = gemModelList{names, time.Now()}
+	gemModelsMu.Unlock()
+	return names
+}
+
+// gemSuggest: "use models/gemini-3.8-flash" in an error of a retired model.
+var gemSuggest = regexp.MustCompile(`use models/([\w.-]+)`)
 
 var geminiHTTP = &http.Client{Timeout: 3 * time.Minute}
 
@@ -110,13 +199,22 @@ func geminiBatch(ctx context.Context, key string, lines []string, lang string) (
 		},
 	})
 	var lastErr error
-	for _, model := range geminiModels {
+	models := geminiModelsFor(ctx, key)
+	for mi := 0; mi < len(models); mi++ {
+		model := models[mi]
 		for attempt := 0; attempt < 2; attempt++ {
 			b, err := geminiDo(ctx, key, "POST", "/models/"+model+":generateContent", reqBody)
 			if err != nil {
 				lastErr = err
 				low := strings.ToLower(err.Error())
-				if strings.Contains(low, "not found") || strings.Contains(low, "not supported") {
+				if m := gemSuggest.FindStringSubmatch(err.Error()); m != nil && !containsStr(models, m[1]) { // retired: the model Google names
+					models = append(models[:mi+1], append([]string{m[1]}, models[mi+1:]...)...)
+					gemModelsMu.Lock()
+					delete(gemModels, key) // read the list again next time
+					gemModelsMu.Unlock()
+					break
+				}
+				if strings.Contains(low, "not found") || strings.Contains(low, "not supported") || strings.Contains(low, "no longer available") {
 					break // this model: next one
 				}
 				if strings.Contains(low, "per day") || strings.Contains(low, "daily") {
@@ -161,4 +259,13 @@ func geminiBatch(ctx context.Context, key string, lines []string, lang string) (
 		lastErr = fmt.Errorf("Gemini: no answer")
 	}
 	return nil, lastErr
+}
+
+func containsStr(l []string, v string) bool {
+	for _, x := range l {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }

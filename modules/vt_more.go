@@ -139,6 +139,7 @@ type probeStream struct {
 	Index     int               `json:"index"`
 	CodecType string            `json:"codec_type"`
 	CodecName string            `json:"codec_name"`
+	Channels  int               `json:"channels"`
 	Tags      map[string]string `json:"tags"`
 }
 
@@ -190,6 +191,43 @@ func vtDefaultAudio(path, want string) {
 		args = append(args, "-map", "0:s?", "-map", "0:t?", "-map_metadata", "0", "-map_chapters", "0", "-c", "copy", "-disposition:a:0", "default")
 		for i := 1; i < len(audio); i++ {
 			args = append(args, fmt.Sprintf("-disposition:a:%d", i), "0")
+		}
+		vtReplace(video, base+".vt"+ext, args)
+	}
+}
+
+// vtDefaultSubs makes one subtitle track (number or language) the default one; the others are
+// not default any more (nothing is re-encoded).
+func vtDefaultSubs(path, want string) {
+	for _, video := range vtVideos(path) {
+		var subs []probeStream
+		for _, s := range probeStreams(video) {
+			if s.CodecType == "subtitle" {
+				subs = append(subs, s)
+			}
+		}
+		pick := -1
+		if n, err := strconv.Atoi(want); err == nil && n >= 1 && n <= len(subs) {
+			pick = n - 1
+		} else {
+			for i, s := range subs {
+				if l := strings.ToLower(s.Tags["language"]); l != "" && (l == want || strings.HasPrefix(l, want)) {
+					pick = i
+					break
+				}
+			}
+		}
+		if pick < 0 {
+			continue
+		}
+		base, ext := strings.TrimSuffix(video, filepath.Ext(video)), filepath.Ext(video)
+		args := []string{"-i", video, "-map", "0", "-map_metadata", "0", "-map_chapters", "0", "-c", "copy"}
+		for i := range subs {
+			d := "0"
+			if i == pick {
+				d = "default"
+			}
+			args = append(args, fmt.Sprintf("-disposition:s:%d", i), d)
 		}
 		vtReplace(video, base+".vt"+ext, args)
 	}

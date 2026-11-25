@@ -1491,6 +1491,15 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 		done()
 	}
 
+	// Default Audio / Default Subtitle: now the tracks are known, the user picks one
+	if vtSel != nil && vtSel.DefAudio == "ask" {
+		setStep(uTask, "Waiting: choose the audio")
+		vtSel.DefAudio = m.askTrack(ctx, peer, msg, downloadedPath, "audio")
+	}
+	if vtSel != nil && vtSel.DefSubs == "ask" {
+		setStep(uTask, "Waiting: choose the subtitle")
+		vtSel.DefSubs = m.askTrack(ctx, peer, msg, downloadedPath, "subs")
+	}
 	if vtSel != nil && !vtSel.empty() {
 		setStep(uTask, "Video Tools (FFmpeg)")
 		var shots int

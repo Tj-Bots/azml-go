@@ -57,7 +57,8 @@ type VTSelection struct {
 	AudioDelay string // seconds, can be negative
 	SubDelay   string // seconds, can be negative
 	Chapters   string // remove | minutes
-	DefAudio   string // track number or language
+	DefAudio   string // "ask" (the user picks a track after the download), a track number or a language
+	DefSubs    string // the same for the default subtitle
 	AudioSplit string // minutes
 	Translate  string // language code
 }
@@ -163,7 +164,10 @@ func vtSelectedText(s VTSelection) []string {
 		out = append(out, "Chapters → "+name(vtChapter, s.Chapters))
 	}
 	if s.DefAudio != "" {
-		out = append(out, "Default Audio → "+telegram.EscapeHTML(s.DefAudio))
+		out = append(out, "Default Audio → "+vtPickText(s.DefAudio))
+	}
+	if s.DefSubs != "" {
+		out = append(out, "Default Subtitle → "+vtPickText(s.DefSubs))
 	}
 	if s.AudioSplit != "" {
 		out = append(out, "Audio Split → "+name(vtASplit, s.AudioSplit))
@@ -264,10 +268,12 @@ func (st *vtState) menu() (string, *telegram.ButtonMaker) {
 	st.btn(b, "async", "Audio Sync", st.sel.AudioDelay != "", "")
 	st.btn(b, "ssync", "Subtitle Sync", st.sel.SubDelay != "", "")
 	b.Row()
-	st.btn(b, "page", "Chapters", st.sel.Chapters != "", "chapters")
 	st.btn(b, "daudio", "Default Audio", st.sel.DefAudio != "", "")
+	st.btn(b, "dsubs", "Default Subtitle", st.sel.DefSubs != "", "")
 	b.Row()
+	st.btn(b, "page", "Chapters", st.sel.Chapters != "", "chapters")
 	st.btn(b, "page", "Audio Split", st.sel.AudioSplit != "", "asplit")
+	b.Row()
 	st.btn(b, "translate", "Translate Subtitles", st.sel.Translate != "", "")
 	b.Row()
 	names, _ := vtCustomTools()
@@ -342,6 +348,10 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 	if len(parts) < 3 {
 		return
 	}
+	if parts[2] == "pick" { // "vtool <uid> pick <token> <n|skip>": a track after the download
+		m.handleVTPick(ctx, peer, queryID, msgID, parts, fromUID)
+		return
+	}
 	v, ok := vtStates.Load(parts[1])
 	if !ok {
 		_ = m.sender.AnswerCallback(ctx, queryID, "This menu is closed!", true)
@@ -384,7 +394,17 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 	case "rename", "trim":
 		st.wait = action
 		ext.SetPendingSettingSession(st.user, "vt_"+action, st.chat, st.msgID, vtTimeout)
-	case "async", "ssync", "daudio", "translate":
+	case "daudio", "dsubs": // the tracks are known only after the download: the user picks one then
+		was := (action == "daudio" && st.sel.DefAudio != "") || (action == "dsubs" && st.sel.DefSubs != "")
+		st.sel.clearTool()
+		if !was {
+			if action == "daudio" {
+				st.sel.DefAudio = "ask"
+			} else {
+				st.sel.DefSubs = "ask"
+			}
+		}
+	case "async", "ssync", "translate":
 		st.wait = action
 		ext.SetPendingSettingSession(st.user, "vt_"+action, st.chat, st.msgID, vtTimeout)
 	case "merge_all", "strip":
@@ -769,8 +789,11 @@ func runVideoTools(path string, s *VTSelection) (string, int) {
 	if s.Chapters != "" {
 		vtChapters(path, s.Chapters)
 	}
-	if s.DefAudio != "" {
+	if s.DefAudio != "" && s.DefAudio != "ask" {
 		vtDefaultAudio(path, s.DefAudio)
+	}
+	if s.DefSubs != "" && s.DefSubs != "ask" {
+		vtDefaultSubs(path, s.DefSubs)
 	}
 	if s.AudioSplit != "" {
 		vtAudioSplit(path, s.AudioSplit)

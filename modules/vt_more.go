@@ -1,11 +1,9 @@
 package modules
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -256,7 +254,6 @@ func vtAudioSplit(path, minutes string) {
 
 // vtTrOpts: how the subtitles are translated (Video Tools → Translate Subtitles).
 type vtTrOpts struct {
-	Key    string // the user's Gemini key: AI translation; "" = Google Translate
 	Stream string // "" = the first text subtitle, "all", or a subtitle number (1 = the first subtitle track)
 	Drop   bool   // the translation replaces the original track (else it is added next to it)
 }
@@ -275,7 +272,7 @@ func vtTranslateSubs(path, lang string, o vtTrOpts) {
 	if len(srts) > 0 { // subtitle files: a translated copy next to each one
 		for _, f := range srts {
 			base := strings.TrimSuffix(f, filepath.Ext(f))
-			_ = translateSRT(f, base+"."+lang+".srt", lang, o.Key)
+			_ = translateSRT(f, base+"."+lang+".srt", lang)
 		}
 		return
 	}
@@ -317,7 +314,7 @@ func vtTranslateSubs(path, lang string, o vtTrOpts) {
 			if runFFmpeg("-i", video, "-map", fmt.Sprintf("0:s:%d", i), "-c:s", "srt", src) != nil {
 				continue
 			}
-			if translateSRT(src, dst, lang, o.Key) == nil {
+			if translateSRT(src, dst, lang) == nil {
 				translated = append(translated, dst)
 				picked = append(picked, i)
 			}
@@ -373,7 +370,7 @@ func vtTranslateSubs(path, lang string, o vtTrOpts) {
 
 type srtCue struct{ head, text string }
 
-func translateSRT(src, dst, lang, geminiKey string) error {
+func translateSRT(src, dst, lang string) error {
 	raw, err := os.ReadFile(src)
 	if err != nil {
 		return err
@@ -394,26 +391,7 @@ func translateSRT(src, dst, lang, geminiKey string) error {
 	if len(cues) == 0 {
 		return fmt.Errorf("empty subtitle")
 	}
-	// AI (the user's Gemini key): the whole subtitle in batches, with context; on any error the
-	// lines go to Google Translate below
 	out := make([]string, len(cues))
-	if geminiKey != "" {
-		texts := make([]string, len(cues))
-		for i, c := range cues {
-			texts[i] = strings.TrimSpace(c.text)
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
-		res, err := ext.GeminiTranslate(ctx, geminiKey, texts, vtLangName(lang))
-		cancel()
-		if err == nil && len(res) == len(cues) {
-			var sb strings.Builder
-			for i, c := range cues {
-				fmt.Fprintf(&sb, "%s\n%s\n\n", c.head, strings.TrimSpace(res[i]))
-			}
-			return os.WriteFile(dst, []byte(sb.String()), 0644)
-		}
-		log.Printf("[VT] Gemini translation failed (%v), using Google Translate", err)
-	}
 	// batches of cues, one cue per line (its own line breaks kept as " ⏎ ")
 	const sep = " ⏎ "
 	for start := 0; start < len(cues); {
@@ -426,11 +404,11 @@ func translateSRT(src, dst, lang, geminiKey string) error {
 		for _, c := range cues[start:end] {
 			lines = append(lines, strings.ReplaceAll(strings.TrimSpace(c.text), "\n", sep))
 		}
-		res, err := googleTranslate(strings.Join(lines, "\n"), lang)
+		res, err := translateFn(strings.Join(lines, "\n"), lang)
 		got := strings.Split(strings.TrimRight(res, "\n"), "\n")
 		if err != nil || len(got) != end-start {
 			for i := start; i < end; i++ { // line count changed: one cue at a time
-				t, e := googleTranslate(lines[i-start], lang)
+				t, e := translateFn(lines[i-start], lang)
 				if e != nil {
 					t = lines[i-start]
 				}
@@ -452,6 +430,9 @@ func translateSRT(src, dst, lang, geminiKey string) error {
 }
 
 var translateClient = &http.Client{Timeout: 40 * time.Second}
+
+// translateFn: Google Translate (a var for the tests).
+var translateFn = googleTranslate
 
 func googleTranslate(text, lang string) (string, error) {
 	// several Google addresses: when one asks for a captcha (blocked server IP) the next one works

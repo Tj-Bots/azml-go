@@ -86,7 +86,7 @@ func vtLangName(code string) string {
 	return strings.ToUpper(code)
 }
 
-// allTrLangs: the spoken languages Google Translate and Gemini both know, by name (A-Z).
+// allTrLangs: the spoken languages of Google Translate, by name (A-Z).
 func allTrLangs() [][2]string {
 	l := [][2]string{
 		{"af", "Afrikaans"}, {"sq", "Albanian"}, {"am", "Amharic"}, {"ar", "Arabic"}, {"hy", "Armenian"}, {"az", "Azerbaijani"},
@@ -205,9 +205,6 @@ func (st *vtState) streamPage(b *telegram.ButtonMaker) (string, bool) {
 			b.IButtonStyled("Choose Language", fmt.Sprintf("vtool %d trlp 0", st.user), "primary")
 		}
 		b.Row()
-		st.btn(b, "tre", "Google", !st.sel.TrAI, "google")
-		st.btn(b, "tre", "AI (Gemini)", st.sel.TrAI, "ai")
-		b.Row()
 		st.btn(b, "trk", "Keep Original Subtitle", !st.sel.TrDrop, "")
 		b.Row()
 		subs := 0
@@ -236,17 +233,12 @@ func (st *vtState) streamPage(b *telegram.ButtonMaker) (string, bool) {
 		if st.sel.Translate != "" {
 			lang = vtLangName(st.sel.Translate)
 		}
-		engine := "Google Translate"
-		if st.sel.TrAI {
-			engine = "AI (your Gemini key)"
-		}
 		keep := "Yes (the translation is added)"
 		if st.sel.TrDrop {
 			keep = "No (the translation replaces it)"
 		}
 		return "㊂ <b><u>Video Tools : Translate Subtitles</u></b>\n\n" +
 			"<blockquote><b>╭</b> <b>To :</b> " + lang + "\n" +
-			"┠ <b>Engine :</b> " + engine + "\n" +
 			"┠ <b>Subtitle :</b> " + which + "\n" +
 			"<b>╰</b> <b>Keep Original :</b> " + keep + "</blockquote>", true
 	}
@@ -257,9 +249,9 @@ func (st *vtState) streamPage(b *telegram.ButtonMaker) (string, bool) {
 func (st *vtState) vtStreamAction(action, arg string) bool {
 	keepTr := func() { // one tool at a time: the other tools go, the translate options stay
 		if st.sel.Translate == "" {
-			ai, stream, drop := st.sel.TrAI, st.sel.TrStream, st.sel.TrDrop
+			stream, drop := st.sel.TrStream, st.sel.TrDrop
 			st.sel.clearTool()
-			st.sel.TrAI, st.sel.TrStream, st.sel.TrDrop = ai, stream, drop
+			st.sel.TrStream, st.sel.TrDrop = stream, drop
 		}
 	}
 	switch action {
@@ -275,9 +267,6 @@ func (st *vtState) vtStreamAction(action, arg string) bool {
 	case "trlo":
 		st.wait = "translate"
 		ext.SetPendingSettingSession(st.user, "vt_translate", st.chat, st.msgID, vtTimeout)
-	case "tre":
-		keepTr()
-		st.sel.TrAI = arg == "ai"
 	case "trk":
 		keepTr()
 		st.sel.TrDrop = !st.sel.TrDrop

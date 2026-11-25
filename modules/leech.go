@@ -1505,9 +1505,6 @@ func (m *LeechModule) processLeechPipeline(peer tg.InputPeerClass, msg *types.Me
 			setStep(uTask, "Waiting: choose the subtitle")
 			vtSel.TrStream = m.askTrack(ctx, peer, msg, downloadedPath, "translate")
 		}
-		if vtSel.TrAI && user != nil {
-			vtSel.TrKey = user.GeminiKey // his own key; without one Google Translate is used
-		}
 	}
 	if vtSel != nil && !vtSel.empty() {
 		setStep(uTask, "Video Tools (FFmpeg)")

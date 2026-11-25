@@ -62,10 +62,8 @@ type VTSelection struct {
 	DefSubs    string // the same for the default subtitle
 	AudioSplit string // minutes
 	Translate  string // language code
-	TrAI       bool   // translate with the user's Gemini key (else Google Translate)
 	TrStream   string // "" first text subtitle, "all", a subtitle number, or "ask" (after the download)
 	TrDrop     bool   // the translation replaces the original track
-	TrKey      string // the user's Gemini key (set when the task runs, never shown)
 }
 
 func (s *VTSelection) empty() bool {
@@ -183,9 +181,6 @@ func vtSelectedText(s VTSelection) []string {
 	}
 	if s.Translate != "" {
 		t := "Translate → " + vtLangName(s.Translate)
-		if s.TrAI {
-			t += " · AI"
-		}
 		if s.TrStream == "all" {
 			t += " · all subtitles"
 		} else if s.TrStream != "" && s.TrStream != "ask" {
@@ -403,12 +398,6 @@ func (m *LeechModule) HandleVTCallback(ctx context.Context, peer tg.InputPeerCla
 	action, arg := parts[2], ""
 	if len(parts) > 3 {
 		arg = parts[3]
-	}
-	if action == "tre" && arg == "ai" { // AI needs the user's own Gemini key
-		if u := m.userMap.Get(fromUID); u == nil || u.GeminiKey == "" {
-			_ = m.sender.AnswerCallback(ctx, queryID, "Add your free Gemini key first: /us → Universal → Gemini Key", true)
-			return
-		}
 	}
 	_ = m.sender.AnswerCallback(ctx, queryID, "", false)
 	st.mu.Lock()
@@ -859,11 +848,7 @@ func runVideoTools(path string, s *VTSelection) (string, int) {
 		vtAudioSplit(path, s.AudioSplit)
 	}
 	if s.Translate != "" {
-		key := ""
-		if s.TrAI {
-			key = s.TrKey
-		}
-		vtTranslateSubs(path, s.Translate, vtTrOpts{Key: key, Stream: s.TrStream, Drop: s.TrDrop})
+		vtTranslateSubs(path, s.Translate, vtTrOpts{Stream: s.TrStream, Drop: s.TrDrop})
 	}
 	if s.Custom != "" {
 		if _, cmds := vtCustomTools(); cmds[s.Custom] != "" {

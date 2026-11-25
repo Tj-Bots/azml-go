@@ -1,50 +1,31 @@
 package modules
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"azml-go/helper/ext"
 )
 
-// a fake Gemini: every line comes back as "HE:<line>"
-func fakeGemini(t *testing.T) func() {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			Contents []struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"contents"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&body)
-		p := body.Contents[0].Parts[0].Text
-		var lines []string
-		_ = json.Unmarshal([]byte(p[strings.LastIndex(p, "\n\n")+2:]), &lines)
+// a fake Google Translate: every line comes back as "HE:<line>"
+func fakeTranslate() func() {
+	old := translateFn
+	translateFn = func(text, lang string) (string, error) {
+		lines := strings.Split(text, "\n")
 		for i := range lines {
 			lines[i] = "HE:" + lines[i]
 		}
-		out, _ := json.Marshal(lines)
-		res, _ := json.Marshal(map[string]interface{}{"candidates": []interface{}{map[string]interface{}{"content": map[string]interface{}{"parts": []interface{}{map[string]string{"text": string(out)}}}}}})
-		fmt.Fprint(w, string(res))
-	}))
-	old := ext.GeminiBaseURL
-	ext.GeminiBaseURL = srv.URL
-	return func() { ext.GeminiBaseURL = old; srv.Close() }
+		return strings.Join(lines, "\n"), nil
+	}
+	return func() { translateFn = old }
 }
 
-func TestTranslateSubsGemini(t *testing.T) {
+func TestTranslateSubs(t *testing.T) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		t.Skip("no ffmpeg")
 	}
-	defer fakeGemini(t)()
+	defer fakeTranslate()()
 	d, srcDir := t.TempDir(), t.TempDir()
 	mk := func(name, text string) string {
 		p := filepath.Join(srcDir, name)
@@ -58,7 +39,7 @@ func TestTranslateSubsGemini(t *testing.T) {
 		"-metadata:s:s:0", "language=eng", "-metadata:s:s:1", "language=rus", v).CombinedOutput(); err != nil {
 		t.Fatalf("%v %s", err, out)
 	}
-	vtTranslateSubs(d, "he", vtTrOpts{Key: "KEY", Stream: "2", Drop: true})
+	vtTranslateSubs(d, "he", vtTrOpts{Stream: "2", Drop: true})
 	var subs []string
 	for _, s := range probeStreams(v) {
 		if s.CodecType == "subtitle" {
